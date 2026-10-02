@@ -6,3 +6,5 @@ import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Discharging
 import FourColorTheorem.Math.MainTheorem
 import FourColorTheorem.Math.Checker
+
+import FourColorTheorem.Math.Parser

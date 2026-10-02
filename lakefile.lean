@@ -7,6 +7,8 @@ package "FourColorTheorem" where
 lean_lib «FourColorTheorem» where
   -- add library configuration options here
 
+lean_lib «FiveColorTheorem» where
+
 @[default_target]
 lean_exe "fourcolortheorem" where
   root := `Main
