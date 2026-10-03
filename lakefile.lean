@@ -12,3 +12,7 @@ lean_lib «FiveColorTheorem» where
 @[default_target]
 lean_exe "fourcolortheorem" where
   root := `Main
+  moreLeancArgs := #["-O3", "-march=native", "-mtune=native"]
+
+lean_exe "dischargetest" where
+  root := `DischargeMain

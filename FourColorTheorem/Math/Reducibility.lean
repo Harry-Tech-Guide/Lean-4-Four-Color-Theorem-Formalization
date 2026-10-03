@@ -2,51 +2,49 @@ import FourColorTheorem.Math.Kempe
 
 namespace Math
 
-/-- A Configuration represents a specific patch of regions.
-For computational reducibility checking, we define it by its boundary size,
-its interior size, and an adjacency matrix for all nodes.
-Nodes `0` to `ringSize - 1` are on the boundary.
-Nodes `ringSize` to `ringSize + interiorSize - 1` are in the interior. -/
 structure Configuration where
   ringSize : Nat
   interiorSize : Nat
   adj : Nat → Nat → Bool
 
-/-- The total number of nodes in the configuration. -/
 def Configuration.totalNodes (c : Configuration) := c.ringSize + c.interiorSize
 
-/-- A valid full coloring of the configuration. -/
+instance : Inhabited Configuration where
+  default := { ringSize := 0, interiorSize := 0, adj := fun _ _ => false }
+
 def IsValidConfigColoring (c : Configuration) (color : Nat → Color) : Prop :=
   ∀ i j, i < c.totalNodes → j < c.totalNodes → c.adj i j = true → color i ≠ color j
 
-/-- A boundary coloring is just a coloring of the nodes `0` to `ringSize - 1`. -/
-def BoundaryColoring (c : Configuration) := Nat → Color
+def BoundaryColoring (_ : Configuration) := Nat → Color
 
-/-- A boundary coloring is valid if adjacent nodes on the boundary have different colors. -/
 def IsValidBoundaryColoring (c : Configuration) (b : BoundaryColoring c) : Prop :=
   ∀ i j, i < c.ringSize → j < c.ringSize → c.adj i j = true → b i ≠ b j
 
-/-- A boundary coloring extends to the interior if there exists a full coloring
-that matches the boundary coloring on the boundary nodes. -/
 def extendsToInterior (c : Configuration) (b : BoundaryColoring c) : Prop :=
   ∃ (full : Nat → Color),
     (∀ i, i < c.ringSize → full i = b i) ∧
     IsValidConfigColoring c full
 
-/-- D-Reducibility:
-A configuration is D-reducible if EVERY valid boundary coloring can be directly
-extended to color the interior. -/
-def IsDReducible (c : Configuration) : Prop :=
-  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToInterior c b
-
-/-- C-Reducibility (Placeholder) -/
+/-- 
+Kempe Equivalence of Boundary Colorings:
+Two boundary colorings `b1` and `b2` are Kempe equivalent if there exists a sequence of
+valid Kempe chain swaps on the boundary that transforms `b1` into `b2`.
+In RSST terminology, this is governed by "Balanced Signed Matchings".
+For our theoretical formalization, we define this as a reachability relation.
+-/
 axiom kempeEquivalent (c : Configuration) (b1 b2 : BoundaryColoring c) : Prop
 
-def IsCReducible (c : Configuration) : Prop :=
-  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → ¬ extendsToInterior c b →
-    ∃ (b' : BoundaryColoring c), IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b'
-
-def IsReducible (c : Configuration) : Prop :=
-  IsDReducible c ∨ IsCReducible c
+/-- 
+True D-Reducibility (RSST Definition):
+A configuration is D-reducible if the set of boundary colorings that do NOT extend
+to the interior can be completely eliminated via Kempe equivalence.
+Specifically, for any non-extending boundary coloring, there must be a Kempe-equivalent
+boundary coloring that DOES extend.
+(Because if it extends, we can color the interior, and if we can color the interior,
+we can just apply the Kempe swap on the whole graph to get the original boundary coloring!)
+-/
+def IsDReducible (c : Configuration) : Prop :=
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
+    (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b')
 
 end Math
