@@ -380,7 +380,12 @@ partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp :
 partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
   match t with
   | ProofTree.reduce =>
-    isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
+      let res := isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
+      if not res then
+        dbg_trace s!"isReducible returned false!"
+        res
+      else
+        res
   | ProofTree.cond v m trueBranch falseBranch => Id.run do
     let mut AA_low_true := A_low
     let mut AA_upp_true := A_upp
