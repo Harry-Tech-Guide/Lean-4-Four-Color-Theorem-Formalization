@@ -41,18 +41,15 @@ namespace FastReducer
 
 /-- A configuration from `U_633`, parsed together with its RSST metadata. -/
 structure RConf where
-  /-- Total number of vertices. Ring vertices are `0 … r-1` and form a cycle. -/
   n : Nat
-  /-- Ring size. -/
   r : Nat
-  /-- RSST's recorded number of extendable ring colourings, up to colour permutation. -/
   X : Nat
-  /-- Size of the RSST contract. `0` means RSST proved the configuration D-reducible. -/
   contract : Nat
-  /-- For each vertex `v`, the neighbours `u < v` (used by the backtracking colourer). -/
+  contractEdges : Array (Nat × Nat)
   earlier : Array (Array Nat)
+  adj : Array (Array Nat)
 
-instance : Inhabited RConf := ⟨{ n := 0, r := 0, X := 0, contract := 0, earlier := #[] }⟩
+instance : Inhabited RConf := ⟨{ n := 0, r := 0, X := 0, contract := 0, contractEdges := #[], earlier := #[], adj := #[] }⟩
 
 /-- Split on whitespace and parse every natural-number token. -/
 def parseNums (s : String) : Array Nat :=
@@ -70,6 +67,9 @@ def parseRConf (s : String) : RConf := Id.run do
   let r := nums[1]!
   let X := nums[2]!
   let a := nums[4]!
+  let mut contractEdges : Array (Nat × Nat) := #[]
+  for i in [0:a] do
+    contractEdges := contractEdges.push (nums[5 + 2*i]! - 1, nums[5 + 2*i + 1]! - 1)
   let mut idx := 5 + 2 * a
   let mut adj : Array (Array Nat) := mkArray n #[]
   for _ in [0:n] do
@@ -80,12 +80,11 @@ def parseRConf (s : String) : RConf := Id.run do
       let u := nums[idx + k]! - 1
       if u < n && v < n then
         adj := adj.modify v (·.push u)
-        adj := adj.modify u (·.push v)
     idx := idx + d
   let mut earlier : Array (Array Nat) := #[]
   for v in [0:n] do
     earlier := earlier.push (adj[v]!.filter (· < v))
-  return { n := n, r := r, X := X, contract := a, earlier := earlier }
+  return { n := n, r := r, X := X, contract := a, contractEdges := contractEdges, earlier := earlier, adj := adj }
 
 /-- All 633 configurations, parsed with the correct header offset. -/
 def loadAll (_ : Unit) : Array RConf :=
@@ -255,15 +254,66 @@ def buildMData (r : Nat) (pow3 : Array Nat) : Array MData × Nat := Id.run do
     b := b + (if d == 0 then 2 else if d == 2 then 0 else 1) * p
   return (a, b)
 
+
+partial def checkCReducible (earlier : Array (Array Nat)) (alias : Array Nat) (n r v : Nat) (col : Array Nat) (pow3 : Array Nat) (live : ByteArray) : Bool :=
+  if v >= n then Id.run do
+    let mut idx := 0
+    for i in [0:r] do
+      let nxt := if i + 1 == r then 0 else i + 1
+      let x := col[i]! ^^^ col[nxt]!
+      if x == 0 then return true
+      let d_i := x - 1
+      idx := idx + d_i * pow3[i]!
+    if live.get! idx == 1 then
+      return false
+    return true
+  else Id.run do
+    let root_v := alias[v]!
+    if root_v < v then
+      let c := col[root_v]!
+      for u in earlier[v]! do
+        if alias[u]! != root_v && col[u]! == c then
+          return true
+      let col := col.set! v c
+      return checkCReducible earlier alias n r (v + 1) col pow3 live
+    else
+      let mut used : Nat := 0
+      for u in earlier[v]! do
+        if alias[u]! != root_v then
+          used := used ||| (1 <<< col[u]!)
+      let mut col := col
+      for c in [0:4] do
+        if (used >>> c) &&& 1 == 0 then
+          col := col.set! v c
+          if not (checkCReducible earlier alias n r (v + 1) col pow3 live) then
+            return false
+      return true
+
+def runCReduction (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
+  let mut alias := mkArray c.n 0
+  for i in [0:c.n] do alias := alias.set! i i
+  for _ in [0:c.n] do
+    for (u, v) in c.contractEdges do
+      let root_u := alias[u]!
+      let root_v := alias[v]!
+      let mn := min root_u root_v
+      alias := alias.set! u mn
+      alias := alias.set! v mn
+      alias := alias.set! root_u mn
+      alias := alias.set! root_v mn
+  
+  let col : Array Nat := mkArray c.n 0
+  return checkCReducible c.earlier alias c.n c.r 1 col pow3 live
+
 structure Result where
-  /-- Number of ring colourings (traces with xor 0). -/
   ringColourings : Nat
   nonExtendable : Nat
   finalLive : Nat
   iterations : Nat
   dReducible : Bool
-  /-- Extendable count matches RSST's recorded `X`. -/
   xMatches : Bool
+  cReducible : Bool
+
 
 def powers3 (k : Nat) : Array Nat := Id.run do
   let mut a := #[]
@@ -315,9 +365,10 @@ def check (c : RConf) (md : Array MData × Nat) (pow3 : Array Nat) : Result := I
           live := live.set! idx 0
     changed := cnt != nlive
     nlive := cnt
+  let cRed := if nlive > 0 && c.contract > 0 then runCReduction c pow3 live else false
   return { ringColourings := ringCols, nonExtendable := nonext, finalLive := nlive,
            iterations := iters, dReducible := nlive == 0,
-           xMatches := extOrbits == c.X }
+           xMatches := extOrbits == c.X, cReducible := cRed }
 
 end FastReducer
 end Math

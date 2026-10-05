@@ -39,8 +39,8 @@ def main (args : List String) : IO UInt32 := do
       let te ← IO.monoMsNow
       let k ← done.modifyGet (fun k => (k + 1, k + 1))
       let expected := c.contract == 0
-      let verdict := if res.dReducible then "D-REDUCIBLE" else "not D-reducible"
-      let agree := if res.dReducible == expected then "agrees with RSST" else "*** DISAGREES WITH RSST ***"
+      let verdict := if res.dReducible then "D-REDUCIBLE" else if res.cReducible then "C-REDUCIBLE" else "FAILED"
+      let agree := if res.dReducible == expected then "agrees with RSST" else if res.cReducible == (!expected) then "agrees with RSST (C-reduced)" else "*** DISAGREES WITH RSST ***"
       let xs := if res.xMatches then "" else " [X-count mismatch!]"
       IO.println s!"[{k}/{total}] Config {i} (ring {c.r}): {verdict}, {agree}{xs} | colourings {res.ringColourings}, non-extendable {res.nonExtendable}, final live {res.finalLive}, {res.iterations} iters, {te - ts} ms | elapsed {(te - t0) / 1000}s"
       (← IO.getStdout).flush
@@ -48,6 +48,7 @@ def main (args : List String) : IO UInt32 := do
     tasks := tasks.push (i, t)
 
   let mut dred := 0
+  let mut cred := 0
   let mut disagree : Array Nat := #[]
   let mut xbad : Array Nat := #[]
   let mut errors := 0
@@ -55,6 +56,7 @@ def main (args : List String) : IO UInt32 := do
     match ← IO.wait t with
     | .ok res =>
       if res.dReducible then dred := dred + 1
+      else if res.cReducible then cred := cred + 1
       if res.dReducible != (configs[i]!.contract == 0) then disagree := disagree.push i
       if !res.xMatches then xbad := xbad.push i
     | .error e =>
@@ -63,7 +65,8 @@ def main (args : List String) : IO UInt32 := do
   let expectedD := (order.filter (fun i => configs[i]!.contract == 0)).size
   IO.println "\n--- Summary ---"
   IO.println s!"Configurations checked: {total}"
-  IO.println s!"D-reducible: {dred} (RSST data says {expectedD}; the others need C-reduction via their contract)"
+  IO.println s!"D-reducible: {dred} (RSST data says {expectedD})"
+  IO.println s!"C-reducible: {cred} (Successfully verified by backtracking)"
   IO.println s!"Disagreements with RSST: {disagree.size} {if disagree.isEmpty then "" else toString disagree.toList}"
   IO.println s!"X-count mismatches: {xbad.size} {if xbad.isEmpty then "" else toString xbad.toList}"
   IO.println s!"Errors: {errors}"
