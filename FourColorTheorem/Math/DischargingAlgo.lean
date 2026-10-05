@@ -210,6 +210,7 @@ structure IsoState where
   c : Configuration
   adjmat : Array (Array Int)
   adjBool : Array UInt64
+  low : Array Nat
   upp : Array Nat
   mapping : Array Nat
   used : Array Bool
@@ -261,7 +262,10 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       
       let is_interior := k >= st.c.ringSize
       let exp_deg := st.degrees[k]!
-      if is_interior && st.upp[w]! != exp_deg then continue
+      if is_interior then
+        if st.upp[w]! != exp_deg then continue
+      else
+        if exp_deg > st.upp[w]! || exp_deg < st.low[w]! then continue
       
       let new_mapping := st.mapping.set! k w
       let new_used := st.used.set! w true
@@ -302,7 +306,7 @@ partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat
   if not found then return false
 
   let mut all_reduced := true
-  for i in [matched_c.ringSize : matched_c.ringSize + matched_c.interiorSize] do
+  for i in [0 : matched_c.ringSize] do
     let v := mapping[i]!
     if A_low[v]! < A_upp[v]! then
       let mut A_upp_new := A_upp
