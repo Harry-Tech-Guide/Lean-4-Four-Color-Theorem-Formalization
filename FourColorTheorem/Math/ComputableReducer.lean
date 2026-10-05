@@ -45,26 +45,37 @@ def generateRingColorings (ringSize : Nat) : Array ColorList :=
 to a full valid coloring of the configuration's interior nodes. -/
 def extendsToInterior (c : Configuration) (boundary : ColorList) : Bool :=
   let total := c.totalNodes
-  let rec solve (idx : Nat) (currentColors : Array Nat) : Bool :=
-    if h : idx < total then Id.run do
-      let mut canExtend := false
-      for color in [0, 1, 2, 3] do
-        let mut valid := true
-        for neighbor in [0:idx] do
-          if c.adj idx neighbor && currentColors[neighbor]! == color then
-            valid := false
-            break
-        if valid then
-          if solve (idx + 1) (currentColors.push color) then
-            canExtend := true
-            break
-      return canExtend
+  let rec solve (idx : Nat) (colors : Array Nat) : Bool × Array Nat :=
+    if h : idx < total then
+      Id.run do
+        let mut currentColors := colors
+        let mut found := false
+        for color in [0, 1, 2, 3] do
+          let mut valid := true
+          for neighbor in [0:idx] do
+            if c.adj idx neighbor && currentColors[neighbor]! == color then
+              valid := false
+              break
+          if valid then
+            currentColors := currentColors.set! idx color
+            let (res, nextColors) := solve (idx + 1) currentColors
+            currentColors := nextColors
+            if res then
+              found := true
+              break
+        return (found, currentColors)
     else 
-      true
+      (true, colors)
   termination_by total - idx
   
-  -- The boundary is already colored, so we start with it.
-  solve c.ringSize boundary
+  -- The boundary is already colored, pad it to use set! in-place
+  let padded := Id.run do
+    let mut p := boundary
+    for _ in [boundary.size : total] do
+      p := p.push 0
+    return p
+    
+  (solve c.ringSize padded).1
 
 /-- Get all boundary colorings that DO NOT extend. These are the "live" colorings
 that we must reduce via Kempe swaps. -/
@@ -101,8 +112,7 @@ An edge coloring `ecol` theta-fits a matching `m` for color `theta` (1, 2, or 3)
 2. For every matched pair, their colors are equal iff the pair's sign is +1 (true).
 3. Every edge that is NOT matched MUST have color `theta`.
 -/
-def checkThetaFit (ringSize : Nat) (col : ColorList) (theta : Nat) (m : SignedMatching) : Bool :=
-  let ecol := vertexToEdgeColoring ringSize col
+def checkThetaFit (ringSize : Nat) (ecol : Array Nat) (theta : Nat) (m : SignedMatching) : Bool :=
   Id.run do
     let mut matchedEdges := mkArray ringSize false
     let mut fits := true
@@ -211,47 +221,72 @@ partial def generateBalancedSignedMatchings (ringSize : Nat) : Array SignedMatch
 /-- The computable implementation of `computeMaxConsistentSubset`.
 It computes the greatest fixed point of the reduction operator over the live colorings.
 Returns the final array of live colorings. If empty, the configuration is D-reducible! -/
+def getNonExtendingMask (c : Configuration) (allColorings : Array ColorList) : Array Bool :=
+  allColorings.map (fun b => not (extendsToInterior c b))
+
+/-- The computable implementation of `computeMaxConsistentSubset`.
+It computes the greatest fixed point of the reduction operator over the live colorings.
+Returns the final array of live colorings. If empty, the configuration is D-reducible! -/
 def computeMaxConsistentSubset (c : Configuration) : Array ColorList :=
   let ringSize := c.ringSize
-  let initialLive := getNonExtendingColorings c
   let matchings := generateBalancedSignedMatchings ringSize
+  let allRingColorings := generateRingColorings ringSize
+  let initialLiveMask := getNonExtendingMask c allRingColorings
+  let allRingWithEdges := allRingColorings.mapIdx (fun i col => (i.val, col, vertexToEdgeColoring ringSize col))
   
   set_option linter.unusedVariables false in
-  let rec fixpoint (live : Array ColorList) : Array ColorList :=
+  let rec fixpoint (liveMask : Array Bool) (liveCount : Nat) : Array Bool × Nat :=
     let M_live := matchings.filter (fun m => Id.run do
       let mut isAlive := true
-      for col in (generateRingColorings ringSize) do
-        for x in [0, 1, 2, 3] do
-          if checkThetaFit ringSize col x m then
-            if not (live.contains col) then
+      for (i, col, ecol) in allRingWithEdges do
+        let mut fitsAny := false
+        for x in [1, 2, 3] do
+          if checkThetaFit ringSize ecol x m then
+            fitsAny := true
+            if not liveMask[i]! then
               isAlive := false
-              break
+            break
         if not isAlive then break
       return isAlive
     )
     
-    let nextLive := live.filter (fun col => Id.run do
-      let mut survives := true
-      for x in [0, 1, 2, 3] do
-        let mut fitsAny := false
-        for m in M_live do
-          if checkThetaFit ringSize col x m then
-            fitsAny := true
-            break
-        if not fitsAny then
-          survives := false
-          break
-      return survives
-    )
-    
-    if h : nextLive.size < live.size then 
-      fixpoint nextLive
+    let (nextLiveMask, nextLiveCount) := Id.run do
+      let mut mask := liveMask
+      let mut count := 0
+      for (i, col, ecol) in allRingWithEdges do
+        if liveMask[i]! then
+          let mut survives := true
+          for x in [1, 2, 3] do
+            let mut fitsAny := false
+            for m in M_live do
+              if checkThetaFit ringSize ecol x m then
+                fitsAny := true
+                break
+            if not fitsAny then
+              survives := false
+              break
+          if survives then
+            count := count + 1
+          else
+            mask := mask.set! i false
+      return (mask, count)
+          
+    if h : nextLiveCount < liveCount then 
+      fixpoint nextLiveMask nextLiveCount
     else 
-      live
-  termination_by live.size
+      (liveMask, liveCount)
+  termination_by liveCount
   decreasing_by exact h
   
-  fixpoint initialLive
+  let initialLiveCount := initialLiveMask.foldl (fun acc b => if b then acc + 1 else acc) 0
+  let (finalMask, _) := fixpoint initialLiveMask initialLiveCount
+  
+  Id.run do
+    let mut finalLive := #[]
+    for i in [0:allRingColorings.size] do
+      if finalMask[i]! then
+        finalLive := finalLive.push allRingColorings[i]!
+    return finalLive
 
 /-- The final computable D-reducibility check! -/
 def isComputablyDReducible (c : Configuration) : Bool :=

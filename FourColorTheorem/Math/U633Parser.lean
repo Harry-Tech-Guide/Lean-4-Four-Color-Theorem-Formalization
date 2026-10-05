@@ -7,7 +7,7 @@ def splitString (s : String) (c : Char) : List String :=
   s.split (fun x => x == c)
 
 def parseNatList (s : String) : List Nat :=
-  (splitString s ' ').filterMap (fun x => 
+  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x => 
     if x == "" then none else x.toNat?)
 
 def mkAdjFromFlat (n : Nat) (data : Array Bool) : Nat -> Nat -> Bool :=
@@ -21,10 +21,9 @@ def parseConfig (s : String) : Configuration :=
     
     Id.run do
       let mut flat := mkArray (numVertices * numVertices) false
-      let mut idx := 2
-      -- Skip metadata until we see the first vertex '1'
-      while idx < nums.length && nums[idx]! != 1 do
-        idx := idx + 1
+      -- Header: n r X Y a, followed by the 2·a contract vertices; adjacency starts after that.
+      let a := nums.getD 4 0
+      let mut idx := 5 + 2 * a
         
       for _ in [0:numVertices] do
         if idx < nums.length then
@@ -52,7 +51,7 @@ def parseConfig (s : String) : Configuration :=
     { ringSize := 0, interiorSize := 0, adj := fun _ _ => false }
 
 /-- Parse the entire U633 dataset into an array of Configurations at runtime. -/
-def parseAllConfigs : Array Configuration :=
+def parseAllConfigs (_ : Unit) : Array Configuration :=
   Id.run do
     let blocks := splitString u633_data '|'
     let mut arr := #[]
@@ -61,7 +60,7 @@ def parseAllConfigs : Array Configuration :=
         arr := arr.push (parseConfig b)
     return arr
 
-/-- The unavoidable set of configurations, directly computable in the Kernel via string parsing. -/
-def theUnavoidableSet : List Configuration := parseAllConfigs.toList
+
+
 
 end Math

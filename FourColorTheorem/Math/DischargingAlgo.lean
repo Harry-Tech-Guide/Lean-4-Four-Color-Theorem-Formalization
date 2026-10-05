@@ -209,10 +209,21 @@ def getDegree (c : Configuration) (v : Nat) : Nat :=
 structure IsoState where
   c : Configuration
   adjmat : Array (Array Int)
+  adjBool : Array UInt64
   upp : Array Nat
   mapping : Array Nat
   used : Array Bool
   degrees : Array Nat
+
+def getAdjBool (adjmat : Array (Array Int)) : Array UInt64 := Id.run do
+  let mut arr : Array UInt64 := mkArray CARTVERT (0 : UInt64)
+  for u in [0 : CARTVERT] do
+    let mut bits : UInt64 := 0
+    for w in [0 : CARTVERT] do
+      if adjmat[u]![w]! != -1 || adjmat[w]![u]! != -1 then
+        bits := bits ||| ((1 : UInt64) <<< w.toUInt64)
+    arr := arr.set! u bits
+  return arr
 
 def isWellPositioned (deg : Nat) (used : Array Bool) : Bool := Id.run do
   let mut ok := true
@@ -230,20 +241,27 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
   if k == totalNodes then
     if isWellPositioned st.upp[0]! st.used then some st.mapping else none
   else Id.run do
-    let prev_neighbors := (List.range k).filter (fun i => st.c.adj i k)
-    let candidates := 
-      if prev_neighbors.isEmpty then List.range CARTVERT
-      else getNeighbors st.adjmat st.mapping[prev_neighbors.head!]!
-    
+    let mut prev_neighbors : Array Nat := #[]
+    for i in [0:k] do
+      if st.c.adj i k then
+        prev_neighbors := prev_neighbors.push i
+        
+    let mut candBits : UInt64 := 0xFFFFFFFFFFFFFFFF
+    if prev_neighbors.isEmpty then
+      candBits := ((1 : UInt64) <<< CARTVERT.toUInt64) - 1
+    else
+      for i in prev_neighbors do
+        candBits := candBits &&& st.adjBool[st.mapping[i]!]!
+        
     let mut res := none
-    for w in candidates do
+    for w in [0 : CARTVERT] do
+      if (candBits &&& ((1 : UInt64) <<< w.toUInt64)) == 0 then continue
+      if w >= st.upp.size then continue
       if st.used[w]! then continue
+      
       let is_interior := k >= st.c.ringSize
       let exp_deg := st.degrees[k]!
       if is_interior && st.upp[w]! != exp_deg then continue
-      
-      let edges_ok := prev_neighbors.all fun i => isAdj st.adjmat st.mapping[i]! w
-      if not edges_ok then continue
       
       let new_mapping := st.mapping.set! k w
       let new_used := st.used.set! w true
@@ -254,18 +272,20 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       | none => continue
     res
 
-partial def verifyReduce (A_low A_upp : Array Nat) : Bool := Id.run do
+partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat) : Bool := Id.run do
   let adjmat := getAdjMat A_upp
+  let adjBool := getAdjBool adjmat
   let mut found := false
   let mut mapping : Array Nat := #[]
   let mut matched_c : Configuration := default
   
-  for c in theUnavoidableSet do
+  for c in configs do
     let totalNodes := c.ringSize + c.interiorSize
     let degrees := mkArray totalNodes 0 |>.mapIdx fun i _ => getDegree c i
     let st : IsoState := {
       c := c,
       adjmat := adjmat,
+      adjBool := adjBool,
       upp := A_upp,
       mapping := mkArray totalNodes CARTVERT,
       used := mkArray CARTVERT false,
@@ -287,16 +307,16 @@ partial def verifyReduce (A_low A_upp : Array Nat) : Bool := Id.run do
     if A_low[v]! < A_upp[v]! then
       let mut A_upp_new := A_upp
       A_upp_new := A_upp_new.set! v (A_upp[v]! - 1)
-      if not (verifyReduce A_low A_upp_new) then
+      if not (verifyReduce configs A_low A_upp_new) then
         all_reduced := false
         break
         
   return all_reduced
 
-def isReducible (A_low A_upp : Array Nat) : Bool :=
-  verifyReduce A_low A_upp
+def isReducible (configs : List Configuration) (A_low A_upp : Array Nat) : Bool :=
+  verifyReduce configs A_low A_upp
 
-partial def checkBound (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) : Bool := Id.run do
+partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) : Bool := Id.run do
   let mut forcedch := 0
   let mut allowedch := 0
   let mut s_curr := s
@@ -318,7 +338,7 @@ partial def checkBound (deg : Nat) (A_low A_upp : Array Nat) (posout : Array Pos
     return true
   
   if forcedch > maxch then
-    return isReducible A_low A_upp
+    return isReducible configs A_low A_upp
 
   for curr_pos in [pos : posout.size] do
     if s_curr[curr_pos]! == 0 && posout[curr_pos]!.T.value > 0 then
@@ -343,7 +363,7 @@ partial def checkBound (deg : Nat) (A_low A_upp : Array Nat) (posout : Array Pos
       if good then
         let mut s_prime := s_curr
         s_prime := s_prime.set! curr_pos 1
-        if not (checkBound deg AA_low AA_upp posout s_prime maxch (curr_pos + 1)) then
+        if not (checkBound configs deg AA_low AA_upp posout s_prime maxch (curr_pos + 1)) then
           return false
       
       s_curr := s_curr.set! curr_pos (-1)
@@ -353,10 +373,10 @@ partial def checkBound (deg : Nat) (A_low A_upp : Array Nat) (posout : Array Pos
 
   return false
 
-partial def verifyTree (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
+partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
   match t with
   | ProofTree.reduce =>
-    isReducible A_low A_upp
+    isReducible configs A_low A_upp
   | ProofTree.cond v m trueBranch falseBranch => Id.run do
     let mut AA_low_true := A_low
     let mut AA_upp_true := A_upp
@@ -370,9 +390,9 @@ partial def verifyTree (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (ou
       AA_low_false := AA_low_false.set! v (1 - m).toNat
       AA_upp_true := AA_upp_true.set! v (-m).toNat
 
-    let bTrue := verifyTree deg AA_low_true AA_upp_true trueBranch outs
+    let bTrue := verifyTree configs deg AA_low_true AA_upp_true trueBranch outs
     if not bTrue then return false
-    else return verifyTree deg AA_low_false AA_upp_false falseBranch outs
+    else return verifyTree configs deg AA_low_false AA_upp_false falseBranch outs
   
   | ProofTree.sym _ _ _ _ =>
     -- TODO: CheckSymmetry
@@ -388,7 +408,7 @@ partial def verifyTree (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (ou
           posout := posout.push { T := o, x := y }
       
       let s := mkArray posout.size 0
-      if not (checkBound deg A_low A_upp posout s v 0) then
+      if not (checkBound configs deg A_low A_upp posout s v 0) then
         return false
     return true
 
