@@ -262,7 +262,7 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       
       let is_interior := k >= st.c.ringSize
       let exp_deg := st.degrees[k]!
-      if is_interior && st.upp[w]! != exp_deg then continue
+      if exp_deg > st.upp[w]! then continue
       
       let new_mapping := st.mapping.set! k w
       let new_used := st.used.set! w true

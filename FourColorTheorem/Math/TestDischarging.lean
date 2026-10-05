@@ -14,7 +14,12 @@ def trivial_A_upp (deg : Nat) : Array Nat := mkArray (5 * deg + 2) 12 |>.set! 0 
 def test7 (configs : List Configuration) (_ : Unit) : Bool :=
   let deg := 7
   let outs := readOutlets deg theRules
-  verifyTree configs deg (trivial_A_low deg) (trivial_A_upp deg) (present7 ()) outs
+  let res := verifyTree configs deg (trivial_A_low deg) (trivial_A_upp deg) (present7 ()) outs
+    if not res then
+      dbg_trace "test7 returned false"
+      res
+    else
+      res
 
 def test8 (configs : List Configuration) (_ : Unit) : Bool :=
   let deg := 8
