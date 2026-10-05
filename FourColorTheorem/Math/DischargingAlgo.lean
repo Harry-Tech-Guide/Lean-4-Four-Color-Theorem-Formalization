@@ -262,10 +262,7 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       
       let is_interior := k >= st.c.ringSize
       let exp_deg := st.degrees[k]!
-      if is_interior then
-        if st.upp[w]! != exp_deg then continue
-      else
-        if exp_deg > st.upp[w]! || exp_deg < st.low[w]! then continue
+      if is_interior && st.upp[w]! != exp_deg then continue
       
       let new_mapping := st.mapping.set! k w
       let new_used := st.used.set! w true
@@ -276,9 +273,7 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       | none => continue
     res
 
-partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat) : Bool := Id.run do
-  let adjmat := getAdjMat A_upp
-  let adjBool := getAdjBool adjmat
+partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool := Id.run do
   let mut found := false
   let mut mapping : Array Nat := #[]
   let mut matched_c : Configuration := default
@@ -307,21 +302,23 @@ partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat
   if not found then return false
 
   let mut all_reduced := true
-  for i in [0 : matched_c.ringSize] do
+  for i in [matched_c.ringSize : matched_c.ringSize + matched_c.interiorSize] do
     let v := mapping[i]!
     if A_low[v]! < A_upp[v]! then
       let mut A_upp_new := A_upp
       A_upp_new := A_upp_new.set! v (A_upp[v]! - 1)
-      if not (verifyReduce configs A_low A_upp_new) then
+      let adjmat_new := getAdjMat A_upp_new
+      let adjBool_new := getAdjBool adjmat_new
+      if not (verifyReduce configs A_low A_upp_new adjmat_new adjBool_new) then
         all_reduced := false
         break
         
   return all_reduced
 
-def isReducible (configs : List Configuration) (A_low A_upp : Array Nat) : Bool :=
-  verifyReduce configs A_low A_upp
+def isReducible (configs : List Configuration) (A_low A_upp : Array Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool :=
+  verifyReduce configs A_low A_upp adjmat adjBool
 
-partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) : Bool := Id.run do
+partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool := Id.run do
   let mut forcedch := 0
   let mut allowedch := 0
   let mut s_curr := s
@@ -343,7 +340,9 @@ partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp :
     return true
   
   if forcedch > maxch then
-    return isReducible configs A_low A_upp
+    let res := isReducible configs A_low A_upp adjmat adjBool
+    if not res then dbg_trace "Failure in isReducible"
+    return res
 
   for curr_pos in [pos : posout.size] do
     if s_curr[curr_pos]! == 0 && posout[curr_pos]!.T.value > 0 then
@@ -368,7 +367,7 @@ partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp :
       if good then
         let mut s_prime := s_curr
         s_prime := s_prime.set! curr_pos 1
-        if not (checkBound configs deg AA_low AA_upp posout s_prime maxch (curr_pos + 1)) then
+        if not (checkBound configs deg AA_low AA_upp posout s_prime maxch (curr_pos + 1) adjmat adjBool) then
           return false
       
       s_curr := s_curr.set! curr_pos (-1)
@@ -381,7 +380,7 @@ partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp :
 partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
   match t with
   | ProofTree.reduce =>
-    isReducible configs A_low A_upp
+    isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
   | ProofTree.cond v m trueBranch falseBranch => Id.run do
     let mut AA_low_true := A_low
     let mut AA_upp_true := A_upp
@@ -396,7 +395,9 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
       AA_upp_true := AA_upp_true.set! v (-m).toNat
 
     let bTrue := verifyTree configs deg AA_low_true AA_upp_true trueBranch outs
-    if not bTrue then return false
+    if not bTrue then
+      dbg_trace "Failure in cond"
+      return false
     else return verifyTree configs deg AA_low_false AA_upp_false falseBranch outs
   
   | ProofTree.sym _ _ _ _ =>
@@ -404,6 +405,8 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
     true
   
   | ProofTree.hubcap members => Id.run do
+    let adjmat := getAdjMat A_upp
+    let adjBool := getAdjBool adjmat
     for (x, y, v) in members do
       let mut posout : Array PosOut := #[]
       for o in outs do
@@ -413,7 +416,8 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
           posout := posout.push { T := o, x := y }
       
       let s := mkArray posout.size 0
-      if not (checkBound configs deg A_low A_upp posout s v 0) then
+      if not (checkBound configs deg A_low A_upp posout s v 0 adjmat adjBool) then
+          dbg_trace "Failure in hubcap"
         return false
     return true
 
