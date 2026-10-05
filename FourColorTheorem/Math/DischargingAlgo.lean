@@ -290,6 +290,7 @@ partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat
       c := c,
       adjmat := adjmat,
       adjBool := adjBool,
+      low := A_low,
       upp := A_upp,
       mapping := mkArray totalNodes CARTVERT,
       used := mkArray CARTVERT false,
