@@ -400,16 +400,22 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
       AA_upp_true := AA_upp_true.set! v (-m).toNat
 
     let bTrue := verifyTree configs deg AA_low_true AA_upp_true trueBranch outs
-    if not bTrue then
-      dbg_trace "Failure in cond"
-      return false
-    else return verifyTree configs deg AA_low_false AA_upp_false falseBranch outs
+      if not bTrue then
+        dbg_trace s!"Failure in cond {v} {m} (trueBranch failed)"
+        return false
+      else
+        let bFalse := verifyTree configs deg AA_low_false AA_upp_false falseBranch outs
+        if not bFalse then
+          dbg_trace s!"Failure in cond {v} {m} (falseBranch failed)"
+        return bFalse
   
   | ProofTree.sym _ _ _ _ =>
     -- TODO: CheckSymmetry
     true
   
-  | ProofTree.hubcap members => Id.run do
+  | ProofTree.hubcap members =>
+      dbg_trace "ENTERED HUBCAP!"
+      Id.run do
     let adjmat := getAdjMat A_upp
     let adjBool := getAdjBool adjmat
     for (x, y, v) in members do
@@ -422,7 +428,7 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
       
       let s := mkArray posout.size 0
       if not (checkBound configs deg A_low A_upp posout s v 0 adjmat adjBool) then
-          dbg_trace "Failure in hubcap"
+        dbg_trace "Failure in hubcap"
         return false
     return true
 
