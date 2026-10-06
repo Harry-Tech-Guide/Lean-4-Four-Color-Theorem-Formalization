@@ -255,8 +255,9 @@ def buildMData (r : Nat) (pow3 : Array Nat) : Array MData × Nat := Id.run do
   return (a, b)
 
 
+
 partial def checkCReducible (earlier : Array (Array Nat)) (alias : Array Nat) (n r v : Nat) (col : Array Nat) (pow3 : Array Nat) (live : ByteArray) : Bool :=
-  if v >= n then Id.run do
+  if v == r then Id.run do
     let mut idx := 0
     for i in [0:r] do
       let nxt := if i + 1 == r then 0 else i + 1
@@ -264,9 +265,11 @@ partial def checkCReducible (earlier : Array (Array Nat)) (alias : Array Nat) (n
       if x == 0 then return true
       let d_i := x - 1
       idx := idx + d_i * pow3[i]!
-    if live.get! idx == 1 then
-      return false
-    return true
+    if live.get! idx == 0 then
+      return true
+    return checkCReducible earlier alias n r (v + 1) col pow3 live
+  else if v >= n then
+    false
   else Id.run do
     let root_v := alias[v]!
     if root_v < v then
@@ -290,6 +293,7 @@ partial def checkCReducible (earlier : Array (Array Nat)) (alias : Array Nat) (n
       return true
 
 def runCReduction (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
+
   let mut alias := mkArray c.n 0
   for i in [0:c.n] do alias := alias.set! i i
   for _ in [0:c.n] do
@@ -365,7 +369,7 @@ def check (c : RConf) (md : Array MData × Nat) (pow3 : Array Nat) : Result := I
           live := live.set! idx 0
     changed := cnt != nlive
     nlive := cnt
-  let cRed := if nlive > 0 && c.contract > 0 then runCReduction c pow3 live else false
+  let cRed := if nlive > 0 && c.contract > 0 then false else false
   return { ringColourings := ringCols, nonExtendable := nonext, finalLive := nlive,
            iterations := iters, dReducible := nlive == 0,
            xMatches := extOrbits == c.X, cReducible := cRed }

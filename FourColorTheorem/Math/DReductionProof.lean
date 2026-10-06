@@ -20,6 +20,19 @@ axiom pure_extensible_implies_array (H : Hypermap) (k : Nat) (R : Hypermap.Ring 
   Hypermap.IsExtensiblePure H k R (fun i => cols[i.val]'(by rw [hValid]; exact i.isLt)) → 
   Hypermap.IsExtensible H k R cols
 
+
+theorem size_eq_of_isValidRingColoring (k : Nat) (cols : Array Color) (h : Hypermap.isValidRingColoring k cols = true) : cols.size = k := by
+  dsimp [Hypermap.isValidRingColoring] at h
+  cases heq : (cols.size == k)
+  · have h_neq : (cols.size != k) = true := by
+      change (!(cols.size == k)) = true
+      rw [heq]
+      rfl
+    rw [h_neq] at h
+    dsimp at h
+    contradiction
+  · exact eq_of_beq heq
+
 /-- The final architecture link for D-Reducibility. -/
 theorem dreduction_is_sound (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) (LiveSet : (Fin k → Color) → Prop) :
   MatchesTopology H k R c → 
@@ -30,9 +43,9 @@ theorem dreduction_is_sound (c : Math.FastReducer.RConf) (md : Array Math.FastRe
   have hExt := outside_liveset_is_extensible c H k R LiveSet hMatch
   intro cols hValid
   have hRed := Hypermap.empty_liveset_implies_reducible H k R LiveSet hEmpty hExt
-  -- We extract the size equality from isValidRingColoring
-  have hSize : cols.size = k := by sorry
+  have hSize : cols.size = k := size_eq_of_isValidRingColoring k cols hValid
   have hPure := hRed (fun i => cols[i.val]'(by rw [hSize]; exact i.isLt))
   exact pure_extensible_implies_array H k R cols hSize hPure
+
 
 end FourColorTheorem

@@ -1,3 +1,4 @@
+import FourColorTheorem.Math.FourColorTheorem
 import FourColorTheorem.Math.DReductionProof
 import FourColorTheorem.Math.ReducibilityProof
 import FourColorTheorem.Math.EmptyLiveSet

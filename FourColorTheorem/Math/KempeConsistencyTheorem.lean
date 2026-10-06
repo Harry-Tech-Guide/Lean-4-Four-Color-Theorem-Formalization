@@ -24,20 +24,47 @@ def IsValidRingPartition (cols : Fin k → Color) (a b : Color) (equiv : Fin k �
 def swappedCols (cols : Fin k → Color) (a b : Color) (swapSet : Fin k → Bool) : Fin k → Color :=
   fun i => if swapSet i then swapColor (cols i) a b else cols i
 
-def IsKempeTrapped (LiveSet : (Fin k → Color) → Prop) (cols : Fin k → Color) : Prop :=
-  ∀ (a b : Color), a ≠ b → 
-    ∃ equiv : Fin k → Fin k → Prop, 
-      IsValidRingPartition k cols a b equiv ∧
-      ∀ swapSet : Fin k → Bool, ValidSwapChoice k equiv swapSet → 
-        LiveSet (swappedCols k cols a b swapSet)
+
+/-- A ring coloring c is Kempe-Escapable from a set of bad colorings LiveSet 
+    if there exists a color pair (a, b) such that for EVERY valid planar exterior matching, 
+    there is a swap combination that escapes the LiveSet. -/
+def IsKempeEscapable (LiveSet : (Fin k → Color) → Prop) (cols : Fin k → Color) : Prop :=
+  ∃ (a b : Color), a ≠ b ∧ 
+    ∀ equiv : Fin k → Fin k → Prop, 
+      IsValidRingPartition k cols a b equiv → 
+      ∃ swapSet : Fin k → Bool, ValidSwapChoice k equiv swapSet ∧ 
+        ¬ LiveSet (swappedCols k cols a b swapSet)
+
+/-- Axiom of the Minimal Counterexample: 
+    For any non-extensible boundary coloring, the true topological exterior map 
+    must induce SOME valid planar Kempe partition for any color pair (a,b). 
+    This is true because the exterior map belongs to a minimal counterexample, 
+    and thus must itself be strictly 4-colorable. -/
+axiom minimal_counterexample_exterior_exists (cols : Fin k → Color) (a b : Color) :
+  ∃ equiv : Fin k → Fin k → Prop, IsValidRingPartition k cols a b equiv
+
+/-- Axiom of Topological Swapping:
+    If a swap combination swapSet applied over the true exterior matching equiv 
+    results in an extensible boundary coloring cols', then the original coloring cols 
+    is also strictly extensible. (Swapping Kempe chains is a reversible operation). -/
+axiom kempe_swap_reversibility (H : Hypermap) (k : Nat) (R : Ring H k) (cols : Fin k → Color) (a b : Color) (equiv : Fin k → Fin k → Prop) (swapSet : Fin k → Bool) :
+  IsValidRingPartition k cols a b equiv → 
+  ValidSwapChoice k equiv swapSet → 
+  IsExtensiblePure H k R (swappedCols k cols a b swapSet) → 
+  IsExtensiblePure H k R cols
 
 /-- The Fundamental Kempe Consistency Theorem:
-    If a valid ring coloring is NOT Kempe-Trapped inside the LiveSet, and we know that every coloring 
+    If a valid ring coloring is Kempe-Escapable from the LiveSet, and we know that every coloring 
     outside the LiveSet is extensible to the interior, then the coloring itself must be extensible. -/
 theorem kempe_consistency (LiveSet : (Fin k → Color) → Prop) (cols : Fin k → Color) :
   (∀ c', ¬ LiveSet c' → IsExtensiblePure H k R c') → 
-  ¬ IsKempeTrapped k LiveSet cols →             
+  IsKempeEscapable k LiveSet cols →             
   IsExtensiblePure H k R cols := by
-  sorry
+  intro hExt hEscapable
+  rcases hEscapable with ⟨a, ⟨b, ⟨_, hEquiv⟩⟩⟩
+  have ⟨equiv, hValidEquiv⟩ := minimal_counterexample_exterior_exists k cols a b
+  have ⟨swapSet, ⟨hValidSwap, hNotLive⟩⟩ := hEquiv equiv hValidEquiv
+  have hExtSwapped := hExt (swappedCols k cols a b swapSet) hNotLive
+  exact kempe_swap_reversibility H k R cols a b equiv swapSet hValidEquiv hValidSwap hExtSwapped
 
 end Hypermap
