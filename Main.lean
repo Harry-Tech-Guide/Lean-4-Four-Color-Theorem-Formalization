@@ -1,3 +1,7 @@
+import FourColorTheorem.Math.Symmetry
+import FourColorTheorem.Math.Trace
+import FourColorTheorem.Math.Reflection
+import FourColorTheorem.Math.Configuration
 import FourColorTheorem.Math.Kempe
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Planarity
