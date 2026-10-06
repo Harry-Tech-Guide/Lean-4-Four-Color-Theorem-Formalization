@@ -1,3 +1,4 @@
+import FourColorTheorem.Math.KempeConsistencyTheorem
 import FourColorTheorem.Math.KempeConsistency
 import FourColorTheorem.Math.Symmetry
 import FourColorTheorem.Math.Trace
