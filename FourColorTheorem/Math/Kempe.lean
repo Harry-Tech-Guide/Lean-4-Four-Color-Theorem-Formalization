@@ -28,6 +28,12 @@ theorem swapColor_inj (col1 col2 a b : Color) (h : swapColor col1 a b = swapColo
   revert h
   cases col1 <;> cases col2 <;> cases a <;> cases b <;> decide
 
+
+
+theorem swapColor_closed (col a b : Color) (h : col = a ∨ col = b) : swapColor col a b = a ∨ swapColor col a b = b := by
+  revert h
+  cases col <;> cases a <;> cases b <;> decide
+
 /-- The new color assignment after performing a Kempe swap on component S. -/
 def kempeSwap (c : FaceColoring H) (a b : Color) (S : H.Dart → Bool) (d : H.Dart) : Color :=
   if S d then swapColor (c.color d) a b else c.color d
@@ -41,12 +47,40 @@ def kempeSwap_valid (c : FaceColoring H) (a b : Color) (S : H.Dart → Bool) (hS
     have hc := c.face_invariant d
     rw [hs, hc]
   edge_proper := fun d h_eq => by
-    -- The proof logic: 
-    -- If S d == S (edge d), they either both swapped or both didn't. 
-    --   By swapColor_inj, they must have been equal originally, contradicting edge_proper.
-    -- If S d != S (edge d), then exactly one swapped. 
-    --   By hS.3, they cannot both be in {a, b}. 
-    --   Since the swapped one IS in {a, b} (by hS.2), the other is NOT in {a, b}, so they can't be equal.
-    sorry
+    dsimp [kempeSwap] at h_eq
+    have hd_edge := c.edge_proper d
+    split at h_eq
+    · split at h_eq
+      · exact hd_edge (swapColor_inj _ _ _ _ h_eq)
+      · rename_i h1 h2
+        have he1 : c.color (H.edge.f d) = a ∨ c.color (H.edge.f d) = b := hS.2.1 (H.edge.f d) h1
+        have he2 : c.color d = a ∨ c.color d = b := by
+          have h_closed := swapColor_closed (c.color (H.edge.f d)) a b he1
+          rw [h_eq] at h_closed
+          exact h_closed
+        have h3 := hS.2.2 d he2 he1
+        rw [h1] at h3
+        have hd_false : S d = false := by
+          cases hd : S d
+          · rfl
+          · contradiction
+        rw [hd_false] at h3
+        contradiction
+    · split at h_eq
+      · rename_i h1 h2
+        have hd1 : c.color d = a ∨ c.color d = b := hS.2.1 d h2
+        have hd2 : c.color (H.edge.f d) = a ∨ c.color (H.edge.f d) = b := by
+          have h_closed := swapColor_closed (c.color d) a b hd1
+          rw [← h_eq] at h_closed
+          exact h_closed
+        have h3 := hS.2.2 d hd1 hd2
+        rw [h2] at h3
+        have he_false : S (H.edge.f d) = false := by
+          cases he : S (H.edge.f d)
+          · rfl
+          · contradiction
+        rw [he_false] at h3
+        contradiction
+      · exact hd_edge h_eq
 
 end Hypermap
