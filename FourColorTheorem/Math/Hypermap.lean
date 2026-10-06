@@ -1,114 +1,108 @@
-import Init.Data.List.Basic
 
-namespace Math
+-- Axiomatic foundation of Combinatorial Hypermaps for the Four Color Theorem
 
-/-- A Permutation is a bijection on a type `α`. -/
-structure Perm (α : Type) where
-  fw : α → α
-  bw : α → α
-  fw_bw : ∀ x, fw (bw x) = x
-  bw_fw : ∀ x, bw (fw x) = x
+structure Perm (D : Type) where
+  f : D → D
+  inv : D → D
+  left_inv : ∀ x, inv (f x) = x
+  right_inv : ∀ x, f (inv x) = x
 
-namespace Perm
+def Perm.symm {D : Type} (p : Perm D) : Perm D :=
+  { f := p.inv, inv := p.f, left_inv := p.right_inv, right_inv := p.left_inv }
 
-variable {α : Type}
+def Perm.mul {D : Type} (p q : Perm D) : Perm D :=
+  { f := fun x => p.f (q.f x),
+    inv := fun x => q.inv (p.inv x),
+    left_inv := fun x => by
+      dsimp
+      rw [p.left_inv, q.left_inv],
+    right_inv := fun x => by
+      dsimp
+      rw [q.right_inv, p.right_inv] }
 
-def id : Perm α :=
-  { fw := fun x => x
-    bw := fun x => x
-    fw_bw := fun _ => rfl
-    bw_fw := fun _ => rfl }
+def Perm.one {D : Type} : Perm D :=
+  { f := id,
+    inv := id,
+    left_inv := fun _ => rfl,
+    right_inv := fun _ => rfl }
 
-def inv (p : Perm α) : Perm α :=
-  { fw := p.bw
-    bw := p.fw
-    fw_bw := p.bw_fw
-    bw_fw := p.fw_bw }
+instance {D : Type} : Inhabited (Perm D) where
+  default := Perm.one
 
-def mul (p q : Perm α) : Perm α :=
-  { fw := fun x => p.fw (q.fw x)
-    bw := fun x => q.bw (p.bw x)
-    fw_bw := fun x => by dsimp; rw [q.fw_bw, p.fw_bw]
-    bw_fw := fun x => by dsimp; rw [p.bw_fw, q.bw_fw] }
-
-end Perm
-
-/-- Combinatorial Hypermap Definition -/
-structure Hypermap (D : Type) where
-  edge : Perm D
-  node : Perm D
-  face : Perm D
-  edge_involution : ∀ x, edge.fw (edge.fw x) = x
-  no_fixed_edges : ∀ x, edge.fw x ≠ x
-  edge_node_face : ∀ x, edge.fw (node.fw (face.fw x)) = x
+/-- A combinatorial hypermap represents a topological map via permutations on darts. -/
+structure Hypermap where
+  Dart : Type
+  edge : Perm Dart
+  node : Perm Dart
+  face : Perm Dart
+  -- Every edge is composed of exactly two darts, or is a self loop if a dart maps to itself.
+  edge_involution : ∀ d, edge.f (edge.f d) = d
+  -- The fundamental topological identity of hypermaps: traversing an edge, then a node, then a face returns to the start.
+  edge_node_face_id : ∀ d, edge.f (node.f (face.f d)) = d
 
 namespace Hypermap
 
-variable {D : Type} (H : Hypermap D)
+variable (H : Hypermap)
 
-/-- Compute the orbit (cycle) of a single dart under a permutation. -/
-partial def orbit [DecidableEq D] (p : Perm D) (start : D) : List D :=
-  let rec loop (current : D) (acc : List D) : List D :=
-    let next_d := p.fw current
-    if next_d == start then acc.reverse
-    else loop next_d (next_d :: acc)
-  loop start [start]
+/-- Applying edge twice is the identity -/
+theorem edge_edge (d : H.Dart) : H.edge.f (H.edge.f d) = d :=
+  H.edge_involution d
 
-/-- Count the total number of distinct orbits of a permutation over a finite list of darts. -/
-partial def countOrbits [DecidableEq D] (p : Perm D) (darts : List D) : Nat :=
-  let rec loop (remaining : List D) (visited : List D) (count : Nat) : Nat :=
-    match remaining with
-    | [] => count
-    | d :: ds =>
-      if visited.contains d then
-        loop ds visited count
-      else
-        let orb := orbit p d
-        loop ds (orb ++ visited) (count + 1)
-  loop darts [] 0
+/-- Since edge is an involution, its inverse is itself -/
+theorem edge_inv_eq_edge (d : H.Dart) : H.edge.inv d = H.edge.f d := by
+  have h := H.edge.left_inv (H.edge.f d)
+  rw [H.edge_involution d] at h
+  exact h
 
-/-- Compute the connected component orbit of a dart. 
-Two darts are connected if they can be reached by a sequence of `edge` and `node` operations. -/
-partial def compOrbit [DecidableEq D] (start : D) : List D :=
-  let rec loop (queue : List D) (visited : List D) : List D :=
-    match queue with
-    | [] => visited
-    | d :: ds =>
-      if visited.contains d then
-        loop ds visited
-      else
-        let n1 := H.edge.fw d
-        let n2 := H.node.fw d
-        loop (n1 :: n2 :: ds) (d :: visited)
-  loop [start] []
+/-- The face permutation can be defined from edge and node inverses -/
+theorem face_eq_node_inv_edge_inv (d : H.Dart) : H.face.f d = H.node.inv (H.edge.inv d) := by
+  have h := H.edge_node_face_id d
+  have h1 : H.edge.inv (H.edge.f (H.node.f (H.face.f d))) = H.edge.inv d := by rw [h]
+  rw [H.edge.left_inv] at h1
+  have h2 : H.node.inv (H.node.f (H.face.f d)) = H.node.inv (H.edge.inv d) := by rw [h1]
+  rw [H.node.left_inv] at h2
+  exact h2
 
-/-- Count the number of connected components in the hypermap. -/
-partial def countComponents [DecidableEq D] (darts : List D) : Nat :=
-  let rec loop (remaining : List D) (visited : List D) (count : Nat) : Nat :=
-    match remaining with
-    | [] => count
-    | d :: ds =>
-      if visited.contains d then
-        loop ds visited count
-      else
-        let orb := compOrbit H d
-        loop ds (orb ++ visited) (count + 1)
-  loop darts [] 0
 
-/-- The Euler Characteristic of a hypermap. 
-χ = V - E + F 
-Where V, E, F are the number of node, edge, and face orbits respectively. -/
-def eulerChar [DecidableEq D] (darts : List D) : Int :=
-  (countOrbits H.node darts : Int) - 
-  (countOrbits H.edge darts : Int) + 
-  (countOrbits H.face darts : Int)
+/-- node * face * edge = id -/
+theorem node_face_edge_id (d : H.Dart) : H.node.f (H.face.f (H.edge.f d)) = d := by
+  have h := H.edge_node_face_id (H.edge.f d)
+  have h2 : H.edge.f (H.edge.f (H.node.f (H.face.f (H.edge.f d)))) = H.edge.f (H.edge.f d) := by rw [h]
+  rw [H.edge_involution, H.edge_involution] at h2
+  exact h2
 
-/-- A Combinatorial Hypermap is PLANAR if its Euler characteristic satisfies Euler's formula:
-χ = 2 * C 
-(Where C is the number of connected components). -/
-def IsPlanar [DecidableEq D] (darts : List D) : Prop :=
-  eulerChar H darts = 2 * (countComponents H darts : Int)
+/-- face * edge * node = id -/
+theorem face_edge_node_id (d : H.Dart) : H.face.f (H.edge.f (H.node.f d)) = d := by
+  have h := node_face_edge_id H (H.node.f d)
+  have h2 : H.node.inv (H.node.f (H.face.f (H.edge.f (H.node.f d)))) = H.node.inv (H.node.f d) := by rw [h]
+  rw [H.node.left_inv, H.node.left_inv] at h2
+  exact h2
+
+
+/-- The topological dual of a hypermap. 
+    Faces become nodes, nodes become faces, and edges remain edges. -/
+def dual : Hypermap where
+  Dart := H.Dart
+  edge := H.edge
+  node := Perm.symm H.face
+  face := Perm.symm H.node
+  edge_involution := H.edge_involution
+  edge_node_face_id := fun d => by
+    -- We need to show: edge.f (face.inv (node.inv d)) = d
+    -- We know face.f (edge.f (node.f d)) = d
+    have h := face_edge_node_id H (H.node.inv d)
+    rw [H.node.right_inv] at h
+    -- h : face.f (edge.f d) = H.node.inv d
+    -- apply face.inv to both sides
+    have h2 : H.face.inv (H.face.f (H.edge.f d)) = H.face.inv (H.node.inv d) := by rw [h]
+    rw [H.face.left_inv] at h2
+    -- h2 : edge.f d = face.inv (node.inv d)
+    -- apply edge.f to both sides
+    have h3 : H.edge.f (H.edge.f d) = H.edge.f (H.face.inv (H.node.inv d)) := by rw [h2]
+    rw [H.edge_involution] at h3
+    exact h3.symm
 
 end Hypermap
 
-end Math
+
+

@@ -1,3 +1,4 @@
+import FourColorTheorem.Math.Planarity
 import FourColorTheorem.Math.FastReducer
 
 open Math.FastReducer
