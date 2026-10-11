@@ -89,13 +89,14 @@ There are **0 `sorry` statements** across the entire repository. The major monol
 - **`reducible_reduction_witness` (`Math/MainTheorem.lean`):** **FULLY PROVEN DEFINITION/THEOREM** via `full_witness_of_surgery`, cleanly separating topological excision (`ReductionWitness`) from planar Kempe chain pullback (`KempePullbackProperty`).
 - **`unavoidable_is_reducible` (`Math/MainTheorem.lean`):** **FULLY PROVEN THEOREM** via `dreducible_of_computable`, bridging the RSST matching elimination certificate (`max_consistent_subset_is_empty`) with mathematical D-reducibility.
 - **`birkhoff_is_d_reducible` (`Math/TestComputable.lean`):** **FULLY PROVEN THEOREM** via `native_decide` in the Lean 4 kernel, certifying that the Birkhoff Diamond is D-reducible!
+- **`reducibility_soundness_proven` (`Math/Algorithm.lean`):** **FULLY PROVEN THEOREM** via well-founded induction on elimination rank (`dreducible_of_elimination_witness`).
 
-The remaining mathematical assumptions are strictly localized to canonical RSST foundation axioms in `Math/MainTheorem.lean`:
-1. **`topological_surgery_witness`**: Embedding a configuration with interior size $\ge 4$ into a minimal counterexample yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
-2. **`kempe_pullback_witness`**: Non-crossing Kempe chains in the planar exterior map satisfy the Kempe Pullback Property.
-3. **`unavoidability_witness`**: The 32 RSST discharging rules and Euler characteristic equation $V - E + F = 2$ yield a `PlanarDischargingWitness`.
-4. **`unavoidable_consistent_subset_empty`**: Every configuration in the 633 RSST unavoidable set satisfies `max_consistent_subset_is_empty`.
-5. **`reducibility_soundness_axiom`**: The RSST matching elimination operator correctly reflects mathematical Kempe extensibility (`ReducibilitySoundness`).
+The remaining mathematical assumptions are strictly localized to canonical RSST foundation axioms:
+1. **`topological_surgery_witness`** (`Math/MainTheorem.lean`): Embedding a configuration with interior size $\ge 4$ into a minimal counterexample yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
+2. **`kempe_pullback_witness`** (`Math/MainTheorem.lean`): Non-crossing Kempe chains in the planar exterior map satisfy the Kempe Pullback Property.
+3. **`unavoidability_witness`** (`Math/MainTheorem.lean`): The 32 RSST discharging rules and Euler characteristic equation $V - E + F = 2$ yield a `PlanarDischargingWitness`.
+4. **`unavoidable_consistent_subset_empty`** (`Math/MainTheorem.lean`): Every configuration in the 633 RSST unavoidable set satisfies `max_consistent_subset_is_empty`.
+5. **`elimination_witness_of_empty_subset`** (`Math/Algorithm.lean`): An empty maximum consistent subset iteratively constructs a valid Kempe elimination witness.
 
 ---
 

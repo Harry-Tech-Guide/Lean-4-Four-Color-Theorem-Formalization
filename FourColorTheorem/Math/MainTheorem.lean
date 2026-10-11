@@ -257,19 +257,13 @@ theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List
 axiom unavoidable_consistent_subset_empty (c : Configuration) :
   c ∈ theUnavoidableSet → max_consistent_subset_is_empty c
 
-/-- Reducibility Soundness Axiom:
-    The matching elimination operator correctly reflects D-reducibility via Kempe chains. -/
-axiom reducibility_soundness_axiom (c : Configuration) :
-  ReducibilitySoundness c
-
 /-- The RSST Reducibility Theorem:
     Every configuration in the unavoidable set is mathematically D-reducible (via Kempe chains).
-    Proved from the computational certificate and reducibility soundness. -/
+    Proved from the computational certificate and reducibility soundness via Kempe elimination induction. -/
 theorem unavoidable_is_reducible (c : Configuration) : c ∈ theUnavoidableSet → IsDReducible c := by
   intro hc
   have hEmpty := unavoidable_consistent_subset_empty c hc
-  have hSound := reducibility_soundness_axiom c
-  exact dreducible_of_computable c hEmpty hSound
+  exact dreducible_of_computable c hEmpty (reducibility_soundness_proven c)
 
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction). -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by
