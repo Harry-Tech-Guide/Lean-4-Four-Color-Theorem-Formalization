@@ -6,6 +6,7 @@ import FourColorTheorem.Math.ComputableReducer
 import FourColorTheorem.Math.Planarity
 import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Algorithm
+import FourColorTheorem.Math.Topology.KempeTopology
 
 namespace Math
 
@@ -158,6 +159,35 @@ theorem no_reducible_with_full_witness (H : Hypermap) [DecidableEq H.Dart] (dart
       exact h_match' i hi
     have h_glued := w.glue col_ext' full' h_match_rewritten h_full_valid'
     exact mc.not_colorable h_glued
+
+/-- A boundary swap is topologically realized by a Kempe chain on the exterior hypermap
+    if there exists a start dart in the exterior map such that swapping the face Kempe chain
+    produces the boundary swap. -/
+def RealizedByFaceKempeChain (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c)
+    (col : MapColoring w.H_ext) (a b_col : Color) (S : Nat → Bool) : Prop :=
+  ∃ (start : w.H_ext.Dart),
+    w.bnd_coloring (Hypermap.swapFaceKempeChain w.H_ext col a b_col start) =
+      boundaryKempeSwap c (w.bnd_coloring col) a b_col S
+
+/-- Topological Kempe Realizability:
+    In a planar hypermap, every valid elementary boundary Kempe swap is realized
+    by swapping a face Kempe chain starting at some boundary dart. -/
+def TopologicalKempeRealizable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c) : Prop :=
+  ∀ (col : MapColoring w.H_ext) (a b_col : Color) (S : Nat → Bool),
+    IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col) a b_col S) →
+    RealizedByFaceKempeChain H darts c w col a b_col S
+
+/-- Elementary Pullback Step Theorem:
+    Any elementary boundary Kempe swap realized by a face Kempe chain on H_ext
+    directly produces a valid exterior coloring witness. -/
+theorem elementary_pullback_of_face_chain (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c)
+    (hReal : TopologicalKempeRealizable H darts c w) :
+    ∀ (col : MapColoring w.H_ext) (a b_col : Color) (S : Nat → Bool),
+      IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col) a b_col S) →
+      ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c (w.bnd_coloring col) a b_col S := by
+  intro col a b_col S hVal
+  have ⟨start, hEq⟩ := hReal col a b_col S hVal
+  exact ⟨Hypermap.swapFaceKempeChain w.H_ext col a b_col start, hEq⟩
 
 /-- Kempe Pullback Property:
     Any boundary coloring Kempe-equivalent to the boundary restriction of an exterior coloring
