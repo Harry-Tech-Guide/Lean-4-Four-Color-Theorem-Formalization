@@ -26,6 +26,13 @@ def appearsIn (c : Configuration) (H : Hypermap) [DecidableEq H.Dart] (darts : L
     (∀ i < c.totalNodes, f i ∈ darts) ∧
     (∀ i < c.totalNodes, ∀ j < c.totalNodes, c.adj i j = true → Hypermap.areAdjacentDarts H (f i) (f j) = true)
 
+/-- Removing a dart that belongs to a non-empty list of darts strictly reduces its length. -/
+theorem erase_dart_strictly_smaller {D : Type} [BEq D] [LawfulBEq D] (darts : List D) (d : D) (hd : d ∈ darts) :
+    (darts.erase d).length < darts.length := by
+  have hlen := List.length_erase_of_mem hd
+  have hpos : darts.length > 0 := List.length_pos_of_mem hd
+  omega
+
 def findMinHelper (P : Nat → Prop) [DecidablePred P] : Nat → Nat → Nat
   | 0, cur => cur
   | fuel + 1, cur => if P cur then cur else findMinHelper P fuel (cur + 1)
