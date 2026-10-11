@@ -1,5 +1,6 @@
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.ComputableReducer
+import FourColorTheorem.Math.TestComputable
 
 namespace Math
 
@@ -45,5 +46,24 @@ If the max consistent subset is empty, then the configuration is D-reducible
 (meaning every non-extending coloring can be Kempe-swapped to an extending one). -/
 def ReducibilitySoundness (c : Configuration) : Prop :=
   max_consistent_subset_is_empty c → IsDReducible c
+
+/-- Reducibility Bridge Theorem:
+    A configuration whose maximum consistent subset is empty, together with
+    reducibility soundness, is mathematically D-reducible. -/
+theorem dreducible_of_computable (c : Configuration) 
+    (hEmpty : max_consistent_subset_is_empty c) 
+    (hSound : ReducibilitySoundness c) : 
+    IsDReducible c :=
+  hSound hEmpty
+
+/-- The Birkhoff Diamond has an empty maximum consistent subset.
+    Proven via computational reflection (`native_decide`) in Lean 4. -/
+theorem birkhoff_empty_consistent_subset : max_consistent_subset_is_empty ComputableReducer.birkhoff :=
+  ComputableReducer.birkhoff_is_d_reducible
+
+/-- The Birkhoff Diamond is mathematically D-reducible under reducibility soundness. -/
+theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.birkhoff) : 
+    IsDReducible ComputableReducer.birkhoff :=
+  dreducible_of_computable ComputableReducer.birkhoff birkhoff_empty_consistent_subset hSound
 
 end Math
