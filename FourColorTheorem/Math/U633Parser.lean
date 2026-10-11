@@ -60,7 +60,8 @@ def parseAllConfigs (_ : Unit) : Array Configuration :=
         arr := arr.push (parseConfig b)
     return arr
 
-
-
+/-- The 633 unavoidable configurations from the RSST dataset. -/
+def theUnavoidableSet : Array Configuration :=
+  parseAllConfigs ()
 
 end Math

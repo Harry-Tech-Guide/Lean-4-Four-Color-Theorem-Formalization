@@ -5,61 +5,61 @@ import FourColorTheorem.Math.Hypermap
 
 variable {D : Type} [BEq D]
 
-/-- Compute the orbit of a dart under a permutation by repeatedly applying it. -/
-partial def getOrbitAux (p : Perm D) (start current : D) (acc : List D) : List D :=
-  let nxt := p.f current
-  if nxt == start then current :: acc
-  else getOrbitAux p start nxt (current :: acc)
+def getOrbitAux (p : Perm D) (start current : D) (acc : List D) (fuel : Nat) : List D :=
+  match fuel with
+  | 0 => current :: acc
+  | fuel' + 1 =>
+    let nxt := p.f current
+    if nxt == start then current :: acc
+    else getOrbitAux p start nxt (current :: acc) fuel'
 
-partial def getOrbit (p : Perm D) (d : D) : List D :=
-  getOrbitAux p d d []
+def getOrbit (p : Perm D) (fuel : Nat) (d : D) : List D :=
+  getOrbitAux p d d [] fuel
 
-/-- Count the number of distinct orbits in a list of darts. -/
-partial def countOrbits (p : Perm D) (l : List D) : Nat :=
+def countOrbits (p : Perm D) (fuel : Nat) (l : List D) : Nat :=
   match l with
   | [] => 0
   | d :: ds => 
-    let orb := getOrbit p d
-    1 + countOrbits p (ds.filter (fun x => !(orb.contains x)))
+    let orb := getOrbit p fuel d
+    have h_len : (ds.filter (fun x => !(orb.contains x))).length < (d :: ds).length :=
+      Nat.lt_succ_of_le (List.length_filter_le _ _)
+    1 + countOrbits p fuel (ds.filter (fun x => !(orb.contains x)))
+termination_by l.length
 
 namespace Hypermap
 
 variable (H : Hypermap) [BEq H.Dart]
 
-/-- Breadth-first search to find all darts in the same connected component. -/
-partial def getComponentAux (queue : List H.Dart) (visited : List H.Dart) : List H.Dart :=
-  match queue with
-  | [] => visited
-  | d :: ds =>
-    if visited.contains d then getComponentAux ds visited -- wait this is infinite loop if visited.contains d! Should be getComponentAux ds visited!
-    else 
-      let n1 := H.edge.f d
-      let n2 := H.edge.inv d
-      let n3 := H.node.f d
-      let n4 := H.node.inv d
-      getComponentAux (n1 :: n2 :: n3 :: n4 :: ds) (d :: visited)
+def getComponentAux (queue : List H.Dart) (visited : List H.Dart) (fuel : Nat) : List H.Dart :=
+  match fuel with
+  | 0 => visited
+  | fuel' + 1 =>
+    match queue with
+    | [] => visited
+    | d :: ds =>
+      if visited.contains d then getComponentAux ds visited fuel'
+      else 
+        let n1 := H.edge.f d
+        let n2 := H.edge.inv d
+        let n3 := H.node.f d
+        let n4 := H.node.inv d
+        getComponentAux (n1 :: n2 :: n3 :: n4 :: ds) (d :: visited) fuel'
 
-partial def getComponent (d : H.Dart) : List H.Dart :=
-  getComponentAux H [d] []
+def getComponent (fuel : Nat) (d : H.Dart) : List H.Dart :=
+  getComponentAux H [d] [] fuel
 
-/-- Count the number of connected components in the hypermap. -/
-partial def countComponents (l : List H.Dart) : Nat :=
+def countComponents (fuel : Nat) (l : List H.Dart) : Nat :=
   match l with
   | [] => 0
   | d :: ds =>
-    let comp := getComponent H d
-    1 + countComponents (ds.filter (fun x => !(comp.contains x)))
+    let comp := getComponent H fuel d
+    have h_len : (ds.filter (fun x => !(comp.contains x))).length < (d :: ds).length :=
+      Nat.lt_succ_of_le (List.length_filter_le _ _)
+    1 + countComponents fuel (ds.filter (fun x => !(comp.contains x)))
+termination_by l.length
 
-/-- The Euler characteristic of a hypermap: V - E + F.
-    V = number of node orbits (vertices).
-    E = number of edge orbits (edges).
-    F = number of face orbits (faces). -/
-def eulerCharacteristic (darts : List H.Dart) : Int :=
-  (countOrbits H.node darts : Int) - (countOrbits H.edge darts : Int) + (countOrbits H.face darts : Int)
-
-/-- A hypermap is planar if and only if it satisfies Euler's formula: V - E + F = 2 * C, 
-    where C is the number of connected components. -/
-def isPlanar (darts : List H.Dart) : Bool :=
-  eulerCharacteristic H darts == 2 * (countComponents H darts : Int)
+def isPlanar (fuel : Nat) (darts : List H.Dart) : Bool :=
+  let eulerChar := (countOrbits H.node fuel darts : Int) - (countOrbits H.edge fuel darts : Int) + (countOrbits H.face fuel darts : Int)
+  eulerChar == 2 * (countComponents H fuel darts : Int)
 
 end Hypermap

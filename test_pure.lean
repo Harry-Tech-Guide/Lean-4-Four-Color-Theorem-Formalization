@@ -18,11 +18,9 @@ theorem pure_extensible_implies_array_proof :
     have hs := size_eq_of_isValidRingColoring k cols hValid
     have hlt : i.val < cols.size := by rw [hs]; exact i.isLt
     have h2 : cols[i.val]'hlt = cols[i.val]! := by
-      apply Eq.symm
-      -- Array.get! definition is if h : i < a.size then a.get ⟨i, h⟩ else default
-      -- I can just use Array.get!_eq_getElem if it exists. Let's see if exact Array.getD_get? works.
-      -- Let's try simp
-      simp [getElem!, getElem]
+      -- in lean 4, getElem! a i is defined via getElem? and getD
+      -- actually we can just apply getElem_eq_getElem! or similar
+      exact Eq.symm (getElem!_pos cols i.val hlt)
     rw [h2] at h1
     exact h1
 

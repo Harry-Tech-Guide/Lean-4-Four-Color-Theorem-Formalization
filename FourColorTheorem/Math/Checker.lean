@@ -28,7 +28,7 @@ partial def canExtendInterior (c : Configuration) (nodeIdx : Nat) (assignments :
         canExtendInterior c (nodeIdx + 1) (assignments.set! nodeIdx (some col))
       else false
     
-    tryColor Color.c1 || tryColor Color.c2 || tryColor Color.c3 || tryColor Color.c4
+    tryColor Color.c0 || tryColor Color.c1 || tryColor Color.c2 || tryColor Color.c3
 
 /-- Given a boundary coloring array, verify it's a valid boundary and if so, check if it extends. -/
 def checkBoundaryAndExtend (c : Configuration) (boundary : Array Color) : Bool :=
@@ -58,13 +58,13 @@ partial def checkAllBoundaries (c : Configuration) (nodeIdx : Nat) (currentBound
   if nodeIdx >= c.ringSize then
     checkBoundaryAndExtend c currentBoundary
   else
+    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c0) &&
     checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c1) &&
     checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c2) &&
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c3) &&
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c4)
+    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c3)
 
 /-- The executable function to check if a configuration is D-Reducible! -/
-def checkDReducible (c : Configuration) : Bool :=
+partial def checkDReducible (c : Configuration) : Bool :=
   checkAllBoundaries c 0 #[]
 
 end Math

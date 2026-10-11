@@ -16,9 +16,22 @@ axiom outside_liveset_is_extensible (c : Math.FastReducer.RConf) (H : Hypermap) 
 
 /-- Bridge between pure topological extensibility (Fin k → Color) and 
     computational array extensibility (Array Color). -/
-axiom pure_extensible_implies_array (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) (cols : Array Color) (hValid : cols.size = k) :
+theorem pure_extensible_implies_array (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) (cols : Array Color) (hValid : cols.size = k) (hValid2 : Hypermap.isValidRingColoring k cols = true) :
   Hypermap.IsExtensiblePure H k R (fun i => cols[i.val]'(by rw [hValid]; exact i.isLt)) → 
-  Hypermap.IsExtensible H k R cols
+  Hypermap.IsExtensible H k R cols := by
+  intro hPure
+  rcases hPure with ⟨vc, hvc⟩
+  constructor
+  · exact hValid2
+  · exists vc
+    intro i
+    have h1 := hvc i
+    dsimp at h1
+    have hlt : i.val < cols.size := by rw [hValid]; exact i.isLt
+    have h2 : cols[i.val]'hlt = cols[i.val]! := by
+      exact Eq.symm (getElem!_pos cols i.val hlt)
+    rw [h2] at h1
+    exact h1
 
 
 theorem size_eq_of_isValidRingColoring (k : Nat) (cols : Array Color) (h : Hypermap.isValidRingColoring k cols = true) : cols.size = k := by
@@ -45,7 +58,7 @@ theorem dreduction_is_sound (c : Math.FastReducer.RConf) (md : Array Math.FastRe
   have hRed := Hypermap.empty_liveset_implies_reducible H k R LiveSet hEmpty hExt
   have hSize : cols.size = k := size_eq_of_isValidRingColoring k cols hValid
   have hPure := hRed (fun i => cols[i.val]'(by rw [hSize]; exact i.isLt))
-  exact pure_extensible_implies_array H k R cols hSize hPure
+  exact pure_extensible_implies_array H k R cols hSize hValid hPure
 
 
 end FourColorTheorem

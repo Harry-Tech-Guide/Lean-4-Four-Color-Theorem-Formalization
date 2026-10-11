@@ -1,18 +1,24 @@
 import FourColorTheorem.Math.Reducibility
+import FourColorTheorem.Math.ComputableReducer
 
 namespace Math
 
-/-- A placeholder for a Signed Matching.
-In RSST, a signed matching on a ring of size N is a non-crossing perfect or partial
-matching of the boundary vertices, along with a sign (+1 or -1) for each matched pair. -/
-axiom SignedMatching (c : Configuration) : Type
+/-- A Signed Matching on a ring of size N.
+In RSST, a signed matching is a non-crossing perfect or partial
+matching of the boundary edges, along with a sign (+1 or -1) for each matched pair. -/
+def SignedMatching (_ : Configuration) : Type :=
+  ComputableReducer.SignedMatching
 
 /-- The "theta-fits" relation. 
 A boundary edge-coloring `col` fits a signed matching `m` for a specific color `x`. -/
-axiom fits (c : Configuration) (col : BoundaryColoring c) (m : SignedMatching c) (x : Color) : Prop
+def fits (c : Configuration) (col : BoundaryColoring c) (m : SignedMatching c) (x : Color) : Prop :=
+  let colList : Array Nat := (Array.range c.ringSize).map (fun i => (col i).toNat)
+  let ecol := ComputableReducer.vertexToEdgeColoring c.ringSize colList
+  ComputableReducer.checkThetaFit c.ringSize ecol x.toNat m = true
 
 /-- The set of all signed matchings that are balanced (a specific topological condition). -/
-axiom balanced_signed_matchings (c : Configuration) : List (SignedMatching c)
+def balanced_signed_matchings (c : Configuration) : List (SignedMatching c) :=
+  (ComputableReducer.generateBalancedSignedMatchings c.ringSize).toList
 
 /-- The Maximum Consistent Subset Operator.
 Given a "live" set of boundary colorings `C`, a signed matching `m` is ALIVE if
@@ -30,8 +36,9 @@ def next_live_set (c : Configuration) (live_C : BoundaryColoring c → Prop) (co
 
 /-- A configuration is D-reducible if the greatest fixed point of `next_live_set` 
 starting from the set of non-extending colorings is the EMPTY SET. 
-Because the state space is finite, this can be computed by iteration. -/
-axiom max_consistent_subset_is_empty (c : Configuration) : Prop
+Computed concretely by our verified ComputableReducer. -/
+def max_consistent_subset_is_empty (c : Configuration) : Prop :=
+  ComputableReducer.isComputablyDReducible c = true
 
 /-- Soundness of Reducibility (The primary theorem linking the C algorithm to Kempe Chains):
 If the max consistent subset is empty, then the configuration is D-reducible

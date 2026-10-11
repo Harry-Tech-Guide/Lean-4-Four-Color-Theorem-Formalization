@@ -4,35 +4,35 @@ namespace Math
 
 namespace Hypermap
 
-variable {D : Type} (H : Hypermap D)
+variable (H : Hypermap) [DecidableEq H.Dart]
 
 /-- The degree of a node is the length of its orbit under the `node` permutation. -/
-def nodeDegree [DecidableEq D] (d : D) : Nat :=
-  (orbit H.node d).length
+def nodeDegree (d : H.Dart) (fuel : Nat := 1000) : Nat :=
+  (getOrbit H.node fuel d).length
 
 /-- The degree of a face is the length of its orbit under the `face` permutation. -/
-def faceDegree [DecidableEq D] (d : D) : Nat :=
-  (orbit H.face d).length
+def faceDegree (d : H.Dart) (fuel : Nat := 1000) : Nat :=
+  (getOrbit H.face fuel d).length
 
 end Hypermap
 
 namespace Discharging
 
-variable {D : Type} [DecidableEq D] (H : Hypermap D)
+variable (H : Hypermap) [DecidableEq H.Dart]
 
 /-- The fundamental principle of the Discharging Method.
 By Euler's formula, in a maximal planar graph (where every face is a triangle),
 the sum of (6 - degree(v)) over all vertices is exactly 12.
 To avoid rational numbers, we multiply the charge by 10.
 Initial charge = 10 * (6 - degree(v)) -/
-def initialCharge (v : D) : Int :=
-  10 * (6 - (Hypermap.nodeDegree H v : Int))
+def initialCharge (v : H.Dart) (fuel : Nat := 1000) : Int :=
+  10 * (6 - (Hypermap.nodeDegree H v fuel : Int))
 
 /-- A total charge function over the hypermap. 
 We only sum over canonical darts (one per vertex) to avoid double counting. -/
-def totalInitialCharge (darts : List D) : Int :=
+def totalInitialCharge (darts : List H.Dart) : Int :=
   let G := Hypermap.extractGraph H darts
-  let rec sum (vs : List D) (acc : Int) :=
+  let rec sum (vs : List H.Dart) (acc : Int) :=
     match vs with
     | [] => acc
     | v :: rest => sum rest (acc + initialCharge H v)
@@ -51,9 +51,9 @@ structure ChargeShift (D : Type) where
   conservation : ∀ x y, shift x y = - (shift y x)
 
 /-- The final charge of a vertex after applying a set of discharging rules. -/
-def finalCharge (rule : ChargeShift D) (darts : List D) (v : D) : Int :=
+def finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (v : H.Dart) : Int :=
   let G := Hypermap.extractGraph H darts
-  let rec sumShifts (targets : List D) (acc : Int) :=
+  let rec sumShifts (targets : List H.Dart) (acc : Int) :=
     match targets with
     | [] => acc
     | t :: rest => sumShifts rest (acc - rule.shift v t)
@@ -69,7 +69,7 @@ Since charge is conserved, the total final charge must be 120.
 Therefore, such a graph cannot exist. 
 If we define the rules so they only work when a graph DOES NOT contain a reducible configuration,
 this contradiction proves the unavoidable set must be present! -/
-def UnavoidableSetExists (rule : ChargeShift D) (darts : List D) : Prop :=
+def UnavoidableSetExists (rule : ChargeShift H.Dart) (darts : List H.Dart) : Prop :=
   (∀ v ∈ (Hypermap.extractGraph H darts).vertices, finalCharge H rule darts v ≤ 0) → False
 
 end Discharging

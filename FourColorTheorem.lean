@@ -1,3 +1,4 @@
+import FourColorTheorem.Math.Topology
 import FourColorTheorem.Math.Hypermap
 import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Coloring

@@ -8,6 +8,14 @@ inductive Color
   | c0 | c1 | c2 | c3
   deriving DecidableEq, Repr
 
+instance : Inhabited Color := ⟨Color.c0⟩
+
+def Color.toNat : Color → Nat
+  | c0 => 0
+  | c1 => 1
+  | c2 => 2
+  | c3 => 3
+
 namespace Hypermap
 
 variable (H : Hypermap)
