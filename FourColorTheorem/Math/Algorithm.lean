@@ -40,10 +40,10 @@ Computed concretely by our verified ComputableReducer. -/
 def max_consistent_subset_is_empty (c : Configuration) : Prop :=
   ComputableReducer.isComputablyDReducible c = true
 
-/-- Soundness of Reducibility (The primary theorem linking the C algorithm to Kempe Chains):
+/-- Soundness property of Reducibility (linking matching elimination to Kempe Chains):
 If the max consistent subset is empty, then the configuration is D-reducible
 (meaning every non-extending coloring can be Kempe-swapped to an extending one). -/
-axiom reducibility_soundness (c : Configuration) :
+def ReducibilitySoundness (c : Configuration) : Prop :=
   max_consistent_subset_is_empty c → IsDReducible c
 
 end Math
