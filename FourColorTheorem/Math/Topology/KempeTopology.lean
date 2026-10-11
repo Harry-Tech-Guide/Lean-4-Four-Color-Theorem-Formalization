@@ -106,4 +106,10 @@ noncomputable def swapKempeChain (vc : VertexColoring H) (a b : Color) (start : 
       · simp only [hd, he, if_false]
         exact hp }
 
+/-- Kempe swap on a FaceColoring by topological duality. -/
+noncomputable def swapFaceKempeChain (fc : FaceColoring H) (a b : Color) (start : H.Dart) :
+    FaceColoring H :=
+  vertexColoringOfDualToFaceColoring H 
+    (swapKempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a b start)
+
 end Hypermap

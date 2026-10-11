@@ -29,6 +29,15 @@ def extendsToInterior (c : Configuration) (b : BoundaryColoring c) : Prop :=
 def boundaryKempeSwap (_ : Configuration) (b : Nat → Color) (a b_col : Color) (S : Nat → Bool) : Nat → Color :=
   fun i => if S i then Hypermap.swapColor (b i) a b_col else b i
 
+/-- Swapping twice with the same boundary Kempe swap is the identity. -/
+theorem boundaryKempeSwap_inv (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool) :
+    boundaryKempeSwap c (boundaryKempeSwap c b a b_col S) a b_col S = b := by
+  funext i
+  dsimp [boundaryKempeSwap]
+  split
+  · exact Hypermap.swapColor_inv (b i) a b_col
+  · rfl
+
 /-- 
 Kempe Equivalence of Boundary Colorings:
 Two boundary colorings `b1` and `b2` are Kempe equivalent if there exists a sequence of
