@@ -44,7 +44,7 @@ theorem Walk.toList_snoc {d1 d2 d3 : H.Dart} (w : Walk H d1 d2) (s : Step H d2 d
     Walk.toList H (Walk.snoc H w s) = Walk.toList H w ++ [d3] := by
   induction w with
   | refl d => simp [Walk.snoc, Walk.toList]
-  | step s' w ih => simp [Walk.snoc, Walk.toList, ih]
+  | step _ w ih => simp [Walk.snoc, Walk.toList, ih]
 
 /-- Every node step can be undone by a step. -/
 theorem Step.node_back (d : H.Dart) : Step H (H.node.f d) d :=

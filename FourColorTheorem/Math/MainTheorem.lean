@@ -56,11 +56,15 @@ theorem computable_reduction_sound (c : Configuration) :
 
 axiom reducibility_theorem (c : Configuration) : c ∈ theUnavoidableSet → ComputableReducer.isComputablyDReducible c = true
 
+/-- Composition of computational reducibility certificate and algebraic soundness:
+    Every configuration in the unavoidable set is mathematically D-reducible. -/
+theorem unavoidable_is_reducible (c : Configuration) (hc : c ∈ theUnavoidableSet) : IsDReducible c :=
+  computable_reduction_sound c (reducibility_theorem c hc)
+
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction). -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by
   have ⟨c, hc_in_set, hc_appears⟩ := unavoidability_theorem H darts mc.is_planar mc.is_bridgeless
-  have hc_reducible := reducibility_theorem c hc_in_set
-  have hc_true_reducible := computable_reduction_sound c hc_reducible
+  have hc_true_reducible := unavoidable_is_reducible c hc_in_set
   exact no_reducible_in_minimal H darts mc c hc_appears hc_true_reducible
 
 /-- If a counterexample exists, there exists a counterexample (a planar, bridgeless, uncolorable map). -/

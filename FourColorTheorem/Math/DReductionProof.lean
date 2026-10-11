@@ -11,14 +11,6 @@ open Classical
 def ConfigLiveSet (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) : (Fin k → Color) → Prop :=
   fun cols => ¬ Hypermap.IsExtensiblePure H k R cols
 
-/-- A configuration's D-reducibility check in FastReducer computes the bitwise fixed point
-    of the non-extending boundary colorings. If it terminates with dReducible = true,
-    the live set has been completely emptied. -/
-axiom check_empties_liveset (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) 
-  (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
-  MatchesTopology H k R c →
-  (Math.FastReducer.check c md pow3).dReducible = true → 
-  Hypermap.IsEmptyLiveSet k (ConfigLiveSet H k R)
 
 /-- Any coloring outside the live set is extensible to the interior.
     (This is a direct theorem by definition of ConfigLiveSet and classical logic). -/
@@ -57,18 +49,7 @@ theorem size_eq_of_isValidRingColoring (k : Nat) (cols : Array Color) (h : Hyper
     contradiction
   · exact eq_of_beq heq
 
-/-- The final architecture link for D-Reducibility. -/
-theorem dreduction_is_sound (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
-  MatchesTopology H k R c → 
-  (Math.FastReducer.check c md pow3).dReducible = true → 
-  Hypermap.IsReducible H k R := by
-  intro hMatch hCheck
-  have hEmpty := check_empties_liveset c md pow3 H k R hMatch hCheck
-  have hExt := outside_liveset_is_extensible H k R
-  intro cols hValid
-  have hRed := Hypermap.empty_liveset_implies_reducible H k R (ConfigLiveSet H k R) hEmpty hExt
-  have hSize : cols.size = k := size_eq_of_isValidRingColoring k cols hValid
-  have hPure := hRed (fun i => cols[i.val]'(by rw [hSize]; exact i.isLt))
-  exact pure_extensible_implies_array H k R cols hSize hValid hPure
+-- The bridge between empty live set and D-reducibility is
+-- proven directly in `FourColorTheorem.Math.Reflection` via `fast_reducer_soundness`.
 
 end FourColorTheorem

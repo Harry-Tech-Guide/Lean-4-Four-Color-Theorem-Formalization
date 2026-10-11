@@ -19,7 +19,7 @@ theorem perm_ext {E : Type} (p q : Perm E) (hf : p.f = q.f) (hinv : p.inv = q.in
   subst hinv
   rfl
 
-theorem fixed_inv (p : Perm D) (d : D) (h : IsFixedPoint p d) : p.inv d = d := by
+theorem fixed_inv {E : Type} (p : Perm E) (d : E) (h : IsFixedPoint p d) : p.inv d = d := by
   have h2 := p.left_inv d
   unfold IsFixedPoint at h
   rw [h] at h2

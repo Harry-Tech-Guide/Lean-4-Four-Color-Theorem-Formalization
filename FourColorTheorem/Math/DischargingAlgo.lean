@@ -260,7 +260,6 @@ partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
       if w >= st.upp.size then continue
       if st.used[w]! then continue
       
-      let is_interior := k >= st.c.ringSize
       let exp_deg := st.degrees[k]!
       if exp_deg > st.upp[w]! then continue
       
