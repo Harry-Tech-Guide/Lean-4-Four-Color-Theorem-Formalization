@@ -107,12 +107,72 @@ structure MinimalCounterexample (H : Hypermap) [DecidableEq H.Dart] (darts : Lis
   is_minimal : ∀ (H' : Hypermap) [DecidableEq H'.Dart] (darts' : List H'.Dart),
     darts'.length < darts.length → IsPlanar H' darts' → Hypermap.isBridgeless H' darts' → Nonempty (MapColoring H')
 
-/-- A key lemma: A minimal counterexample cannot contain ANY D-reducible configuration.
-If it did, the map could be reduced, colored, and the coloring extended, proving it
-was colorable in the first place! -/
-axiom no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+/-- A Reduction Witness for configuration `c` in hypermap `H`:
+    Provides a strictly smaller planar bridgeless hypermap `H_ext` whose 4-coloring
+    restricts to a boundary coloring that, when extended to the interior of `c`,
+    glues into a valid 4-coloring of the entire hypermap `H`. -/
+structure ReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) where
+  H_ext : Hypermap
+  dec_ext : DecidableEq H_ext.Dart
+  darts_ext : List H_ext.Dart
+  smaller : darts_ext.length < darts.length
+  planar : @IsPlanar H_ext (@instBEqOfDecidableEq H_ext.Dart dec_ext) darts_ext darts_ext.length
+  bridgeless : Hypermap.isBridgeless H_ext darts_ext
+  bnd_coloring : MapColoring H_ext → BoundaryColoring c
+  valid_bnd : ∀ col, IsValidBoundaryColoring c (bnd_coloring col)
+  glue : ∀ (col : MapColoring H_ext) (ext : Nat → Color),
+    (∀ i < c.ringSize, ext i = bnd_coloring col i) →
+    IsValidConfigColoring c ext →
+    MapColoring H
+
+/-- A Full Reduction Witness extends a Reduction Witness with Kempe chain pullback:
+    any boundary coloring reachable via Kempe chain swaps from `col` can be realized
+    by an exterior coloring `col'`. -/
+structure FullReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) extends ReductionWitness H darts c where
+  kempe_pullback : ∀ (col : MapColoring H_ext) (b' : BoundaryColoring c),
+    kempeEquivalent c (bnd_coloring col) b' →
+    ∃ col' : MapColoring H_ext, bnd_coloring col' = b'
+
+/-- Core Reducibility Contradiction Theorem:
+    If a configuration in a minimal counterexample admits a full reduction witness,
+    then D-reducibility strictly produces a valid 4-coloring of H, contradicting uncolorability. -/
+theorem no_reducible_with_full_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (mc : MinimalCounterexample H darts) (c : Configuration)
+    (w : FullReductionWitness H darts c)
+    (hRed : IsDReducible c) : False := by
+  have hNonempty := @MinimalCounterexample.is_minimal H _ darts mc w.H_ext w.dec_ext w.darts_ext w.smaller w.planar w.bridgeless
+  rcases hNonempty with ⟨col_ext⟩
+  have hbnd_valid := w.valid_bnd col_ext
+  have h_cases := hRed (w.bnd_coloring col_ext) hbnd_valid
+  cases h_cases with
+  | inl hExtDirect =>
+    rcases hExtDirect with ⟨full, h_match, h_full_valid⟩
+    have h_glued := w.glue col_ext full (fun i hi => h_match i hi) h_full_valid
+    exact mc.not_colorable h_glued
+  | inr hKempe =>
+    rcases hKempe with ⟨b', _, hEquiv, ⟨full', h_match', h_full_valid'⟩⟩
+    rcases w.kempe_pullback col_ext b' hEquiv with ⟨col_ext', h_col_b'⟩
+    have h_match_rewritten : ∀ i < c.ringSize, full' i = w.bnd_coloring col_ext' i := by
+      intro i hi
+      rw [h_col_b']
+      exact h_match' i hi
+    have h_glued := w.glue col_ext' full' h_match_rewritten h_full_valid'
+    exact mc.not_colorable h_glued
+
+/-- Topological Surgery Axiom: Embedding a reducible configuration into a hypermap
+    yields a topological full reduction witness. -/
+axiom reducible_reduction_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) (c : Configuration) :
-  appearsIn c H darts → IsDReducible c → False
+  appearsIn c H darts → FullReductionWitness H darts c
+
+/-- A key lemma: A minimal counterexample cannot contain ANY D-reducible configuration.
+    Proved directly from the existence of a FullReductionWitness. -/
+theorem no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (mc : MinimalCounterexample H darts) (c : Configuration) :
+  appearsIn c H darts → IsDReducible c → False := by
+  intro hApp hRed
+  have w := reducible_reduction_witness H darts mc c hApp
+  exact no_reducible_with_full_witness H darts mc c w hRed
 
 /-- The Unavoidability Theorem: 
 Any planar, bridgeless map must contain at least one configuration from our unavoidable set. -/
