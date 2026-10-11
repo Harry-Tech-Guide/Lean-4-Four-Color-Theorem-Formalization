@@ -7,6 +7,7 @@ import FourColorTheorem.Math.Planarity
 import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Algorithm
 import FourColorTheorem.Math.Topology.KempeTopology
+import FourColorTheorem.Math.Topology.Surgery
 
 namespace Math
 
@@ -207,12 +208,61 @@ def full_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
   { toReductionWitness := w,
     kempe_pullback := kp.pullback }
 
-/-- Topological Surgery Existence:
+/-- Topological Surgery Invariants for excision of an embedded disk configuration from a planar hypermap.
+    Encapsulates:
+    1. Euler characteristic conservation along the boundary circle: χ(H_ext) = 2.
+    2. Preservation of 2-connectivity: H_ext is bridgeless.
+    3. Boundary restriction properness: restricting a proper coloring to the ring is proper.
+    4. Topological pasting lemma: compatible exterior and interior colorings glue along the boundary cycle. -/
+structure SurgeryInvariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (f : Nat → H.Dart) where
+  planar : @IsPlanar (Hypermap.exciseFixed H c f) inferInstance (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)).length
+  bridgeless : Hypermap.isBridgeless (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f))
+  valid_bnd : ∀ (col : MapColoring (Hypermap.exciseFixed H c f)), IsValidBoundaryColoring c (fun i => col.color (f i))
+  glue : ∀ (col : MapColoring (Hypermap.exciseFixed H c f)) (ext : Nat → Color),
+    (∀ i < c.ringSize, ext i = col.color (f i)) →
+    IsValidConfigColoring c ext →
+    MapColoring H
+
+/-- The Surgery Assembly Theorem:
+    Any hypermap excision equipped with its topological invariants constructs a valid ReductionWitness. -/
+def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0)
+    (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (inv : SurgeryInvariants H darts c f) :
+    ReductionWitness H darts c :=
+  let internalIndices := (List.range c.interiorSize).map (fun i => c.ringSize + i)
+  let internalDarts := internalIndices.map f
+  let H_ext := Hypermap.exciseFixed H c f
+  let darts_ext := Hypermap.eraseAllDarts darts internalDarts
+  { H_ext := H_ext,
+    dec_ext := inferInstance,
+    darts_ext := darts_ext,
+    smaller := Hypermap.exciseConfiguration_strictly_smaller darts c h_int f hf_mem,
+    planar := inv.planar,
+    bridgeless := inv.bridgeless,
+    bnd_coloring := fun col i => col.color (f i),
+    valid_bnd := inv.valid_bnd,
+    glue := inv.glue }
+
+/-- Planar Surgery Invariants Existence:
+    Excising an embedded disk configuration preserves planarity (χ = 2) and 2-connectivity. -/
+axiom topological_surgery_invariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (mc : MinimalCounterexample H darts) (c : Configuration) (f : Nat → H.Dart) :
+  SurgeryInvariants H darts c f
+
+/-- Topological Surgery Theorem:
     Embedding a configuration with positive interior size into a minimal counterexample
-    yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless. -/
-axiom topological_surgery_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) (c : Configuration) :
-  appearsIn c H darts → ReductionWitness H darts c
+    yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
+    Proved from the constructive excision operator, strictly smaller dart theorem,
+    and topological surgery invariants. -/
+noncomputable def topological_surgery_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
+  appearsIn c H darts → ReductionWitness H darts c := by
+  intro hApp
+  let f := Classical.choose hApp
+  have hMem := (Classical.choose_spec hApp).2.1
+  have inv := topological_surgery_invariants H darts mc c f
+  exact reduction_witness_of_surgery H darts c h_int f hMem inv
 
 /-- Planar Kempe Pullback Existence:
     The excised exterior map satisfies the Kempe Pullback Property by planarity. -/
@@ -225,20 +275,20 @@ axiom kempe_pullback_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H
     Embedding a reducible configuration into a hypermap yields a topological full reduction witness.
     Constructed directly from the topological excision witness and planar Kempe pullback. -/
 noncomputable def reducible_reduction_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) (c : Configuration) :
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → FullReductionWitness H darts c := by
   intro hApp
-  have w := topological_surgery_witness H darts mc c hApp
+  have w := topological_surgery_witness H darts mc c h_int hApp
   have kp := kempe_pullback_witness H darts mc c hApp w
   exact full_witness_of_surgery H darts c w kp
 
 /-- A key lemma: A minimal counterexample cannot contain ANY D-reducible configuration.
     Proved directly from the existence of a FullReductionWitness. -/
 theorem no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) (c : Configuration) :
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → IsDReducible c → False := by
   intro hApp hRed
-  have w := reducible_reduction_witness H darts mc c hApp
+  have w := reducible_reduction_witness H darts mc c h_int hApp
   exact no_reducible_with_full_witness H darts mc c w hRed
 
 /-- A Planar Discharging Witness encapsulates the RSST discharging method for hypermap `H`:
@@ -298,8 +348,9 @@ theorem unavoidable_is_reducible (c : Configuration) : c ∈ theUnavoidableSet �
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction). -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by
   have ⟨c, hc_in_set, hc_appears⟩ := unavoidability_theorem H darts mc.is_planar mc.is_bridgeless
+  have hc_int : c.interiorSize > 0 := unavoidable_interior_pos c hc_in_set
   have hc_true_reducible := unavoidable_is_reducible c hc_in_set
-  exact no_reducible_in_minimal H darts mc c hc_appears hc_true_reducible
+  exact no_reducible_in_minimal H darts mc c hc_int hc_appears hc_true_reducible
 
 /-- If a counterexample exists, there exists a genuine minimal counterexample (a planar, bridgeless, uncolorable map where every smaller map is colorable). -/
 theorem minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 

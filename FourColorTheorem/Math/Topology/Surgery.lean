@@ -1,5 +1,6 @@
 import FourColorTheorem.Math.Hypermap
 import FourColorTheorem.Math.Reducibility
+import FourColorTheorem.Math.Coloring
 
 namespace Hypermap
 
@@ -205,5 +206,17 @@ theorem exciseConfiguration_strictly_smaller {D : Type} [DecidableEq D]
     dsimp [Math.Configuration.totalNodes]
     omega
   exact eraseAllDarts_strictly_smaller_of_mem darts _ (f c.ringSize) h_dart_mem h_f_in_darts
+
+/-- Boundary coloring restriction of a face coloring of the excised map. -/
+def configBoundaryColoring (H : Hypermap) (c : Math.Configuration) (f : Nat → H.Dart) (col : FaceColoring H) : Math.BoundaryColoring c :=
+  fun i => col.color (f i)
+
+/-- Topologically glued dart color: internal darts take their color from `ext`,
+    exterior and boundary darts take their color from `col`. -/
+def gluedColor (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart)
+    (col : FaceColoring H) (ext : Nat → Color) (d : H.Dart) : Color :=
+  match (List.range c.interiorSize).find? (fun i => f (c.ringSize + i) = d) with
+  | some i => ext (c.ringSize + i)
+  | none => col.color d
 
 end Hypermap
