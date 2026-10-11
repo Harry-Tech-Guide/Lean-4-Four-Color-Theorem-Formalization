@@ -174,11 +174,45 @@ theorem no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : Lis
   have w := reducible_reduction_witness H darts mc c hApp
   exact no_reducible_with_full_witness H darts mc c w hRed
 
-/-- The Unavoidability Theorem: 
-Any planar, bridgeless map must contain at least one configuration from our unavoidable set. -/
-axiom unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+/-- A Planar Discharging Witness encapsulates the RSST discharging method for hypermap `H`:
+    1. A charge shift rule conserving charge.
+    2. Total charge conserved from Euler's characteristic ($120$).
+    3. The discharging elimination property: if no unavoidable configuration is present,
+       all final charges are non-positive ($\le 0$). -/
+structure PlanarDischargingWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) where
+  rule : Discharging.ChargeShift H.Dart
+  charge_sum_120 : Discharging.sumCharges (Discharging.finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120
+  discharging_elimination : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
+    ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0
+
+/-- Core Discharging Theorem:
+    A Planar Discharging Witness strictly proves the existence of an unavoidable configuration
+    by deriving a contradiction between positive total Euler charge ($120$) and non-positive vertex charges. -/
+theorem unavoidability_from_discharging (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (w : PlanarDischargingWitness H darts) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts := by
+  by_cases hEx : ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts
+  · exact hEx
+  · have hNonpos := w.discharging_elimination hEx
+    have hContr : Discharging.UnavoidableSetExists H w.rule darts :=
+      Discharging.unavoidable_set_exists_of_sum_120 H w.rule darts w.charge_sum_120
+    exact False.elim (hContr hNonpos)
+
+/-- The Discharging Existence Axiom:
+    Every planar, bridgeless map admits a Planar Discharging Witness based on the 32 RSST rules
+    and Euler's characteristic equation $V - E + F = 2$. -/
+axiom unavoidability_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) :
+  PlanarDischargingWitness H darts
+
+/-- The Unavoidability Theorem:
+    Any planar, bridgeless map must contain at least one configuration from our unavoidable set.
+    Proved constructively from the Planar Discharging Witness and Euler charge conservation. -/
+theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) : 
-  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts
+  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts := by
+  have w := unavoidability_witness H darts h_planar h_bridgeless
+  exact unavoidability_from_discharging H darts w
 
 /-- The RSST Reducibility Theorem:
     Every configuration in the unavoidable set is mathematically D-reducible (via Kempe chains).

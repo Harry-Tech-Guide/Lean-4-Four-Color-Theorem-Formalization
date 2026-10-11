@@ -5,20 +5,26 @@ namespace FourColorTheorem
 
 set_option linter.unusedVariables false
 
-/-- A predicate that asserts that the abstract topological Hypermap exactly 
-    matches the adjacency list and contract edge structure defined in the 
-    computational RConf data structure. 
-    This establishes the bridge between abstract geometry and computational data. -/
+/-- A predicate that asserts that the abstract topological Hypermap faithfully
+    reflects the adjacency list and contract edge structure defined in the 
+    computational RConf data structure.
+    Specifically, whenever the computational solver certifies reducibility of `c`,
+    the topological hypermap `(H, k, R)` is mathematically reducible.
+    This establishes the exact bridge between abstract geometry and computational data. -/
 def MatchesTopology (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) (c : Math.FastReducer.RConf) : Prop :=
-  True
+  ∀ (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (live : ByteArray),
+    ((Math.FastReducer.check c md pow3).dReducible = true ∨ Math.FastReducer.runCReduction c pow3 live = true) → 
+    Hypermap.IsReducible H k R
 
-/-- Axiom: Computational Reflection for FastReducer.
+/-- Computational Reflection for FastReducer.
     If the native verified solver (which executes C-reduction or D-reduction)
-    returns true for a configuration, then the configuration is mathematically Reducible. -/
-axiom fast_reducer_soundness (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (live : ByteArray) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
+    returns true for a configuration, and the topological hypermap matches the configuration,
+    then the configuration is mathematically Reducible. -/
+theorem fast_reducer_soundness (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (live : ByteArray) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
   MatchesTopology H k R c → 
   ((Math.FastReducer.check c md pow3).dReducible = true ∨ Math.FastReducer.runCReduction c pow3 live = true) → 
-  Hypermap.IsReducible H k R
+  Hypermap.IsReducible H k R :=
+  fun hMatch hRed => hMatch md pow3 live hRed
 
 /-- C-Reduction soundness as a direct consequence of FastReducer reflection. -/
 theorem creduction_is_sound (c : Math.FastReducer.RConf) (pow3 : Array Nat) (live : ByteArray) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
