@@ -12,8 +12,8 @@ variable (H : Hypermap) (k : Nat) (R : Ring H k)
     the boundary ring darts into connected Kempe components. 
     This relation represents whether dart i and dart j belong to the same component. -/
 def IsValidExteriorKempePartition (c : VertexColoring H) (a b : Color) (equiv : Fin k → Fin k → Prop) : Prop :=
-  -- It is a formal equivalence relation
-  (∀ i, equiv i i) ∧
+  -- It is an equivalence relation on the subset of darts colored a or b
+  (∀ i, (c.color (R.darts[i.val]'(by rw [R.size_eq]; exact i.isLt)) = a ∨ c.color (R.darts[i.val]'(by rw [R.size_eq]; exact i.isLt)) = b) → equiv i i) ∧
   (∀ i j, equiv i j → equiv j i) ∧
   (∀ i j l, equiv i j → equiv j l → equiv i l) ∧
   -- It strictly only relates boundary darts that are colored a or b

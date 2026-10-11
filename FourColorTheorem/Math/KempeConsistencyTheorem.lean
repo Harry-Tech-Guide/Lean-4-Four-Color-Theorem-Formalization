@@ -14,7 +14,7 @@ def IsExtensiblePure (cols : Fin k → Color) : Prop :=
 /-- To evaluate Kempe Chains on the boundary without knowing the interior,
     we define exterior equivalence directly on the Ring Coloring. -/
 def IsValidRingPartition (cols : Fin k → Color) (a b : Color) (equiv : Fin k → Fin k → Prop) : Prop :=
-  (∀ i, equiv i i) ∧
+  (∀ i, (cols i = a ∨ cols i = b) → equiv i i) ∧
   (∀ i j, equiv i j → equiv j i) ∧
   (∀ i j l, equiv i j → equiv j l → equiv i l) ∧
   (∀ i j, equiv i j → (cols i = a ∨ cols i = b)) ∧
