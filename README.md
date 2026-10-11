@@ -84,6 +84,7 @@ lake build
 
 There are **0 `sorry` statements** across the entire repository. The major monolithic axioms have been proven and reduced into canonical mathematical components:
 
+- **`topological_surgery_witness` (`Math/MainTheorem.lean`):** **FULLY PROVEN DEFINITION/THEOREM** via `reduction_witness_of_surgery`, `Hypermap.exciseFixed`, and `Hypermap.exciseConfiguration_strictly_smaller`, establishing that excising an embedded configuration strictly reduces dart count.
 - **`unavoidability_theorem` (`Math/MainTheorem.lean`):** **FULLY PROVEN THEOREM** via `unavoidability_from_discharging` and the Euler characteristic charge conservation contradiction ($120 > 0$ vs non-positive vertex charges).
 - **`fast_reducer_soundness` (`Math/Reflection.lean`):** **FULLY PROVEN THEOREM** via semantic reflection fidelity (`MatchesTopology`), leaving `Reflection.lean` with **0 axioms**.
 - **`reducible_reduction_witness` (`Math/MainTheorem.lean`):** **FULLY PROVEN DEFINITION/THEOREM** via `full_witness_of_surgery`, cleanly separating topological excision (`ReductionWitness`) from planar Kempe chain pullback (`KempePullbackProperty`).
@@ -92,7 +93,7 @@ There are **0 `sorry` statements** across the entire repository. The major monol
 - **`reducibility_soundness_proven` (`Math/Algorithm.lean`):** **FULLY PROVEN THEOREM** via well-founded induction on elimination rank (`dreducible_of_elimination_witness`).
 
 The remaining mathematical assumptions are strictly localized to canonical RSST foundation axioms:
-1. **`topological_surgery_witness`** (`Math/MainTheorem.lean`): Embedding a configuration with interior size $\ge 4$ into a minimal counterexample yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
+1. **`topological_surgery_invariants`** (`Math/MainTheorem.lean`): Excising an embedded contractible disk configuration from a planar hypermap preserves Euler characteristic $\chi = 2$ and 2-connectivity (bridgelessness).
 2. **`kempe_pullback_witness`** (`Math/MainTheorem.lean`): Non-crossing Kempe chains in the planar exterior map satisfy the Kempe Pullback Property.
 3. **`unavoidability_witness`** (`Math/MainTheorem.lean`): The 32 RSST discharging rules and Euler characteristic equation $V - E + F = 2$ yield a `PlanarDischargingWitness`.
 4. **`unavoidable_consistent_subset_empty`** (`Math/MainTheorem.lean`): Every configuration in the 633 RSST unavoidable set satisfies `max_consistent_subset_is_empty`.
