@@ -17,8 +17,14 @@ abbrev MapColoring (H : Hypermap) := Hypermap.FaceColoring H
 def IsPlanar (H : Hypermap) [BEq H.Dart] (darts : List H.Dart) (fuel : Nat := darts.length) : Prop :=
   Hypermap.isPlanar H fuel darts = true
 
-/-- A placeholder for the "appearsIn" relation: a configuration physically appearing in the hypermap. -/
-axiom appearsIn (c : Configuration) (H : Hypermap) (darts : List H.Dart) : Prop
+/-- A configuration `c` appears in hypermap `H` (on dart list `darts`) if there is an
+    injective embedding of the configuration's vertices into canonical darts such that
+    all adjacency relations are preserved. -/
+def appearsIn (c : Configuration) (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) : Prop :=
+  ∃ (f : Nat → H.Dart),
+    (∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j) ∧
+    (∀ i < c.totalNodes, f i ∈ darts) ∧
+    (∀ i < c.totalNodes, ∀ j < c.totalNodes, c.adj i j = true → Hypermap.areAdjacentDarts H (f i) (f j) = true)
 
 /-- We proceed by assuming a Minimal Counterexample exists.
 A minimal counterexample is a planar map that cannot be 4-colored, but any

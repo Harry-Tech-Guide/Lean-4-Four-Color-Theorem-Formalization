@@ -14,7 +14,7 @@ def RSSTRules : List RawRule := theRules
 
 /-- A hypermap contains an unavoidable configuration if one of the 633 
 configurations is a valid topological submap of H. -/
-def containsUnavoidable (H : Hypermap) (darts : List H.Dart) : Prop :=
+def containsUnavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) : Prop :=
   ∃ (c : Configuration), c ∈ theUnavoidableSet ∧ 
   appearsIn c H darts
 
@@ -24,8 +24,9 @@ contain any of the 633 unavoidable configurations, the resulting charge
 distribution is strictly positive everywhere. 
 However, Euler's formula guarantees the sum of charges is exactly 120, 
 which means average charge is 0, contradicting positive bounded charge! -/
-axiom discharging_forces_unavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+theorem discharging_forces_unavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (h_planar : IsPlanar H darts) (h_no_bridge : Hypermap.isBridgeless H darts) : 
-  containsUnavoidable H darts
+  containsUnavoidable H darts :=
+  unavoidability_theorem H darts h_planar h_no_bridge
 
 end Math
