@@ -119,6 +119,27 @@ def finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (v : H.Dart) :
   -- The final charge is the initial charge PLUS all charge received MINUS all charge sent.
   (initialCharge H v) - sumShifts G.vertices 0
 
+def sumCharges {D : Type} (f : D → Int) : List D → Int
+  | [] => 0
+  | v :: vs => f v + sumCharges f vs
+
+theorem sumCharges_nonpos {D : Type} (f : D → Int) (vs : List D)
+    (h : ∀ v ∈ vs, f v ≤ 0) : sumCharges f vs ≤ 0 := by
+  induction vs with
+  | nil =>
+    dsimp [sumCharges]
+    omega
+  | cons v vs ih =>
+    dsimp [sumCharges]
+    have hv : f v ≤ 0 := h v (List.Mem.head vs)
+    have hvs : sumCharges f vs ≤ 0 := ih (fun x hx => h x (List.Mem.tail v hx))
+    omega
+
+theorem positive_charge_contradiction {D : Type} (f : D → Int) (vs : List D)
+    (hSum : sumCharges f vs = 120) (hNonpos : ∀ v ∈ vs, f v ≤ 0) : False := by
+  have hLe := sumCharges_nonpos f vs hNonpos
+  omega
+
 /-- Unavoidability Theorem State:
 If a discharging rule exists such that the final charge of EVERY vertex is non-positive,
 then the sum of final charges is non-positive. 
@@ -130,6 +151,13 @@ If we define the rules so they only work when a graph DOES NOT contain a reducib
 this contradiction proves the unavoidable set must be present! -/
 def UnavoidableSetExists (rule : ChargeShift H.Dart) (darts : List H.Dart) : Prop :=
   (∀ v ∈ (Hypermap.extractGraph H darts).vertices, finalCharge H rule darts v ≤ 0) → False
+
+/-- If the sum of final charges across vertices is 120 (conserved from Euler's characteristic),
+    then an unavoidable configuration must exist! -/
+theorem unavoidable_set_exists_of_sum_120 (rule : ChargeShift H.Dart) (darts : List H.Dart)
+    (hSum : sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120) :
+    UnavoidableSetExists H rule darts :=
+  fun hNonpos => positive_charge_contradiction (finalCharge H rule darts) _ hSum hNonpos
 
 end Discharging
 end Math
