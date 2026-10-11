@@ -1,4 +1,5 @@
 import FourColorTheorem.Math.Hypermap
+import FourColorTheorem.Math.Reducibility
 
 namespace Hypermap
 
@@ -73,5 +74,48 @@ def deleteEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
 def contractEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
   have : DecidableEq H.dual.Dart := inferInstanceAs (DecidableEq H.Dart)
   (H.dual.deleteEdge d).dual
+
+/-- Excises a list of darts from a hypermap by iteratively deleting their edges. -/
+def exciseDarts (H : Hypermap) [DecidableEq H.Dart] : List H.Dart → Hypermap
+  | [] => H
+  | d :: ds => exciseDarts (H.deleteEdge d) ds
+
+/-- Excises an embedded configuration from a hypermap by deleting all internal darts.
+    The internal darts are those with indices from ringSize to totalNodes - 1. -/
+def exciseConfiguration (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart) : Hypermap :=
+  let internalIndices := List.range c.interiorSize |>.map (fun i => c.ringSize + i)
+  let internalDarts := internalIndices.map f
+  exciseDarts H internalDarts
+
+/-- Recursively erases a list of excised darts from the dart list. -/
+def eraseAllDarts {D : Type} [BEq D] : List D → List D → List D
+  | darts, [] => darts
+  | darts, d :: ds => eraseAllDarts (darts.erase d) ds
+
+/-- Erasing darts can only decrease or preserve list length. -/
+theorem eraseAllDarts_length_le {D : Type} [BEq D] (darts : List D) (excised : List D) :
+    (eraseAllDarts darts excised).length ≤ darts.length := by
+  induction excised generalizing darts with
+  | nil =>
+    dsimp [eraseAllDarts]
+    exact Nat.le_refl _
+  | cons d ds ih =>
+    dsimp [eraseAllDarts]
+    have h1 := ih (darts.erase d)
+    have h2 := List.length_erase_le d darts
+    omega
+
+/-- Erasing a non-empty list of excised darts containing at least one dart from the list
+    strictly decreases the dart count. -/
+theorem eraseAllDarts_strictly_smaller {D : Type} [BEq D] [LawfulBEq D] (darts : List D) (d : D) (ds : List D)
+    (hd : d ∈ darts) :
+    (eraseAllDarts darts (d :: ds)).length < darts.length := by
+  dsimp [eraseAllDarts]
+  have hLe := eraseAllDarts_length_le (darts.erase d) ds
+  have hLt : (darts.erase d).length < darts.length := by
+    have hlen := List.length_erase_of_mem hd
+    have hpos := List.length_pos_of_mem hd
+    omega
+  omega
 
 end Hypermap
