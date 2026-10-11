@@ -5,6 +5,7 @@ import FourColorTheorem.Math.U633Parser
 import FourColorTheorem.Math.ComputableReducer
 import FourColorTheorem.Math.Planarity
 import FourColorTheorem.Math.HypermapGraph
+import FourColorTheorem.Math.Algorithm
 
 namespace Math
 
@@ -43,8 +44,9 @@ axiom unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H
 /-- The Reducibility Theorem:
 Every configuration in the unavoidable set is mathematically D-reducible (via Kempe chains).
 This is what we computationally verify. -/
-axiom computable_reduction_sound (c : Configuration) :
-  ComputableReducer.isComputablyDReducible c = true → IsDReducible c
+theorem computable_reduction_sound (c : Configuration) :
+  ComputableReducer.isComputablyDReducible c = true → IsDReducible c :=
+  reducibility_soundness c
 
 axiom reducibility_theorem (c : Configuration) : c ∈ theUnavoidableSet → ComputableReducer.isComputablyDReducible c = true
 
