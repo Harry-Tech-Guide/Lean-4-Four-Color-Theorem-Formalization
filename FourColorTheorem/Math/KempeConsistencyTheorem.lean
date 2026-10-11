@@ -58,28 +58,31 @@ theorem minimal_counterexample_exterior_exists (cols : Fin k → Color) (a b : C
     have heq : i.val = l.val := congrArg Fin.val hil.1
     exact absurd heq (Nat.ne_of_lt hlt)
 
-/-- Axiom of Topological Swapping:
-    If a swap combination swapSet applied over the true exterior matching equiv 
+/-- Topological Swapping Property:
+    If a swap combination swapSet applied over a valid exterior matching equiv 
     results in an extensible boundary coloring cols', then the original coloring cols 
-    is also strictly extensible. (Swapping Kempe chains is a reversible operation). -/
-axiom kempe_swap_reversibility (H : Hypermap) (k : Nat) (R : Ring H k) (cols : Fin k → Color) (a b : Color) (equiv : Fin k → Fin k → Prop) (swapSet : Fin k → Bool) :
-  IsValidRingPartition k cols a b equiv → 
-  ValidSwapChoice k equiv swapSet → 
-  IsExtensiblePure H k R (swappedCols k cols a b swapSet) → 
-  IsExtensiblePure H k R cols
+    is also extensible. (Kempe chain reversibility on the boundary). -/
+def KempeSwapReversible (cols : Fin k → Color) : Prop :=
+  ∀ a b equiv swapSet,
+    IsValidRingPartition k cols a b equiv → 
+    ValidSwapChoice k equiv swapSet → 
+    IsExtensiblePure H k R (swappedCols k cols a b swapSet) → 
+    IsExtensiblePure H k R cols
 
 /-- The Fundamental Kempe Consistency Theorem:
-    If a valid ring coloring is Kempe-Escapable from the LiveSet, and we know that every coloring 
-    outside the LiveSet is extensible to the interior, then the coloring itself must be extensible. -/
+    If a valid ring coloring is Kempe-Escapable from the LiveSet, every coloring 
+    outside the LiveSet is extensible, and Kempe swapping is reversible on the boundary,
+    then the coloring itself is extensible. -/
 theorem kempe_consistency (LiveSet : (Fin k → Color) → Prop) (cols : Fin k → Color) :
+  KempeSwapReversible H k R cols →
   (∀ c', ¬ LiveSet c' → IsExtensiblePure H k R c') → 
   IsKempeEscapable k LiveSet cols →             
   IsExtensiblePure H k R cols := by
-  intro hExt hEscapable
+  intro hRev hExt hEscapable
   rcases hEscapable with ⟨a, ⟨b, ⟨_, hEquiv⟩⟩⟩
   have ⟨equiv, hValidEquiv⟩ := minimal_counterexample_exterior_exists k cols a b
   have ⟨swapSet, ⟨hValidSwap, hNotLive⟩⟩ := hEquiv equiv hValidEquiv
   have hExtSwapped := hExt (swappedCols k cols a b swapSet) hNotLive
-  exact kempe_swap_reversibility H k R cols a b equiv swapSet hValidEquiv hValidSwap hExtSwapped
+  exact hRev a b equiv swapSet hValidEquiv hValidSwap hExtSwapped
 
 end Hypermap
