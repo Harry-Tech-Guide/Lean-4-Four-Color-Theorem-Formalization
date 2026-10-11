@@ -64,4 +64,21 @@ def parseAllConfigs (_ : Unit) : Array Configuration :=
 def theUnavoidableSet : Array Configuration :=
   parseAllConfigs ()
 
+/-- Computational certificate: every configuration in the unavoidable set has interior size ≥ 4. -/
+theorem unavoidable_data_all_int : theUnavoidableSet.data.all (fun c => c.interiorSize >= 4) = true := by
+  native_decide
+
+/-- Every configuration in the RSST unavoidable set has at least 4 interior vertices. -/
+theorem unavoidable_interior_ge_4 (c : Configuration) (h : c ∈ theUnavoidableSet) :
+  c.interiorSize ≥ 4 := by
+  have hMem : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
+  have hTrue := List.all_eq_true.mp unavoidable_data_all_int c hMem
+  exact of_decide_eq_true hTrue
+
+/-- Every configuration in the RSST unavoidable set has strictly positive interior size. -/
+theorem unavoidable_interior_pos (c : Configuration) (h : c ∈ theUnavoidableSet) :
+  c.interiorSize > 0 := by
+  have h4 := unavoidable_interior_ge_4 c h
+  omega
+
 end Math
