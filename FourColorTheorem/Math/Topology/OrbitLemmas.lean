@@ -86,21 +86,61 @@ theorem countComponents_nil (H : Hypermap) [BEq H.Dart] (fuel : Nat) :
     countComponents H fuel [] = 0 := by
   rw [countComponents]
 
-/-
-  NOTE (correctness audit, 2026-10-11).
-  Two statements previously in this file were FALSE as stated and were removed
-  rather than left as unprovable `sorry`s:
+theorem countOrbits_singleton (p : Perm D) (fuel : Nat) (d : D) :
+    countOrbits p fuel [d] = 1 := by
+  rw [countOrbits]
+  simp [countOrbits_nil]
 
-  * `bypass_orbit_count : ¬ IsFixedPoint p d →
-        countOrbits (bypass p d) fuel l = countOrbits p fuel l + 1`
-    Counterexample: `l = []` gives `0 = 1`. A correct version needs hypotheses:
-    `l` duplicate-free, closed under `p`, containing `d`, and `fuel ≥ l.length`.
+theorem countComponents_singleton (H : Hypermap) [BEq H.Dart] (fuel : Nat) (d : H.Dart) :
+    countComponents H fuel [d] = 1 := by
+  rw [countComponents]
+  simp [countComponents_nil]
 
-  * `deleteEdge_euler_characteristic` (edge-orbit count drops by one on `l \ {d, d'}`)
-    Counterexample: any `l` not containing `d`. Same missing hypotheses as above.
+theorem getOrbit_fixed_point (p : Perm D) (d : D) (fuel : Nat) (h : IsFixedPoint p d) :
+    getOrbit p (fuel + 1) d = [d] := by
+  dsimp [getOrbit, getOrbitAux]
+  have hf : p.f d = d := h
+  have hbeq : (p.f d == d) = true := by
+    change (if p.f d = d then true else false) = true
+    rw [hf]
+    simp
+  rw [hbeq]
+  rfl
 
-  Proving the corrected versions requires a theory of `getOrbit` (that with enough
-  fuel it returns exactly the cycle of `d`), which has not been developed yet.
--/
+theorem bypass_getOrbit_self (p : Perm D) (d : D) (fuel : Nat) :
+    getOrbit (bypass p d) (fuel + 1) d = [d] :=
+  getOrbit_fixed_point (bypass p d) d fuel (bypass_self p d)
+
+theorem getOrbitAux_acc_subset (p : Perm D) (start current : D) (acc : List D) (fuel : Nat) :
+    ∀ x ∈ acc, x ∈ getOrbitAux p start current acc fuel := by
+  induction fuel generalizing current acc with
+  | zero =>
+    intro x hx
+    dsimp [getOrbitAux]
+    exact List.Mem.tail current hx
+  | succ fuel ih =>
+    intro x hx
+    dsimp [getOrbitAux]
+    split
+    · exact List.Mem.tail current hx
+    · apply ih
+      exact List.Mem.tail current hx
+
+theorem mem_getOrbitAux_current (p : Perm D) (start current : D) (acc : List D) (fuel : Nat) :
+    current ∈ getOrbitAux p start current acc fuel := by
+  induction fuel generalizing current acc with
+  | zero =>
+    dsimp [getOrbitAux]
+    exact List.Mem.head acc
+  | succ fuel _ =>
+    dsimp [getOrbitAux]
+    split
+    · exact List.Mem.head acc
+    · apply getOrbitAux_acc_subset
+      exact List.Mem.head acc
+
+theorem mem_getOrbit_self (p : Perm D) (fuel : Nat) (d : D) :
+    d ∈ getOrbit p fuel d :=
+  mem_getOrbitAux_current p d d [] fuel
 
 end Hypermap

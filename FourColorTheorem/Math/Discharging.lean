@@ -50,6 +50,65 @@ structure ChargeShift (D : Type) where
   /-- Charge is conserved: no charge is created or destroyed -/
   conservation : ∀ x y, shift x y = - (shift y x)
 
+theorem shift_self_zero {D : Type} (rule : ChargeShift D) (x : D) : rule.shift x x = 0 := by
+  have h := rule.conservation x x
+  omega
+
+def sumShiftsTo {D : Type} (rule : ChargeShift D) (v : D) : List D → Int
+  | [] => 0
+  | t :: ts => rule.shift v t + sumShiftsTo rule v ts
+
+def sumOppositeShifts {D : Type} (rule : ChargeShift D) (v : D) : List D → Int
+  | [] => 0
+  | s :: ss => rule.shift s v + sumOppositeShifts rule v ss
+
+def totalShifts {D : Type} (rule : ChargeShift D) (sources targets : List D) : Int :=
+  match sources with
+  | [] => 0
+  | s :: ss => sumShiftsTo rule s targets + totalShifts rule ss targets
+
+theorem totalShifts_cons_target {D : Type} (rule : ChargeShift D) (sources : List D) (t : D) (ts : List D) :
+    totalShifts rule sources (t :: ts) =
+      sumOppositeShifts rule t sources + totalShifts rule sources ts := by
+  induction sources with
+  | nil => rfl
+  | cons s ss ih =>
+    dsimp [totalShifts, sumShiftsTo, sumOppositeShifts]
+    rw [ih]
+    omega
+
+theorem sumShiftsTo_plus_opposite {D : Type} (rule : ChargeShift D) (v : D) (vs : List D) :
+    sumShiftsTo rule v vs + sumOppositeShifts rule v vs = 0 := by
+  induction vs with
+  | nil => rfl
+  | cons t ts ih =>
+    dsimp [sumShiftsTo, sumOppositeShifts]
+    have hcons := rule.conservation v t
+    omega
+
+theorem totalShifts_cons_self {D : Type} (rule : ChargeShift D) (v : D) (vs : List D) :
+    totalShifts rule (v :: vs) (v :: vs) =
+      rule.shift v v +
+      (sumShiftsTo rule v vs + sumOppositeShifts rule v vs) +
+      totalShifts rule vs vs := by
+  dsimp [totalShifts]
+  rw [totalShifts_cons_target]
+  dsimp [sumShiftsTo, sumOppositeShifts]
+  omega
+
+/-- Charge Conservation Theorem:
+    The sum of all charge shifts over any finite list of vertices is identically zero. -/
+theorem totalShifts_self_zero {D : Type} (rule : ChargeShift D) (vs : List D) :
+    totalShifts rule vs vs = 0 := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    rw [totalShifts_cons_self]
+    rw [shift_self_zero]
+    rw [sumShiftsTo_plus_opposite]
+    rw [ih]
+    rfl
+
 /-- The final charge of a vertex after applying a set of discharging rules. -/
 def finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (v : H.Dart) : Int :=
   let G := Hypermap.extractGraph H darts
