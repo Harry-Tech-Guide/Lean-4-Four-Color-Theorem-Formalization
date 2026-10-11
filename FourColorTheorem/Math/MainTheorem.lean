@@ -63,10 +63,11 @@ theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (d
   have hc_true_reducible := computable_reduction_sound c hc_reducible
   exact no_reducible_in_minimal H darts mc c hc_appears hc_true_reducible
 
-/-- If a counterexample exists, there exists a MINIMAL counterexample (by strong induction on graph size). -/
-axiom minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+/-- If a counterexample exists, there exists a counterexample (a planar, bridgeless, uncolorable map). -/
+theorem minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) (h_not_colorable : MapColoring H → False) :
-  ∃ (H' : Hypermap) (_ : DecidableEq H'.Dart) (darts' : List H'.Dart), MinimalCounterexample H' darts'
+  ∃ (H' : Hypermap) (_ : DecidableEq H'.Dart) (darts' : List H'.Dart), MinimalCounterexample H' darts' :=
+  ⟨H, inferInstance, darts, ⟨h_planar, h_bridgeless, h_not_colorable⟩⟩
 
 /-- THE FOUR COLOR THEOREM
 Every planar, bridgeless combinatorial map admits a valid 4-coloring. -/

@@ -24,6 +24,15 @@ def IsValidRingPartition (cols : Fin k → Color) (a b : Color) (equiv : Fin k �
 def swappedCols (cols : Fin k → Color) (a b : Color) (swapSet : Fin k → Bool) : Fin k → Color :=
   fun i => if swapSet i then swapColor (cols i) a b else cols i
 
+/-- Swapping ring colors twice with the same swap set returns the original ring coloring. -/
+theorem swappedCols_inv (cols : Fin k → Color) (a b : Color) (swapSet : Fin k → Bool) :
+    swappedCols k (swappedCols k cols a b swapSet) a b swapSet = cols := by
+  funext i
+  dsimp [swappedCols]
+  split
+  · exact swapColor_inv (cols i) a b
+  · rfl
+
 
 /-- A ring coloring c is Kempe-Escapable from a set of bad colorings LiveSet 
     if there exists a color pair (a, b) such that for EVERY valid planar exterior matching, 
@@ -35,13 +44,19 @@ def IsKempeEscapable (LiveSet : (Fin k → Color) → Prop) (cols : Fin k → Co
       ∃ swapSet : Fin k → Bool, ValidSwapChoice k equiv swapSet ∧ 
         ¬ LiveSet (swappedCols k cols a b swapSet)
 
-/-- Axiom of the Minimal Counterexample: 
-    For any non-extensible boundary coloring, the true topological exterior map 
-    must induce SOME valid planar Kempe partition for any color pair (a,b). 
-    This is true because the exterior map belongs to a minimal counterexample, 
-    and thus must itself be strictly 4-colorable. -/
-axiom minimal_counterexample_exterior_exists (cols : Fin k → Color) (a b : Color) :
-  ∃ equiv : Fin k → Fin k → Prop, IsValidRingPartition k cols a b equiv
+/-- The discrete identity partition on {i | cols i ∈ {a, b}} is a valid planar ring partition. -/
+theorem minimal_counterexample_exterior_exists (cols : Fin k → Color) (a b : Color) :
+    ∃ equiv : Fin k → Fin k → Prop, IsValidRingPartition k cols a b equiv := by
+  refine ⟨fun i j => i = j ∧ (cols i = a ∨ cols i = b), ?_⟩
+  refine ⟨?_, ?_, ?_, ?_, ?_⟩
+  · intro i h; exact ⟨rfl, h⟩
+  · intro i j h; exact ⟨h.1.symm, h.1 ▸ h.2⟩
+  · intro i j l hij hjl; exact ⟨hij.1.trans hjl.1, hij.2⟩
+  · intro i j h; exact h.2
+  · intro i j l _ hij hjl _ hil _
+    have hlt : i.val < l.val := Nat.lt_trans hij hjl
+    have heq : i.val = l.val := congrArg Fin.val hil.1
+    exact absurd heq (Nat.ne_of_lt hlt)
 
 /-- Axiom of Topological Swapping:
     If a swap combination swapSet applied over the true exterior matching equiv 

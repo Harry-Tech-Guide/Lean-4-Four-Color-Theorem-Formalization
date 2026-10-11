@@ -34,6 +34,10 @@ theorem swapColor_closed (col a b : Color) (h : col = a ∨ col = b) : swapColor
   revert h
   cases col <;> cases a <;> cases b <;> decide
 
+/-- Theorem: Swapping colors twice is the identity operation (involution). -/
+theorem swapColor_inv (col a b : Color) : swapColor (swapColor col a b) a b = col := by
+  cases col <;> cases a <;> cases b <;> decide
+
 /-- The new color assignment after performing a Kempe swap on component S. -/
 def kempeSwap (c : FaceColoring H) (a b : Color) (S : H.Dart → Bool) (d : H.Dart) : Color :=
   if S d then swapColor (c.color d) a b else c.color d
