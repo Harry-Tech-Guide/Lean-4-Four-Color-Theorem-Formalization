@@ -492,6 +492,78 @@ theorem gluedFixedColor_edge_proper_exterior (H : Hypermap) [DecidableEq H.Dart]
   rw [h_edge_eq] at h_prop
   exact h_prop
 
+/-- Internal edge properness theorem: On any adjacent internal configuration nodes,
+    `gluedFixedColor` properly assigns different colors across the edge. -/
+theorem gluedFixedColor_edge_proper_internal (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (h_ext_valid : Math.IsValidConfigColoring c ext)
+    (i j : Nat) (hi : i < c.interiorSize) (hj : j < c.interiorSize)
+    (h_edge : H.edge.f (f (c.ringSize + i)) = f (c.ringSize + j))
+    (h_adj : c.adj (c.ringSize + i) (c.ringSize + j) = true) :
+    gluedFixedColor H c f col ext (H.edge.f (f (c.ringSize + i))) ≠ gluedFixedColor H c f col ext (f (c.ringSize + i)) := by
+  rw [h_edge]
+  rw [gluedFixedColor_internal H c f h_inj col ext j hj]
+  rw [gluedFixedColor_internal H c f h_inj col ext i hi]
+  have hi_tot : c.ringSize + i < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have hj_tot : c.ringSize + j < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have h_ne := h_ext_valid (c.ringSize + i) (c.ringSize + j) hi_tot hj_tot h_adj
+  exact h_ne.symm
+
+/-- Boundary-internal edge properness theorem: Across an edge from a boundary dart to an internal dart,
+    `gluedFixedColor` properly assigns different colors. -/
+theorem gluedFixedColor_edge_proper_boundary_internal (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (h_match : ∀ i < c.ringSize, ext i = col.color (f i))
+    (h_ext_valid : Math.IsValidConfigColoring c ext)
+    (i j : Nat) (hi : i < c.ringSize) (hj : j < c.interiorSize)
+    (h_edge : H.edge.f (f i) = f (c.ringSize + j))
+    (h_adj : c.adj i (c.ringSize + j) = true) :
+    gluedFixedColor H c f col ext (H.edge.f (f i)) ≠ gluedFixedColor H c f col ext (f i) := by
+  rw [h_edge]
+  rw [gluedFixedColor_internal H c f h_inj col ext j hj]
+  rw [gluedFixedColor_boundary_ext H c f h_inj col ext h_match i hi]
+  have hi_tot : i < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have hj_tot : c.ringSize + j < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have h_ne := h_ext_valid i (c.ringSize + j) hi_tot hj_tot h_adj
+  exact h_ne.symm
+
+/-- Internal-boundary edge properness theorem: Across an edge from an internal dart to a boundary dart,
+    `gluedFixedColor` properly assigns different colors. -/
+theorem gluedFixedColor_edge_proper_internal_boundary (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (h_match : ∀ i < c.ringSize, ext i = col.color (f i))
+    (h_ext_valid : Math.IsValidConfigColoring c ext)
+    (i j : Nat) (hi : i < c.interiorSize) (hj : j < c.ringSize)
+    (h_edge : H.edge.f (f (c.ringSize + i)) = f j)
+    (h_adj : c.adj (c.ringSize + i) j = true) :
+    gluedFixedColor H c f col ext (H.edge.f (f (c.ringSize + i))) ≠ gluedFixedColor H c f col ext (f (c.ringSize + i)) := by
+  rw [h_edge]
+  rw [gluedFixedColor_boundary_ext H c f h_inj col ext h_match j hj]
+  rw [gluedFixedColor_internal H c f h_inj col ext i hi]
+  have hi_tot : c.ringSize + i < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have hj_tot : j < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have h_ne := h_ext_valid (c.ringSize + i) j hi_tot hj_tot h_adj
+  exact h_ne.symm
+
+
 /-- Boundary restriction properness theorem:
     If adjacent boundary nodes in c correspond to edge-connected darts in the excised map,
     then any proper coloring of the excised map restricts to a valid boundary coloring of c. -/

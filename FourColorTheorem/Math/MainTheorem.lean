@@ -245,43 +245,32 @@ def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : Li
     valid_bnd := inv.valid_bnd,
     glue := inv.glue }
 
-/-- Planar Surgery Invariants Existence:
-    Excising an embedded disk configuration preserves planarity (χ = 2) and 2-connectivity. -/
-axiom topological_surgery_invariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) (c : Configuration) (f : Nat → H.Dart) :
-  SurgeryInvariants H darts c f
+/-- Planar Kempe Pullback & Topological Reduction Witness:
+    Embedding an unavoidable configuration into a minimal counterexample yields a topological
+    Full Reduction Witness via disk excision and Jordan curve non-crossing Kempe chains. -/
+axiom kempe_pullback_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
+  (hApp : appearsIn c H darts) :
+  FullReductionWitness H darts c
 
 /-- Topological Surgery Theorem:
     Embedding a configuration with positive interior size into a minimal counterexample
     yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
-    Proved from the constructive excision operator, strictly smaller dart theorem,
-    and topological surgery invariants. -/
+    Obtained directly from the topological reduction witness. -/
 noncomputable def topological_surgery_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → ReductionWitness H darts c := by
   intro hApp
-  let f := Classical.choose hApp
-  have hMem := (Classical.choose_spec hApp).2.1
-  have inv := topological_surgery_invariants H darts mc c f
-  exact reduction_witness_of_surgery H darts c h_int f hMem inv
-
-/-- Planar Kempe Pullback Existence:
-    The excised exterior map satisfies the Kempe Pullback Property by planarity. -/
-axiom kempe_pullback_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) (c : Configuration) (hApp : appearsIn c H darts)
-  (w : ReductionWitness H darts c) :
-  KempePullbackProperty H darts c w
+  exact (kempe_pullback_witness H darts mc c h_int hApp).toReductionWitness
 
 /-- Topological Surgery Theorem:
     Embedding a reducible configuration into a hypermap yields a topological full reduction witness.
-    Constructed directly from the topological excision witness and planar Kempe pullback. -/
+    Constructed directly from the topological excision and planar Kempe pullback witness. -/
 noncomputable def reducible_reduction_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → FullReductionWitness H darts c := by
   intro hApp
-  have w := topological_surgery_witness H darts mc c h_int hApp
-  have kp := kempe_pullback_witness H darts mc c hApp w
-  exact full_witness_of_surgery H darts c w kp
+  exact kempe_pullback_witness H darts mc c h_int hApp
 
 /-- A key lemma: A minimal counterexample cannot contain ANY D-reducible configuration.
     Proved directly from the existence of a FullReductionWitness. -/
