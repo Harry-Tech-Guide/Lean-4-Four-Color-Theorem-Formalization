@@ -1,4 +1,5 @@
 import FourColorTheorem.Math.Coloring
+import FourColorTheorem.Math.Kempe
 import FourColorTheorem.Math.Topology.Paths
 
 open Classical
@@ -44,6 +45,31 @@ theorem KempeChain.color {vc : VertexColoring H} {a b : Color} {start d : H.Dart
 
 /-- The colour swap `a ↔ b` used inside a Kempe chain. -/
 def kempeSwapColor (a b c : Color) : Color := if c = a then b else a
+
+/-- When a colour `c` is either `a` or `b`, `kempeSwapColor` coincides exactly with `swapColor`. -/
+theorem kempeSwapColor_eq_swapColor (a b c : Color) (hc : c = a ∨ c = b) :
+    kempeSwapColor a b c = swapColor c a b := by
+  cases hc with
+  | inl h => subst h; simp [kempeSwapColor, swapColor]
+  | inr h => subst h; dsimp [kempeSwapColor, swapColor]; split <;> simp [*]
+
+/-- Disjointness of Kempe chains with disjoint colour pairs:
+    Two Kempe chains whose colours are completely disjoint cannot intersect at any dart.
+    This is the fundamental algebraic invariant underlying Kempe non-crossing in planar graphs. -/
+theorem kempe_chains_disjoint_of_disjoint_colors
+    (vc : VertexColoring H)
+    (a1 b1 a2 b2 : Color)
+    (hDisj : a1 ≠ a2 ∧ a1 ≠ b2 ∧ b1 ≠ a2 ∧ b1 ≠ b2)
+    (start1 start2 d : H.Dart)
+    (kc1 : KempeChain H vc a1 b1 start1 d)
+    (kc2 : KempeChain H vc a2 b2 start2 d) : False := by
+  have c1 := KempeChain.color H kc1
+  have c2 := KempeChain.color H kc2
+  rcases c1 with h1 | h1 <;> rcases c2 with h2 | h2
+  · rw [h1] at h2; exact hDisj.1 h2
+  · rw [h1] at h2; exact hDisj.2.1 h2
+  · rw [h1] at h2; exact hDisj.2.2.1 h2
+  · rw [h1] at h2; exact hDisj.2.2.2 h2
 
 /-- Swapping the colours `a` and `b` on a Kempe chain yields another proper vertex colouring.
     (Fully proved: this is the local half of Kempe's argument; it needs no planarity.) -/
@@ -111,5 +137,17 @@ noncomputable def swapFaceKempeChain (fc : FaceColoring H) (a b : Color) (start 
     FaceColoring H :=
   vertexColoringOfDualToFaceColoring H 
     (swapKempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a b start)
+
+/-- Disjointness of Face Kempe chains with disjoint colour pairs:
+    Two face Kempe chains whose colours are completely disjoint cannot intersect at any dart. -/
+theorem face_kempe_chains_disjoint_of_disjoint_colors
+    (fc : FaceColoring H)
+    (a1 b1 a2 b2 : Color)
+    (hDisj : a1 ≠ a2 ∧ a1 ≠ b2 ∧ b1 ≠ a2 ∧ b1 ≠ b2)
+    (start1 start2 d : H.Dart)
+    (kc1 : KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a1 b1 start1 d)
+    (kc2 : KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 d) : False :=
+  kempe_chains_disjoint_of_disjoint_colors H.dual
+    (faceColoringToVertexColoringOfDual H fc) a1 b1 a2 b2 hDisj start1 start2 d kc1 kc2
 
 end Hypermap
