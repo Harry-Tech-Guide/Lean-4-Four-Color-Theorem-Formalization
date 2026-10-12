@@ -18,14 +18,7 @@ import FourColorTheorem.Math.Present8
 import FourColorTheorem.Math.Present9
 import FourColorTheorem.Math.Present10
 import FourColorTheorem.Math.Present11
-
-import FourColorTheorem.Math.Rules
 import FourColorTheorem.Math.ProofTree
-import FourColorTheorem.Math.Present7
-import FourColorTheorem.Math.Present8
-import FourColorTheorem.Math.Present9
-import FourColorTheorem.Math.Present10
-import FourColorTheorem.Math.Present11
-
 import FourColorTheorem.Math.DischargingAlgo
 import FourColorTheorem.Math.TestDischarging
+import FourColorTheorem.Math.Batch.R6to10
