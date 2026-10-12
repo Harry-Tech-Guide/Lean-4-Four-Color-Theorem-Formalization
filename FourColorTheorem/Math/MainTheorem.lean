@@ -434,6 +434,26 @@ def full_witness_of_bundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
   let kp := kempe_pullback_property_of_realizable H darts c w b.realizable
   full_witness_of_surgery H darts c w kp
 
+/-- Construct a TopologicalReductionBundle constructively from disk excision invariants
+    and topological Kempe realizability. -/
+def topological_reduction_bundle_of_disk (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0) (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (inv : SurgeryInvariants H darts c f)
+    (hReal : TopologicalKempeRealizable H darts c (reduction_witness_of_surgery H darts c h_int f hf_mem inv)) :
+    TopologicalReductionBundle H darts c h_int f hf_mem :=
+  { inv := inv,
+    realizable := hReal }
+
+/-- Construct a FullReductionWitness directly from disk excision invariants
+    and topological Kempe realizability. -/
+def full_witness_of_disk (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0) (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (inv : SurgeryInvariants H darts c f)
+    (hReal : TopologicalKempeRealizable H darts c (reduction_witness_of_surgery H darts c h_int f hf_mem inv)) :
+    FullReductionWitness H darts c :=
+  let b := topological_reduction_bundle_of_disk H darts c h_int f hf_mem inv hReal
+  full_witness_of_bundle H darts c h_int f hf_mem b
+
 /-- The Topological Disk Excision and Kempe Realizability Principle:
     Embedding an unavoidable configuration into a minimal counterexample yields
     a topological reduction bundle consisting of surgery invariants and Kempe pullback realizability. -/
@@ -546,6 +566,31 @@ def rsst_from_discharging_and_witness (H : Hypermap) [DecidableEq H.Dart] (darts
   have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
   have hc_red := dreducible_of_elimination_witness c (hWit c hc_in)
   exact ⟨c, hc_in, hc_app, hc_red⟩
+
+/-- Construct an RSST reducible configuration existence witness from a PlanarDischargingWitness
+    and mathematical D-reducibility directly. -/
+def rsst_from_discharging_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (w : PlanarDischargingWitness H darts)
+    (hRed : ∀ c, c ∈ theUnavoidableSet → IsDReducible c) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c := by
+  have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
+  exact ⟨c, hc_in, hc_app, hRed c hc_in⟩
+
+/-- Construct an RSST reducible configuration existence witness for a maximal planar triangulation
+    equipped with Euler characteristic, triangulation condition, RSST discharging elimination,
+    and mathematical D-reducibility. -/
+def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (rule : Discharging.ChargeShift H.Dart)
+    (E F : Int)
+    (hDegSum : Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E)
+    (hEuler : ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2)
+    (hTriang : 2 * E = 3 * F)
+    (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
+      ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0)
+    (hRed : ∀ c, c ∈ theUnavoidableSet → IsDReducible c) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c :=
+  let w := planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
+  rsst_from_discharging_and_reducibility H darts w hRed
 
 /-- The RSST Reducible Configuration Theorem (Robertson-Sanders-Seymour-Thomas 1997):
     Every planar, bridgeless combinatorial map contains at least one configuration

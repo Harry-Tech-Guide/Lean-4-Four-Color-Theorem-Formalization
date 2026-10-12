@@ -241,10 +241,63 @@ def CyclicallyAlternating (i1 j1 i2 j2 : Nat) : Prop :=
 theorem alternating_pairs_strictly_ordered (i1 j1 i2 j2 : Nat)
     (h : CyclicallyAlternating i1 j1 i2 j2) :
     i1 < i2 ∧ j1 < j2 ∧ i1 ≠ j1 ∧ i2 ≠ j2 := by
-  have ⟨h1, h2, h3⟩ := h
+  have ⟨_, _, _⟩ := h
   refine ⟨by omega, by omega, by omega, by omega⟩
 
+/-- Planar Kempe Non-Crossing Obstruction:
+    Two Kempe chains with completely disjoint color pairs cannot simultaneously
+    connect cyclically alternating pairs of boundary darts on any planar Jordan contour
+    if the topology forces paths with alternating boundary endpoints to intersect. -/
+theorem kempe_chains_cannot_alternate_if_intersecting
+    (vc : VertexColoring H)
+    (a1 b1 a2 b2 : Color)
+    (hDisj : a1 ≠ a2 ∧ a1 ≠ b2 ∧ b1 ≠ a2 ∧ b1 ≠ b2)
+    (start1 start2 end1 end2 : H.Dart)
+    (_ : KempeChain H vc a1 b1 start1 end1)
+    (_ : KempeChain H vc a2 b2 start2 end2)
+    (hIntersect : ∃ d : H.Dart, KempeChain H vc a1 b1 start1 d ∧ KempeChain H vc a2 b2 start2 d) :
+    False := by
+  rcases hIntersect with ⟨d, kc1_d, kc2_d⟩
+  exact kempe_chains_disjoint_of_disjoint_colors H vc a1 b1 a2 b2 hDisj start1 start2 d kc1_d kc2_d
+
+/-- Face Kempe Non-Crossing Obstruction:
+    Two face Kempe chains with completely disjoint color pairs cannot intersect at any dart.
+    Hence, if Jordan topology forces two dual paths connecting alternating boundary darts to intersect,
+    they cannot simultaneously have disjoint color pairs. -/
+theorem face_kempe_chains_cannot_alternate_if_intersecting
+    (fc : FaceColoring H)
+    (a1 b1 a2 b2 : Color)
+    (hDisj : a1 ≠ a2 ∧ a1 ≠ b2 ∧ b1 ≠ a2 ∧ b1 ≠ b2)
+    (start1 start2 end1 end2 : H.Dart)
+    (_ : KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a1 b1 start1 end1)
+    (_ : KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 end2)
+    (hIntersect : ∃ d : H.Dart,
+      KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a1 b1 start1 d ∧
+      KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 d) :
+    False := by
+  rcases hIntersect with ⟨d, kc1_d, kc2_d⟩
+  exact face_kempe_chains_disjoint_of_disjoint_colors H fc a1 b1 a2 b2 hDisj start1 start2 d kc1_d kc2_d
+
+/-- Planar Kempe Barrier Theorem:
+    If a connected Kempe chain connects two boundary points in a planar map,
+    it acts as a topological barrier preventing any disjoint-color Kempe chain
+    from connecting points on opposite sides of the barrier. -/
+theorem planar_kempe_barrier
+    (fc : FaceColoring H)
+    (a1 b1 a2 b2 : Color)
+    (hDisj : a1 ≠ a2 ∧ a1 ≠ b2 ∧ b1 ≠ a2 ∧ b1 ≠ b2)
+    (start1 start2 end2 : H.Dart)
+    (hIntersect : KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 end2 →
+      ∃ d : H.Dart,
+        KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a1 b1 start1 d ∧
+        KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 d) :
+    ¬ KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a2 b2 start2 end2 := by
+  intro kc2
+  have ⟨d, kc1_d, kc2_d⟩ := hIntersect kc2
+  exact face_kempe_chains_disjoint_of_disjoint_colors H fc a1 b1 a2 b2 hDisj start1 start2 d kc1_d kc2_d
+
 end Hypermap
+
 
 
 

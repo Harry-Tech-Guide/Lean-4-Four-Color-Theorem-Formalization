@@ -114,4 +114,49 @@ theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.b
     IsDReducible ComputableReducer.birkhoff :=
   dreducible_of_computable ComputableReducer.birkhoff birkhoff_empty_consistent_subset hSound
 
+/-- Elimination Witness Synthesis Theorem:
+    Any mathematically D-reducible configuration constructively admits a canonical
+    Kempe elimination witness of rank ≤ 1. -/
+noncomputable def elimination_witness_of_dreducible (c : Configuration) (h : IsDReducible c) :
+    KempeEliminationWitness c :=
+  let rank : BoundaryColoring c → Nat := fun b => if extendsToInterior c b then 0 else 1
+  { rank := rank,
+    base_case := by
+      intro b _ hr0
+      dsimp [rank] at hr0
+      split at hr0
+      · rename_i hExt; exact hExt
+      · contradiction,
+    step_case := by
+      intro b hb _
+      have hCases := h b hb
+      cases hCases with
+      | inl hExt =>
+        -- rank b = 0, but premise had rank b > 0
+        dsimp [rank]
+        have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
+        -- impossible since rank b > 0
+        intro hpos
+        omega
+      | inr hKempe =>
+        intro _
+        rcases hKempe with ⟨b', hb', hEquiv, hExt'⟩
+        refine ⟨b', hb', hEquiv, ?_⟩
+        dsimp [rank]
+        have hr' : (if extendsToInterior c b' then 0 else 1) = 0 := if_pos hExt'
+        have hnotExt : ¬ extendsToInterior c b := by
+          intro hExt
+          have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
+          rename_i hpos
+          omega
+        have hrb : (if extendsToInterior c b then 0 else 1) = 1 := if_neg hnotExt
+        rw [hr', hrb]
+        exact Nat.zero_lt_one }
+
+/-- Exact Mathematical Equivalence between D-Reducibility and Kempe Elimination Witness. -/
+theorem dreducible_iff_elimination_witness (c : Configuration) :
+    IsDReducible c ↔ Nonempty (KempeEliminationWitness c) :=
+  ⟨fun h => ⟨elimination_witness_of_dreducible c h⟩,
+   fun ⟨w⟩ => dreducible_of_elimination_witness c w⟩
+
 end Math
