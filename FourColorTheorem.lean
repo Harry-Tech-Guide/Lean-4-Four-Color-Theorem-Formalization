@@ -22,3 +22,4 @@ import FourColorTheorem.Math.ProofTree
 import FourColorTheorem.Math.DischargingAlgo
 import FourColorTheorem.Math.TestDischarging
 import FourColorTheorem.Math.Batch.R6to10
+import FourColorTheorem.Math.Batch.R11
