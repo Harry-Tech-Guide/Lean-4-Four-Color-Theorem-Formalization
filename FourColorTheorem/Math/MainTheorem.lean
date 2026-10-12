@@ -367,6 +367,55 @@ def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : Li
     valid_bnd := inv.valid_bnd,
     glue := inv.glue }
 
+/-- Canonical Realization Theorem:
+    Every face Kempe chain swap on the exterior hypermap starting at `start`
+    realizes a canonical boundary Kempe swap whose subset S corresponds to
+    membership of boundary darts in the Kempe chain. -/
+theorem face_kempe_chain_realizes_boundary_swap
+    (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0)
+    (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (inv : SurgeryInvariants H darts c f)
+    (col : MapColoring (Hypermap.exciseFixed H c f))
+    (a b_col : Color)
+    (start : (Hypermap.exciseFixed H c f).Dart) :
+    let w := reduction_witness_of_surgery H darts c h_int f hf_mem inv
+    let S_chain := fun i => decide (Hypermap.KempeChain (Hypermap.exciseFixed H c f).dual
+      (Hypermap.faceColoringToVertexColoringOfDual (Hypermap.exciseFixed H c f) col) a b_col start (f i))
+    w.bnd_coloring (Hypermap.swapFaceKempeChain w.H_ext col a b_col start) =
+      boundaryKempeSwap c (w.bnd_coloring col) a b_col S_chain := by
+  intro w S_chain
+  funext i
+  dsimp [w, reduction_witness_of_surgery, S_chain, boundaryKempeSwap,
+         Hypermap.swapFaceKempeChain, Hypermap.vertexColoringOfDualToFaceColoring,
+         Hypermap.faceColoringToVertexColoringOfDual, Hypermap.swapKempeChain]
+  split
+  · rename_i h_kc
+    have h_col := Hypermap.KempeChain.color (Hypermap.exciseFixed H c f).dual h_kc
+    have h_swap := Hypermap.kempeSwapColor_eq_swapColor a b_col (col.color (f i)) h_col
+    simp [h_kc, h_swap]
+  · rename_i h_not_kc
+    simp [h_not_kc]
+
+/-- Kempe Realizability of Swapped Exterior Chain:
+    Any boundary coloring obtained by swapping an exterior face Kempe chain
+    is topologically realized by that chain. -/
+theorem realized_by_face_kempe_chain_of_chain
+    (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0)
+    (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (inv : SurgeryInvariants H darts c f)
+    (col : MapColoring (Hypermap.exciseFixed H c f))
+    (a b_col : Color)
+    (start : (Hypermap.exciseFixed H c f).Dart) :
+    let w := reduction_witness_of_surgery H darts c h_int f hf_mem inv
+    let S_chain := fun i => decide (Hypermap.KempeChain (Hypermap.exciseFixed H c f).dual
+      (Hypermap.faceColoringToVertexColoringOfDual (Hypermap.exciseFixed H c f) col) a b_col start (f i))
+    RealizedByFaceKempeChain H darts c w col a b_col S_chain := by
+  intro w S_chain
+  refine ⟨start, ?_⟩
+  exact face_kempe_chain_realizes_boundary_swap H darts c h_int f hf_mem inv col a b_col start
+
 /-- A Topological Reduction Bundle packages the surgery invariants and topological Kempe realizability
     for an embedded configuration in a planar hypermap. -/
 structure TopologicalReductionBundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
