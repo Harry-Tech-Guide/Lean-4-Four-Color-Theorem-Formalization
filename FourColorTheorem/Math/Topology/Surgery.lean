@@ -302,6 +302,19 @@ theorem exciseConfiguration_strictly_smaller {D : Type} [DecidableEq D]
     omega
   exact eraseAllDarts_strictly_smaller_of_mem darts _ (f c.ringSize) h_dart_mem h_f_in_darts
 
+/-- Helper lemma: List.find? returns none if the predicate is false on every element. -/
+theorem find?_eq_none_of_forall_not {α : Type} (p : α → Bool) (l : List α)
+    (h : ∀ x ∈ l, p x = false) : l.find? p = none := by
+  induction l with
+  | nil => rfl
+  | cons x xs ih =>
+    dsimp [List.find?]
+    have hx : p x = false := h x (List.Mem.head xs)
+    rw [hx]
+    apply ih
+    intro y hy
+    exact h y (List.Mem.tail x hy)
+
 /-- Boundary coloring restriction of a face coloring of the excised map. -/
 def configBoundaryColoring (H : Hypermap) (c : Math.Configuration) (f : Nat → H.Dart) (col : FaceColoring H) : Math.BoundaryColoring c :=
   fun i => col.color (f i)
@@ -310,8 +323,99 @@ def configBoundaryColoring (H : Hypermap) (c : Math.Configuration) (f : Nat → 
     exterior and boundary darts take their color from `col`. -/
 def gluedColor (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart)
     (col : FaceColoring H) (ext : Nat → Color) (d : H.Dart) : Color :=
-  match (List.range c.interiorSize).find? (fun i => f (c.ringSize + i) = d) with
+  match (List.range c.interiorSize).find? (fun i => decide (f (c.ringSize + i) = d)) with
   | some i => ext (c.ringSize + i)
   | none => col.color d
+
+/-- Topologically glued dart color for the excised fixed-dart hypermap:
+    Internal darts take their color from `ext`,
+    exterior and boundary darts take their color from `col`. -/
+def gluedFixedColor (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color) (d : H.Dart) : Color :=
+  match (List.range c.interiorSize).find? (fun i => decide (f (c.ringSize + i) = d)) with
+  | some i => ext (c.ringSize + i)
+  | none => col.color d
+
+/-- Boundary evaluation theorem: On any boundary dart, `gluedFixedColor` evaluates directly
+    to the exterior coloring `col.color (f i)`. -/
+theorem gluedFixedColor_boundary (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (i : Nat) (hi : i < c.ringSize) :
+    gluedFixedColor H c f col ext (f i) = col.color (f i) := by
+  dsimp [gluedFixedColor]
+  have h_none : (List.range c.interiorSize).find? (fun k => decide (f (c.ringSize + k) = f i)) = none := by
+    apply find?_eq_none_of_forall_not
+    intro k hk
+    rw [List.mem_range] at hk
+    have hi_tot : i < c.totalNodes := by
+      dsimp [Math.Configuration.totalNodes]
+      omega
+    have hk_tot : c.ringSize + k < c.totalNodes := by
+      dsimp [Math.Configuration.totalNodes]
+      omega
+    have h_ne_idx : c.ringSize + k ≠ i := by omega
+    have h_f_ne := h_inj (c.ringSize + k) hk_tot i hi_tot h_ne_idx
+    simp [h_f_ne]
+  rw [h_none]
+
+/-- Exterior evaluation theorem: On any dart outside the internal darts of the configuration,
+    `gluedFixedColor` evaluates directly to `col.color x`. -/
+theorem gluedFixedColor_exterior (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (x : H.Dart)
+    (hx : ∀ k < c.interiorSize, f (c.ringSize + k) ≠ x) :
+    gluedFixedColor H c f col ext x = col.color x := by
+  dsimp [gluedFixedColor]
+  have h_none : (List.range c.interiorSize).find? (fun i => decide (f (c.ringSize + i) = x)) = none := by
+    apply find?_eq_none_of_forall_not
+    intro k hk
+    rw [List.mem_range] at hk
+    have h_ne := hx k hk
+    simp [h_ne]
+  rw [h_none]
+
+/-- Boundary matching theorem: When ext matches col on the boundary ring,
+    `gluedFixedColor` on any boundary dart evaluates to `ext i`. -/
+theorem gluedFixedColor_boundary_ext (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (h_match : ∀ i < c.ringSize, ext i = col.color (f i))
+    (i : Nat) (hi : i < c.ringSize) :
+    gluedFixedColor H c f col ext (f i) = ext i := by
+  rw [gluedFixedColor_boundary H c f h_inj col ext i hi]
+  exact (h_match i hi).symm
+
+/-- Boundary restriction properness theorem:
+    If adjacent boundary nodes in c correspond to edge-connected darts in the excised map,
+    then any proper coloring of the excised map restricts to a valid boundary coloring of c. -/
+theorem valid_boundary_coloring_of_edge_adj (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_edge_adj : ∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true →
+      (exciseFixed H c f).edge.f (f i) = f j)
+    (col : FaceColoring (exciseFixed H c f)) :
+    Math.IsValidBoundaryColoring c (fun i => col.color (f i)) := by
+  intro i j hi hj hadj
+  have h_edge := h_edge_adj i hi j hj hadj
+  have h_prop := col.edge_proper (f i)
+  rw [h_edge] at h_prop
+  exact h_prop.symm
+
+/-- Topological Pasting Theorem:
+    Given an exterior face coloring `col` and an interior configuration coloring `ext`
+    that agree on the boundary ring and satisfy face invariance and edge properness,
+    the glued coloring forms a valid MapColoring (FaceColoring) of the entire hypermap H. -/
+def pasteFaceColoring (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (h_face : ∀ d, gluedFixedColor H c f col ext (H.face.f d) = gluedFixedColor H c f col ext d)
+    (h_edge : ∀ d, gluedFixedColor H c f col ext (H.edge.f d) ≠ gluedFixedColor H c f col ext d) :
+    FaceColoring H :=
+  { color := gluedFixedColor H c f col ext,
+    face_invariant := h_face,
+    edge_proper := h_edge }
 
 end Hypermap

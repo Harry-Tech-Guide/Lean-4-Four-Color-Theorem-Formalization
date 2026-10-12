@@ -34,4 +34,28 @@ def GonthierPlanar (H : Hypermap) [BEq H.Dart] (fuel : Nat) (l : List H.Dart) : 
   operations used in the reducibility argument. Those theorems are still TODO.
 -/
 
+/-- Euler's characteristic equation `EulerChar H fuel l = 2 * numComponents H fuel l`
+    implies computational planarity `isPlanar H fuel l = true`. -/
+theorem isPlanar_of_euler_char_eq (H : Hypermap) [BEq H.Dart] (fuel : Nat) (l : List H.Dart)
+    (h_euler : EulerChar H fuel l = 2 * (numComponents H fuel l : Int)) :
+    isPlanar H fuel l = true := by
+  dsimp [isPlanar, EulerChar, numNodes, numEdges, numFaces, numComponents] at *
+  rw [h_euler]
+  exact beq_self_eq_true _
+
+/-- Euler characteristic conservation under disk excision:
+    excising an embedded disk configuration preserves the Euler characteristic χ = 2 * C. -/
+def EulerSurgeryPreservation (H : Hypermap) [BEq H.Dart] [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Math.Configuration) (f : Nat → H.Dart) (fuel : Nat) : Prop :=
+  EulerChar (exciseFixed H c f) fuel (eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) =
+    2 * (numComponents (exciseFixed H c f) fuel (eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) : Int)
+
+/-- Disk excision planarity theorem:
+    Any disk excision that conserves the Euler characteristic preserves planarity. -/
+theorem exciseFixed_isPlanar_of_euler_preservation (H : Hypermap) [BEq H.Dart] [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Math.Configuration) (f : Nat → H.Dart) (fuel : Nat)
+    (h_pres : EulerSurgeryPreservation H darts c f fuel) :
+    isPlanar (exciseFixed H c f) fuel (eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) = true :=
+  isPlanar_of_euler_char_eq (exciseFixed H c f) fuel _ h_pres
+
 end Hypermap
