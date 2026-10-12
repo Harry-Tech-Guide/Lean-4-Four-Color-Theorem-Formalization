@@ -8,6 +8,7 @@ import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Algorithm
 import FourColorTheorem.Math.Topology.KempeTopology
 import FourColorTheorem.Math.Topology.Surgery
+import FourColorTheorem.Math.Topology.Euler
 
 namespace Math
 
