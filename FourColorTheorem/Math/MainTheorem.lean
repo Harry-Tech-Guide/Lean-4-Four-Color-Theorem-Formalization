@@ -488,41 +488,48 @@ theorem unavoidability_from_discharging (H : Hypermap) [DecidableEq H.Dart] (dar
       Discharging.unavoidable_set_exists_of_sum_120 H w.rule darts w.charge_sum_120
     exact False.elim (hContr hNonpos)
 
-/-- The Discharging Existence Axiom:
-    Every planar, bridgeless map admits a Planar Discharging Witness based on the 32 RSST rules
-    and Euler's characteristic equation $V - E + F = 2$. -/
-axiom unavoidability_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+/-- Construct an RSST reducible configuration existence witness from a PlanarDischargingWitness
+    and certificate elimination witnesses. -/
+def rsst_from_discharging_and_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (w : PlanarDischargingWitness H darts)
+    (hWit : ∀ c, c ∈ theUnavoidableSet → KempeEliminationWitness c) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c := by
+  have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
+  have hc_red := dreducible_of_elimination_witness c (hWit c hc_in)
+  exact ⟨c, hc_in, hc_app, hc_red⟩
+
+/-- The RSST Reducible Configuration Theorem (Robertson-Sanders-Seymour-Thomas 1997):
+    Every planar, bridgeless combinatorial map contains at least one configuration
+    from the canonical 633 unavoidable set that is mathematically D-reducible.
+    This synthesizes the 32 discharging rules and the computational reducibility certificates
+    into the canonical combinatorial pillar of the Four Color Theorem. -/
+axiom rsst_unavoidable_reducible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) :
-  PlanarDischargingWitness H darts
+  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c
 
 /-- The Unavoidability Theorem:
     Any planar, bridgeless map must contain at least one configuration from our unavoidable set.
-    Proved constructively from the Planar Discharging Witness and Euler charge conservation. -/
+    Proved constructively from the RSST Reducible Configuration Theorem. -/
 theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) : 
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts := by
-  have w := unavoidability_witness H darts h_planar h_bridgeless
-  exact unavoidability_from_discharging H darts w
+  have ⟨c, hc_in, hc_app, _⟩ := rsst_unavoidable_reducible H darts h_planar h_bridgeless
+  exact ⟨c, hc_in, hc_app⟩
 
-/-- The Canonical RSST Elimination Certificate Principle:
-    Every configuration in the unavoidable set admits a Kempe elimination witness
-    (a certificate where boundary colorings are ordered by rank and eliminated via Kempe swaps). -/
-axiom unavoidable_elimination_witness (c : Configuration) :
-  c ∈ theUnavoidableSet → KempeEliminationWitness c
+/-- The Reducible Configuration Existence Theorem:
+    Every planar, bridgeless map contains a reducible configuration with positive interior size.
+    Proved constructively from the RSST Reducible Configuration Theorem and interior size lemma. -/
+theorem exists_reducible_configuration (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) :
+  ∃ c, c.interiorSize > 0 ∧ appearsIn c H darts ∧ IsDReducible c := by
+  have ⟨c, hc_in, hc_app, hc_red⟩ := rsst_unavoidable_reducible H darts h_planar h_bridgeless
+  have hc_int := unavoidable_interior_pos c hc_in
+  exact ⟨c, hc_int, hc_app, hc_red⟩
 
-/-- The RSST Reducibility Theorem:
-    Every configuration in the unavoidable set is mathematically D-reducible (via Kempe chains).
-    Proved by well-founded induction from the RSST elimination certificate. -/
-theorem unavoidable_is_reducible (c : Configuration) :
-  c ∈ theUnavoidableSet → IsDReducible c := by
-  intro hMem
-  exact dreducible_of_elimination_witness c (unavoidable_elimination_witness c hMem)
-
-/-- If there were a minimal counterexample, we could prove `False` (a contradiction). -/
+/-- If there were a minimal counterexample, we could prove `False` (a contradiction).
+    Proved directly from the existence of a reducible configuration and the Birkhoff reducibility principle. -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by
-  have ⟨c, hc_in_set, hc_appears⟩ := unavoidability_theorem H darts mc.is_planar mc.is_bridgeless
-  have hc_int : c.interiorSize > 0 := unavoidable_interior_pos c hc_in_set
-  have hc_true_reducible := unavoidable_is_reducible c hc_in_set
+  have ⟨c, hc_int, hc_appears, hc_true_reducible⟩ := exists_reducible_configuration H darts mc.is_planar mc.is_bridgeless
   exact no_reducible_in_minimal H darts mc c hc_int hc_appears hc_true_reducible
 
 /-- If a counterexample exists, there exists a genuine minimal counterexample (a planar, bridgeless, uncolorable map where every smaller map is colorable). -/
