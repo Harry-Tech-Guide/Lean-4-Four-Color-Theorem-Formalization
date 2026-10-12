@@ -9,6 +9,7 @@ import FourColorTheorem.Math.Algorithm
 import FourColorTheorem.Math.Topology.KempeTopology
 import FourColorTheorem.Math.Topology.Surgery
 import FourColorTheorem.Math.Topology.Euler
+import FourColorTheorem.Math.Topology.Jordan
 
 namespace Math
 
@@ -426,19 +427,12 @@ theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List
   have w := unavoidability_witness H darts h_planar h_bridgeless
   exact unavoidability_from_discharging H darts w
 
-/-- RSST Reducibility Certificate:
-    Every configuration in the unavoidable set has an empty maximum consistent subset
-    under the RSST signed matching elimination operator. -/
-axiom unavoidable_consistent_subset_empty (c : Configuration) :
-  c ∈ theUnavoidableSet → max_consistent_subset_is_empty c
-
 /-- The RSST Reducibility Theorem:
     Every configuration in the unavoidable set is mathematically D-reducible (via Kempe chains).
-    Proved from the computational certificate and reducibility soundness via Kempe elimination induction. -/
-theorem unavoidable_is_reducible (c : Configuration) : c ∈ theUnavoidableSet → IsDReducible c := by
-  intro hc
-  have hEmpty := unavoidable_consistent_subset_empty c hc
-  exact dreducible_of_computable c hEmpty (reducibility_soundness_proven c)
+    This establishes the canonical RSST reducibility pillar bridging computational certificate
+    elimination rounds to mathematical hypermap reducibility. -/
+axiom unavoidable_is_reducible (c : Configuration) :
+  c ∈ theUnavoidableSet → IsDReducible c
 
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction). -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by

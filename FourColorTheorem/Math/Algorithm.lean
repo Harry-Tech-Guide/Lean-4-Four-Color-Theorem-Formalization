@@ -88,18 +88,11 @@ theorem dreducible_of_elimination_witness (c : Configuration) (w : KempeEliminat
           exact Or.inr ⟨b'', hb'', hEquivTotal, hExt''⟩
   exact h_ind (w.rank b) b hb (Nat.le_refl _)
 
-/-- Elimination Witness Construction:
-    When the maximum consistent subset is empty, the iterative elimination rounds
-    form a valid Kempe elimination witness. -/
-axiom elimination_witness_of_empty_subset (c : Configuration) :
-  max_consistent_subset_is_empty c → KempeEliminationWitness c
-
 /-- Reducibility Soundness Theorem:
-    Proven directly by combining the elimination witness with the induction theorem. -/
-theorem reducibility_soundness_proven (c : Configuration) :
+    Proven directly by combining an elimination witness with the induction theorem. -/
+theorem reducibility_soundness_of_witness (c : Configuration) (w : KempeEliminationWitness c) :
     ReducibilitySoundness c := by
-  intro hEmpty
-  have w := elimination_witness_of_empty_subset c hEmpty
+  intro _
   exact dreducible_of_elimination_witness c w
 
 /-- Reducibility Bridge Theorem:
@@ -107,7 +100,7 @@ theorem reducibility_soundness_proven (c : Configuration) :
     reducibility soundness, is mathematically D-reducible. -/
 theorem dreducible_of_computable (c : Configuration) 
     (hEmpty : max_consistent_subset_is_empty c) 
-    (hSound : ReducibilitySoundness c := reducibility_soundness_proven c) : 
+    (hSound : ReducibilitySoundness c) : 
     IsDReducible c :=
   hSound hEmpty
 
@@ -117,7 +110,7 @@ theorem birkhoff_empty_consistent_subset : max_consistent_subset_is_empty Comput
   ComputableReducer.birkhoff_is_d_reducible
 
 /-- The Birkhoff Diamond is mathematically D-reducible under reducibility soundness. -/
-theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.birkhoff := reducibility_soundness_proven ComputableReducer.birkhoff) : 
+theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.birkhoff) : 
     IsDReducible ComputableReducer.birkhoff :=
   dreducible_of_computable ComputableReducer.birkhoff birkhoff_empty_consistent_subset hSound
 
