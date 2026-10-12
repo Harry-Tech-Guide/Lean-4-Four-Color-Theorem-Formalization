@@ -9,6 +9,7 @@ def md6 := buildMData 6 pow3
 def md7 := buildMData 7 pow3
 def md8 := buildMData 8 pow3
 def md9 := buildMData 9 pow3
+def md10 := buildMData 10 pow3
 
 def all_rconfs := loadAll ()
 
@@ -32,6 +33,13 @@ theorem c24_d_red : (check all_rconfs[24]! md9 pow3).dReducible = true := by nat
 theorem c26_d_red : (check all_rconfs[26]! md9 pow3).dReducible = true := by native_decide
 theorem c37_d_red : (check all_rconfs[37]! md9 pow3).dReducible = true := by native_decide
 theorem c323_d_red : (check all_rconfs[323]! md9 pow3).dReducible = true := by native_decide
+
+-- Ring 10 (sample 5 configs)
+theorem c8_d_red : (check all_rconfs[8]! md10 pow3).dReducible = true := by native_decide
+theorem c9_d_red : (check all_rconfs[9]! md10 pow3).dReducible = true := by native_decide
+theorem c12_d_red : (check all_rconfs[12]! md10 pow3).dReducible = true := by native_decide
+theorem c13_d_red : (check all_rconfs[13]! md10 pow3).dReducible = true := by native_decide
+theorem c18_d_red : (check all_rconfs[18]! md10 pow3).dReducible = true := by native_decide
 
 end FastReducer
 end Math
