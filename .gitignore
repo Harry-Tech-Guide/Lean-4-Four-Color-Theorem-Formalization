@@ -10,3 +10,6 @@ __pycache__/
 *.pyo
 .DS_Store
 Thumbs.db
+out*.txt
+*output*.txt
+test_*.lean
