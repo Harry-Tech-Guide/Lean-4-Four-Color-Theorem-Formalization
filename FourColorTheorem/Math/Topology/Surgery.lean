@@ -315,6 +315,52 @@ theorem find?_eq_none_of_forall_not {α : Type} (p : α → Bool) (l : List α)
     intro y hy
     exact h y (List.Mem.tail x hy)
 
+/-- Helper lemma: List.find? on an appended list preserves match from the first list. -/
+theorem find?_append_some {α : Type} (p : α → Bool) (l1 l2 : List α) (x : α)
+    (h1 : l1.find? p = some x) : (l1 ++ l2).find? p = some x := by
+  induction l1 with
+  | nil => contradiction
+  | cons y ys ih =>
+    dsimp [List.find?] at *
+    split at h1
+    · exact h1
+    · exact ih h1
+
+/-- Helper lemma: List.find? falls through to the second list when the first has no match. -/
+theorem find?_append_none {α : Type} (p : α → Bool) (l1 l2 : List α)
+    (h1 : l1.find? p = none) : (l1 ++ l2).find? p = l2.find? p := by
+  induction l1 with
+  | nil => rfl
+  | cons y ys ih =>
+    dsimp [List.find?] at *
+    split at h1
+    · contradiction
+    · exact ih h1
+
+/-- Helper lemma: List.find? on a range returns the first element satisfying the predicate. -/
+theorem find?_range_eq_some (p : Nat → Bool) (n i : Nat) (hi : i < n)
+    (h_i : p i = true) (h_prev : ∀ j < i, p j = false) :
+    (List.range n).find? p = some i := by
+  induction n with
+  | zero =>
+    exact (Nat.not_lt_zero i hi).elim
+  | succ n ih =>
+    rw [List.range_succ]
+    cases Nat.lt_or_eq_of_le (Nat.le_of_lt_succ hi) with
+    | inl h_lt =>
+      have ih_app := ih h_lt
+      exact find?_append_some p (List.range n) [n] i ih_app
+    | inr h_eq =>
+      subst h_eq
+      have h_none : (List.range i).find? p = none := by
+        apply find?_eq_none_of_forall_not
+        intro j hj
+        rw [List.mem_range] at hj
+        exact h_prev j hj
+      rw [find?_append_none p (List.range i) [i] h_none]
+      dsimp [List.find?]
+      rw [h_i]
+
 /-- Boundary coloring restriction of a face coloring of the excised map. -/
 def configBoundaryColoring (H : Hypermap) (c : Math.Configuration) (f : Nat → H.Dart) (col : FaceColoring H) : Math.BoundaryColoring c :=
   fun i => col.color (f i)
@@ -377,6 +423,32 @@ theorem gluedFixedColor_exterior (H : Hypermap) [DecidableEq H.Dart]
     simp [h_ne]
   rw [h_none]
 
+/-- Internal evaluation theorem: On any internal configuration dart,
+    `gluedFixedColor` evaluates directly to `ext (c.ringSize + i)`. -/
+theorem gluedFixedColor_internal (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (i : Nat) (hi : i < c.interiorSize) :
+    gluedFixedColor H c f col ext (f (c.ringSize + i)) = ext (c.ringSize + i) := by
+  dsimp [gluedFixedColor]
+  have h_p_i : (fun k => decide (f (c.ringSize + k) = f (c.ringSize + i))) i = true := by
+    simp
+  have h_p_prev : ∀ j < i, (fun k => decide (f (c.ringSize + k) = f (c.ringSize + i))) j = false := by
+    intro j hj
+    dsimp
+    have hj_tot : c.ringSize + j < c.totalNodes := by
+      dsimp [Math.Configuration.totalNodes]
+      omega
+    have hi_tot : c.ringSize + i < c.totalNodes := by
+      dsimp [Math.Configuration.totalNodes]
+      omega
+    have h_ne_idx : c.ringSize + j ≠ c.ringSize + i := by omega
+    have h_ne := h_inj (c.ringSize + j) hj_tot (c.ringSize + i) hi_tot h_ne_idx
+    simp [h_ne]
+  have h_find := find?_range_eq_some (fun k => decide (f (c.ringSize + k) = f (c.ringSize + i))) c.interiorSize i hi h_p_i h_p_prev
+  rw [h_find]
+
 /-- Boundary matching theorem: When ext matches col on the boundary ring,
     `gluedFixedColor` on any boundary dart evaluates to `ext i`. -/
 theorem gluedFixedColor_boundary_ext (H : Hypermap) [DecidableEq H.Dart]
@@ -388,6 +460,37 @@ theorem gluedFixedColor_boundary_ext (H : Hypermap) [DecidableEq H.Dart]
     gluedFixedColor H c f col ext (f i) = ext i := by
   rw [gluedFixedColor_boundary H c f h_inj col ext i hi]
   exact (h_match i hi).symm
+
+/-- Exterior edge properness theorem: On any exterior dart whose edge partner is also exterior,
+    `gluedFixedColor` properly assigns different colors across the edge. -/
+theorem gluedFixedColor_edge_proper_exterior (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (col : FaceColoring (exciseFixed H c f)) (ext : Nat → Color)
+    (x : H.Dart)
+    (hx : ∀ d ∈ (List.range c.interiorSize |>.map (fun i => c.ringSize + i)).map f, x ≠ d ∧ H.edge.f x ≠ d) :
+    gluedFixedColor H c f col ext (H.edge.f x) ≠ gluedFixedColor H c f col ext x := by
+  have h_not_x : ∀ k < c.interiorSize, f (c.ringSize + k) ≠ x := by
+    intro k hk
+    have hk_mem : f (c.ringSize + k) ∈ (List.range c.interiorSize |>.map (fun i => c.ringSize + i)).map f := by
+      rw [List.mem_map]
+      refine ⟨c.ringSize + k, ?_, rfl⟩
+      rw [List.mem_map]
+      exact ⟨k, List.mem_range.mpr hk, rfl⟩
+    exact (hx (f (c.ringSize + k)) hk_mem).1.symm
+  have h_not_ex : ∀ k < c.interiorSize, f (c.ringSize + k) ≠ H.edge.f x := by
+    intro k hk
+    have hk_mem : f (c.ringSize + k) ∈ (List.range c.interiorSize |>.map (fun i => c.ringSize + i)).map f := by
+      rw [List.mem_map]
+      refine ⟨c.ringSize + k, ?_, rfl⟩
+      rw [List.mem_map]
+      exact ⟨k, List.mem_range.mpr hk, rfl⟩
+    exact (hx (f (c.ringSize + k)) hk_mem).2.symm
+  rw [gluedFixedColor_exterior H c f col ext x h_not_x]
+  rw [gluedFixedColor_exterior H c f col ext (H.edge.f x) h_not_ex]
+  have h_edge_eq := exciseFixed_edge_apply_of_not_mem H c f x hx
+  have h_prop := col.edge_proper x
+  rw [h_edge_eq] at h_prop
+  exact h_prop
 
 /-- Boundary restriction properness theorem:
     If adjacent boundary nodes in c correspond to edge-connected darts in the excised map,
