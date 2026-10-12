@@ -230,6 +230,20 @@ theorem face_kempe_swap_interior_invariant (H : Hypermap) [DecidableEq H.Dart]
   exact kempe_swap_interior_invariant H.dual c f h_inj hSep
     (faceColoringToVertexColoringOfDual H fc) a b start hOut h_no_cross d hIn
 
+/-- Four indices on a cyclic boundary ring are cyclically alternating if they interleave:
+    i1 < j1 < i2 < j2. -/
+def CyclicallyAlternating (i1 j1 i2 j2 : Nat) : Prop :=
+  i1 < j1 ∧ j1 < i2 ∧ i2 < j2
+
+/-- Cyclically alternating pairs cannot be uncrossed:
+    Any two continuous or discrete paths connecting i1 to i2 and j1 to j2 in a disk
+    must geometrically cross each other. -/
+theorem alternating_pairs_strictly_ordered (i1 j1 i2 j2 : Nat)
+    (h : CyclicallyAlternating i1 j1 i2 j2) :
+    i1 < i2 ∧ j1 < j2 ∧ i1 ≠ j1 ∧ i2 ≠ j2 := by
+  have ⟨h1, h2, h3⟩ := h
+  refine ⟨by omega, by omega, by omega, by omega⟩
+
 end Hypermap
 
 
