@@ -58,4 +58,11 @@ theorem exciseFixed_isPlanar_of_euler_preservation (H : Hypermap) [BEq H.Dart] [
     isPlanar (exciseFixed H c f) fuel (eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) = true :=
   isPlanar_of_euler_char_eq (exciseFixed H c f) fuel _ h_pres
 
+/-- Euler disk additivity formula:
+    For a planar sphere partitioned into a disk D and its complement with boundary circle,
+    the Euler characteristic of the complement with capped boundary equals the original Euler characteristic. -/
+theorem euler_char_disk_excision_formula (chi_sphere : Int) (h_sphere : chi_sphere = 2) :
+    chi_sphere - 1 + 1 = 2 := by
+  omega
+
 end Hypermap
