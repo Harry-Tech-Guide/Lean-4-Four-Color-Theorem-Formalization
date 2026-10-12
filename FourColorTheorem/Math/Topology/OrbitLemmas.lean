@@ -29,11 +29,6 @@ theorem fixed_inv {E : Type} (p : Perm E) (d : E) (h : IsFixedPoint p d) : p.inv
 theorem bypass_self (p : Perm D) (d : D) : IsFixedPoint (bypass p d) d := by
   simp [IsFixedPoint, bypass]
 
-/-- Bypassing does not change the image of a dart that is neither `d` nor the predecessor of `d`. -/
-theorem bypass_apply_of_ne (p : Perm D) (d x : D) (hx : x ≠ d) (hpx : p.f x ≠ d) :
-    (bypass p d).f x = p.f x := by
-  simp [bypass, hx, hpx]
-
 /-- The predecessor of `d` is redirected to the successor of `d`. -/
 theorem bypass_apply_pred (p : Perm D) (d x : D) (hx : x ≠ d) (hpx : p.f x = d) :
     (bypass p d).f x = p.f d := by

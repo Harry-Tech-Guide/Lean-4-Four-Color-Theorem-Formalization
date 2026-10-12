@@ -53,6 +53,22 @@ theorem bypass_involution (p : Perm D) (hp : ∀ x, p.f (p.f x) = x) (d : D) :
       simp [hx, hpx, hxd]
     · simp [hx, hpx, hp x]
 
+/-- Bypassing a dart does not affect any dart other than d and the predecessor of d. -/
+theorem bypass_apply_of_ne (p : Perm D) (d x : D) (hx : x ≠ d) (hpx : p.f x ≠ d) :
+    (bypass p d).f x = p.f x := by
+  dsimp [bypass]
+  by_cases h : x = d
+  · exact False.elim (hx h)
+  · by_cases hp : p.f x = d
+    · exact False.elim (hpx hp)
+    · simp [h, hp]
+
+/-- Bypassing a dart d makes d a fixed point. -/
+theorem bypass_apply_self (p : Perm D) (d : D) :
+    (bypass p d).f d = d := by
+  dsimp [bypass]
+  simp
+
 /-- The face permutation determined by edge and node: `face = node⁻¹ ∘ edge⁻¹`. -/
 def faceOf (e n : Perm D) : Perm D :=
   { f := fun x => n.inv (e.inv x),
@@ -118,6 +134,53 @@ theorem excisePerms_involution {D : Type} [DecidableEq D] (l : List D) :
     have he' := deleteEdgePerms_involution e n he d
     exact ih _ _ he' x
 
+/-- Edge deletion preserves the edge permutation on darts outside the edge {d, edge d}. -/
+theorem deleteEdgePerms_edge_apply_of_ne {D : Type} [DecidableEq D]
+    (e n : Perm D) (he : ∀ y, e.f (e.f y) = y) (d x : D)
+    (hxd : x ≠ d) (hxed : e.f x ≠ d) :
+    (deleteEdgePerms e n d).1.f x = e.f x := by
+  dsimp [deleteEdgePerms]
+  have h_x_ne_ed : x ≠ e.f d := by
+    intro h
+    have : e.f x = e.f (e.f d) := by rw [h]
+    rw [he d] at this
+    exact hxed this
+  have h2 : (bypass e d).f x ≠ e.f d := by
+    rw [bypass_apply_of_ne e d x hxd hxed]
+    intro h
+    have : e.f (e.f x) = e.f (e.f d) := by rw [h]
+    rw [he x, he d] at this
+    exact hxd this
+  rw [bypass_apply_of_ne (bypass e d) (e.f d) x h_x_ne_ed h2]
+  exact bypass_apply_of_ne e d x hxd hxed
+
+/-- Iterative edge deletion preserves the edge permutation on any dart that is not excised
+    and whose edge partner is not excised. -/
+theorem excisePerms_edge_apply_of_not_mem {D : Type} [DecidableEq D]
+    (l : List D) :
+    ∀ (e n : Perm D), (∀ y, e.f (e.f y) = y) →
+      ∀ x, (∀ d ∈ l, x ≠ d ∧ e.f x ≠ d) →
+        (excisePerms (e, n) l).1.f x = e.f x := by
+  induction l with
+  | nil =>
+    intro e _ _ x _
+    rfl
+  | cons d ds ih =>
+    intro e n he x hx
+    dsimp [excisePerms]
+    have hd_mem : d ∈ d :: ds := List.Mem.head ds
+    have ⟨hxd, hxed⟩ := hx d hd_mem
+    have he' := deleteEdgePerms_involution e n he d
+    have h_del := deleteEdgePerms_edge_apply_of_ne e n he d x hxd hxed
+    have hx_ds : ∀ d' ∈ ds, x ≠ d' ∧ (deleteEdgePerms e n d).1.f x ≠ d' := by
+      intro d' hd'
+      have hd'_mem : d' ∈ d :: ds := List.Mem.tail d hd'
+      have ⟨hxd', hxed'⟩ := hx d' hd'_mem
+      rw [h_del]
+      exact ⟨hxd', hxed'⟩
+    have ih_app := ih (deleteEdgePerms e n d).1 (deleteEdgePerms e n d).2 he' x hx_ds
+    rw [ih_app, h_del]
+
 /-- Excision of an embedded configuration yielding a hypermap with definitionally identical dart type. -/
 def exciseFixed (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart) : Hypermap :=
   let internalIndices := List.range c.interiorSize |>.map (fun i => c.ringSize + i)
@@ -129,6 +192,38 @@ def exciseFixed (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f 
     face := faceOf p.1 p.2,
     edge_involution := excisePerms_involution internalDarts H.edge H.node H.edge_involution,
     edge_node_face_id := fun x => by simp only [faceOf, Perm.right_inv] }
+
+/-- Excision preserves the edge permutation on any dart that is not internal
+    and whose edge partner is not internal. -/
+theorem exciseFixed_edge_apply_of_not_mem (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart) (x : H.Dart)
+    (hx : ∀ d ∈ (List.range c.interiorSize |>.map (fun i => c.ringSize + i)).map f, x ≠ d ∧ H.edge.f x ≠ d) :
+    (exciseFixed H c f).edge.f x = H.edge.f x := by
+  dsimp [exciseFixed]
+  exact excisePerms_edge_apply_of_not_mem _ H.edge H.node H.edge_involution x hx
+
+/-- Boundary darts (with indices < ringSize) never belong to the internal darts list
+    whenever the embedding f is injective. -/
+theorem not_mem_internalDarts_of_lt_ringSize {D : Type} (c : Math.Configuration) (f : Nat → D)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (i : Nat) (hi : i < c.ringSize) :
+    f i ∉ (List.range c.interiorSize |>.map (fun k => c.ringSize + k)).map f := by
+  intro h_mem
+  rw [List.mem_map] at h_mem
+  rcases h_mem with ⟨k_idx, hk_idx, h_eq⟩
+  rw [List.mem_map] at hk_idx
+  rcases hk_idx with ⟨k, hk, hk_eq⟩
+  rw [List.mem_range] at hk
+  subst hk_eq
+  have hi_total : i < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have hk_total : c.ringSize + k < c.totalNodes := by
+    dsimp [Math.Configuration.totalNodes]
+    omega
+  have h_ne : i ≠ c.ringSize + k := by omega
+  have h_f_ne := h_inj i hi_total (c.ringSize + k) hk_total h_ne
+  exact h_f_ne h_eq.symm
 
 /-- Recursively erases a list of excised darts from the dart list. -/
 def eraseAllDarts {D : Type} [BEq D] : List D → List D → List D
