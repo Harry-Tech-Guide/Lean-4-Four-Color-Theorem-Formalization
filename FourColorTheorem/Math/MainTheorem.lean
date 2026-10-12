@@ -191,6 +191,62 @@ theorem elementary_pullback_of_face_chain (H : Hypermap) [DecidableEq H.Dart] (d
   have ⟨start, hEq⟩ := hReal col a b_col S hVal
   exact ⟨Hypermap.swapFaceKempeChain w.H_ext col a b_col start, hEq⟩
 
+/-- Reverse Elementary Pullback Step Theorem:
+    Any elementary boundary Kempe swap realized by a face Kempe chain on H_ext
+    is invertible, allowing pullback in the reverse direction. -/
+theorem elementary_pullback_of_face_chain_rev (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c)
+    (hReal : TopologicalKempeRealizable H darts c w)
+    (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool)
+    (hb_val : IsValidBoundaryColoring c b) :
+    ∀ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c b a b_col S →
+      ∃ col : MapColoring w.H_ext, w.bnd_coloring col = b := by
+  intro col' h
+  have hInv := boundaryKempeSwap_inv c b a b_col S
+  have hb_eq : b = boundaryKempeSwap c (w.bnd_coloring col') a b_col S := by
+    rw [h, hInv]
+  have hVal' : IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col') a b_col S) := by
+    rw [← hb_eq]
+    exact hb_val
+  have ⟨start, hEq⟩ := hReal col' a b_col S hVal'
+  refine ⟨Hypermap.swapFaceKempeChain w.H_ext col' a b_col start, ?_⟩
+  rw [hEq]
+  exact hb_eq.symm
+
+/-- Inductive definition of a chain of valid boundary Kempe swaps between valid boundary colorings. -/
+inductive ValidKempeChain (c : Configuration) : BoundaryColoring c → BoundaryColoring c → Prop where
+  | refl (b : BoundaryColoring c) (hb : IsValidBoundaryColoring c b) : ValidKempeChain c b b
+  | step {b1 b2 b3 : BoundaryColoring c} (a b_col : Color) (S : Nat → Bool)
+      (h12 : ValidKempeChain c b1 b2)
+      (hb3_eq : b3 = boundaryKempeSwap c b2 a b_col S)
+      (hb3_val : IsValidBoundaryColoring c b3) :
+      ValidKempeChain c b1 b3
+
+/-- Kempe Pullback Chain Theorem:
+    Any boundary coloring reachable by a finite sequence of valid boundary Kempe swaps
+    is realizable as the restriction of another valid exterior coloring. -/
+theorem pullback_of_valid_kempe_chain (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration)
+    (w : ReductionWitness H darts c)
+    (hReal : TopologicalKempeRealizable H darts c w)
+    (b1 b2 : BoundaryColoring c)
+    (hChain : ValidKempeChain c b1 b2) :
+    ∀ col : MapColoring w.H_ext, w.bnd_coloring col = b1 →
+      ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = b2 := by
+  induction hChain with
+  | refl _ =>
+    intro col h
+    exact ⟨col, h⟩
+  | step a b_col S _ hb3_eq hb3_val ih =>
+    intro col h
+    have ⟨col2, hcol2⟩ := ih col h
+    subst hb3_eq
+    have hVal : IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col2) a b_col S) := by
+      rw [hcol2]
+      exact hb3_val
+    have ⟨start, hEq⟩ := hReal col2 a b_col S hVal
+    refine ⟨Hypermap.swapFaceKempeChain w.H_ext col2 a b_col start, ?_⟩
+    rw [hEq, hcol2]
+
+
 /-- Kempe Pullback Property:
     Any boundary coloring Kempe-equivalent to the boundary restriction of an exterior coloring
     is realizable as the restriction of another valid exterior coloring.
