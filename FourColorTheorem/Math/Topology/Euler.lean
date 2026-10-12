@@ -65,4 +65,14 @@ theorem euler_char_disk_excision_formula (chi_sphere : Int) (h_sphere : chi_sphe
     chi_sphere - 1 + 1 = 2 := by
   omega
 
+/-- Triangulated planar sphere initial charge equation:
+    In any planar triangulation with V vertices, E edges, and F faces satisfying
+    Euler's formula V - E + F = 2 and maximal triangulation condition 2E = 3F,
+    the sum of initial charges 10 * (6V - 2E) identically equals 120. -/
+theorem euler_initial_charge_sum_eq_120 (V E F : Int)
+    (hEuler : V - E + F = 2)
+    (hTriang : 2 * E = 3 * F) :
+    10 * (6 * V - 2 * E) = 120 := by
+  omega
+
 end Hypermap
