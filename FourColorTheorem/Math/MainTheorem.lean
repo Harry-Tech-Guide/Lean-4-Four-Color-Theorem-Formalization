@@ -351,6 +351,24 @@ def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : Li
     valid_bnd := inv.valid_bnd,
     glue := inv.glue }
 
+/-- A Topological Reduction Bundle packages the surgery invariants and topological Kempe realizability
+    for an embedded configuration in a planar hypermap. -/
+structure TopologicalReductionBundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0) (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts) where
+  inv : SurgeryInvariants H darts c f
+  realizable : TopologicalKempeRealizable H darts c (reduction_witness_of_surgery H darts c h_int f hf_mem inv)
+
+/-- The Master Topological Reduction Assembly Theorem:
+    Given an embedded configuration and its topological reduction bundle,
+    a FullReductionWitness is constructed constructively without any unproven axioms. -/
+def full_witness_of_bundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (h_int : c.interiorSize > 0) (f : Nat → H.Dart) (hf_mem : ∀ i < c.totalNodes, f i ∈ darts)
+    (b : TopologicalReductionBundle H darts c h_int f hf_mem) :
+    FullReductionWitness H darts c :=
+  let w := reduction_witness_of_surgery H darts c h_int f hf_mem b.inv
+  let kp := kempe_pullback_property_of_realizable H darts c w b.realizable
+  full_witness_of_surgery H darts c w kp
+
 /-- Planar Kempe Pullback & Topological Reduction Witness:
     Embedding an unavoidable configuration into a minimal counterexample yields a topological
     Full Reduction Witness via disk excision and Jordan curve non-crossing Kempe chains. -/
@@ -397,6 +415,18 @@ structure PlanarDischargingWitness (H : Hypermap) [DecidableEq H.Dart] (darts : 
   charge_sum_120 : Discharging.sumCharges (Discharging.finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120
   discharging_elimination : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
     ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0
+
+/-- Construct a PlanarDischargingWitness from Euler initial charge = 120 and RSST discharging elimination.
+    The final charge sum = 120 is automatically derived via the master charge conservation theorem. -/
+def planar_discharging_witness_of_initial_120 (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (rule : Discharging.ChargeShift H.Dart)
+    (hInitial : Discharging.sumCharges (Discharging.initialCharge H) (Hypermap.extractGraph H darts).vertices = 120)
+    (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
+      ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0) :
+    PlanarDischargingWitness H darts :=
+  { rule := rule,
+    charge_sum_120 := Discharging.sumCharges_finalCharge_eq_120 H rule darts hInitial,
+    discharging_elimination := hElim }
 
 /-- Core Discharging Theorem:
     A Planar Discharging Witness strictly proves the existence of an unavoidable configuration

@@ -109,19 +109,43 @@ theorem totalShifts_self_zero {D : Type} (rule : ChargeShift D) (vs : List D) :
     rw [ih]
     rfl
 
-/-- The final charge of a vertex after applying a set of discharging rules. -/
+/-- The final charge of a vertex after applying a set of discharging rules.
+    Defined as the initial charge plus all net shifts received from adjacent vertices. -/
 def finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (v : H.Dart) : Int :=
   let G := Hypermap.extractGraph H darts
-  let rec sumShifts (targets : List H.Dart) (acc : Int) :=
-    match targets with
-    | [] => acc
-    | t :: rest => sumShifts rest (acc - rule.shift v t)
-  -- The final charge is the initial charge PLUS all charge received MINUS all charge sent.
-  (initialCharge H v) - sumShifts G.vertices 0
+  initialCharge H v + sumShiftsTo rule v G.vertices
 
 def sumCharges {D : Type} (f : D → Int) : List D → Int
   | [] => 0
   | v :: vs => f v + sumCharges f vs
+
+/-- The sum of final charges over any vertex list is the sum of initial charges plus total shifts. -/
+theorem sumCharges_finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (vs : List H.Dart) :
+    sumCharges (finalCharge H rule darts) vs =
+      sumCharges (initialCharge H) vs + totalShifts rule vs (Hypermap.extractGraph H darts).vertices := by
+  induction vs with
+  | nil => rfl
+  | cons v rest ih =>
+    simp only [sumCharges, finalCharge, totalShifts]
+    omega
+
+/-- Master Discharging Conservation Theorem:
+    The sum of final charges across all vertices of the graph equals the sum of initial charges!
+    Proved from the global charge conservation theorem `totalShifts_self_zero`. -/
+theorem sumCharges_finalCharge_all (rule : ChargeShift H.Dart) (darts : List H.Dart) :
+    sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices =
+      sumCharges (initialCharge H) (Hypermap.extractGraph H darts).vertices := by
+  have h := sumCharges_finalCharge H rule darts (Hypermap.extractGraph H darts).vertices
+  rw [totalShifts_self_zero] at h
+  omega
+
+/-- Total Final Charge Conservation from Euler Characteristic:
+    If the initial Euler charge sums to 120, then the sum of final charges is unconditionally 120! -/
+theorem sumCharges_finalCharge_eq_120 (rule : ChargeShift H.Dart) (darts : List H.Dart)
+    (hInitial : sumCharges (initialCharge H) (Hypermap.extractGraph H darts).vertices = 120) :
+    sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120 := by
+  rw [sumCharges_finalCharge_all]
+  exact hInitial
 
 theorem sumCharges_nonpos {D : Type} (f : D → Int) (vs : List D)
     (h : ∀ v ∈ vs, f v ≤ 0) : sumCharges f vs ≤ 0 := by
