@@ -154,6 +154,64 @@ theorem exterior_kempe_chain_disjoint_from_inside (H : Hypermap) (jp : JordanPar
   have h_contr := h_no_cross c_dart h_cnt ⟨d, kc, w, h_list⟩
   exact False.elim h_contr
 
+/-- The Jordan partition induced by an embedded configuration with ring boundary and interior nodes. -/
+def configJordanPartition (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j) :
+    JordanPartition H :=
+  let contourDarts := (List.range c.ringSize).map f
+  let insideDarts := ((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f
+  { contour := contourDarts,
+    inside := fun d => d ∈ insideDarts,
+    outside := fun d => d ∉ contourDarts ∧ d ∉ insideDarts,
+    disjoint_in_out := by
+      intro d hIn hOut
+      exact hOut.2 hIn,
+    disjoint_contour_in := by
+      intro d hCnt hIn
+      rw [List.mem_map] at hCnt
+      rcases hCnt with ⟨i, hi, rfl⟩
+      rw [List.mem_range] at hi
+      have hNot := not_mem_internalDarts_of_lt_ringSize c f h_inj i hi
+      exact hNot hIn,
+    disjoint_contour_out := by
+      intro d hCnt hOut
+      exact hOut.1 hCnt }
+
+/-- Exhaustion of the configuration Jordan partition:
+    Every dart in the hypermap belongs either to the interior disk, the exterior, or the boundary contour. -/
+theorem configJordanPartition_excl (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j) (d : H.Dart) :
+    (configJordanPartition H c f h_inj).inside d ∨
+    (configJordanPartition H c f h_inj).outside d ∨
+    d ∈ (configJordanPartition H c f h_inj).contour := by
+  dsimp [configJordanPartition]
+  by_cases hCnt : d ∈ (List.range c.ringSize).map f
+  · exact Or.inr (Or.inr hCnt)
+  · by_cases hIn : d ∈ ((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f
+    · exact Or.inl hIn
+    · exact Or.inr (Or.inl ⟨hCnt, hIn⟩)
+
+/-- Kempe swap invariance on the interior:
+    Any Kempe chain starting outside that does not intersect the boundary contour
+    leaves the coloring of every interior dart strictly invariant. -/
+theorem kempe_swap_interior_invariant (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (hSep : HasJordanSeparation H (configJordanPartition H c f h_inj))
+    (vc : VertexColoring H) (a b : Color)
+    (start : H.Dart) (hOut : (configJordanPartition H c f h_inj).outside start)
+    (h_no_cross : ∀ c_dart ∈ (configJordanPartition H c f h_inj).contour,
+      ¬ (∃ (d : H.Dart), KempeChain H vc a b start d ∧
+        ∃ (w : Walk H start d), c_dart ∈ Walk.toList H w))
+    (d : H.Dart) (hIn : (configJordanPartition H c f h_inj).inside d) :
+    (swapKempeChain H vc a b start).color d = vc.color d := by
+  dsimp [swapKempeChain]
+  have h_not_kc := exterior_kempe_chain_disjoint_from_inside H
+    (configJordanPartition H c f h_inj) hSep vc a b start hOut h_no_cross
+    (configJordanPartition_excl H c f h_inj) d
+  have h_not : ¬ KempeChain H vc a b start d := fun kc => h_not_kc kc hIn
+  simp [h_not]
+
 end Hypermap
 
 

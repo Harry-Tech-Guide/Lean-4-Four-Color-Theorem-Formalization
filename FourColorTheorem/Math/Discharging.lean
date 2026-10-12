@@ -1,4 +1,5 @@
 import FourColorTheorem.Math.HypermapGraph
+import FourColorTheorem.Math.Topology.Euler
 
 namespace Math
 
@@ -162,6 +163,39 @@ theorem sumCharges_nonpos {D : Type} (f : D → Int) (vs : List D)
 theorem positive_charge_contradiction {D : Type} (f : D → Int) (vs : List D)
     (hSum : sumCharges f vs = 120) (hNonpos : ∀ v ∈ vs, f v ≤ 0) : False := by
   have hLe := sumCharges_nonpos f vs hNonpos
+  omega
+
+/-- The sum of integer degrees over a list of vertices. -/
+def sumDegrees {D : Type} (deg : D → Int) : List D → Int
+  | [] => 0
+  | v :: vs => deg v + sumDegrees deg vs
+
+/-- Linear expansion of initial charge sum:
+    Sum of initial charges 10 * (6 - deg(v)) expands linearly to 60 * |vs| - 10 * sum(deg(v)). -/
+theorem sum_initialCharge_formula (H : Hypermap) [DecidableEq H.Dart] (vs : List H.Dart) (fuel : Nat) :
+    sumCharges (fun v => initialCharge H v fuel) vs =
+      60 * (vs.length : Int) - 10 * sumDegrees (fun v => (Hypermap.nodeDegree H v fuel : Int)) vs := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    dsimp only [sumCharges, sumDegrees]
+    rw [ih]
+    dsimp only [initialCharge]
+    have : ((v :: vs).length : Int) = (vs.length : Int) + 1 := by simp
+    omega
+
+/-- Initial charge sum derived from Euler's characteristic and maximal planar triangulation:
+    When the vertex count is V, edge count is E, face count is F, with degrees summing to 2E,
+    Euler's formula V - E + F = 2 and maximal triangulation condition 2E = 3F
+    algebraically force the initial charge sum to equal 120. -/
+theorem initial_charge_sum_eq_120_of_triangulation (H : Hypermap) [DecidableEq H.Dart]
+    (vs : List H.Dart) (fuel : Nat) (E F : Int)
+    (hDegSum : sumDegrees (fun v => (Hypermap.nodeDegree H v fuel : Int)) vs = 2 * E)
+    (hEuler : (vs.length : Int) - E + F = 2)
+    (hTriang : 2 * E = 3 * F) :
+    sumCharges (fun v => initialCharge H v fuel) vs = 120 := by
+  rw [sum_initialCharge_formula, hDegSum]
+  have := Hypermap.euler_initial_charge_sum_eq_120 (vs.length : Int) E F hEuler hTriang
   omega
 
 /-- Unavoidability Theorem State:
