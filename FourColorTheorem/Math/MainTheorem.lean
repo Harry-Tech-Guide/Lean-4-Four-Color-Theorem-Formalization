@@ -330,6 +330,22 @@ structure SurgeryInvariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
     IsValidConfigColoring c ext →
     MapColoring H
 
+/-- Construct SurgeryInvariants from planar disk excision:
+    Given that the excised exterior hypermap is planar, bridgeless, and adjacent boundary nodes
+    satisfy edge adjacency and gluing conditions, SurgeryInvariants is constructed constructively. -/
+def surgery_invariants_of_disk (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (c : Configuration) (f : Nat → H.Dart)
+    (h_planar : @IsPlanar (Hypermap.exciseFixed H c f) inferInstance (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)).length)
+    (h_bridgeless : Hypermap.isBridgeless (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)))
+    (h_edge_adj : ∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (Hypermap.exciseFixed H c f).edge.f (f i) = f j)
+    (h_paste : ∀ (col : MapColoring (Hypermap.exciseFixed H c f)) (ext : Nat → Color),
+      (∀ i < c.ringSize, ext i = col.color (f i)) → IsValidConfigColoring c ext → MapColoring H) :
+    SurgeryInvariants H darts c f :=
+  { planar := h_planar,
+    bridgeless := h_bridgeless,
+    valid_bnd := fun col => Hypermap.valid_boundary_coloring_of_edge_adj H c f h_edge_adj col,
+    glue := h_paste }
+
 /-- The Surgery Assembly Theorem:
     Any hypermap excision equipped with its topological invariants constructs a valid ReductionWitness. -/
 def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)

@@ -212,6 +212,24 @@ theorem kempe_swap_interior_invariant (H : Hypermap) [DecidableEq H.Dart]
   have h_not : ¬ KempeChain H vc a b start d := fun kc => h_not_kc kc hIn
   simp [h_not]
 
+/-- Face Kempe swap invariance on the interior:
+    Any face Kempe chain starting outside that does not intersect the boundary contour
+    leaves the coloring of every interior dart strictly invariant. -/
+theorem face_kempe_swap_interior_invariant (H : Hypermap) [DecidableEq H.Dart]
+    (c : Math.Configuration) (f : Nat → H.Dart)
+    (h_inj : ∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j)
+    (hSep : HasJordanSeparation H.dual (configJordanPartition H.dual c f h_inj))
+    (fc : FaceColoring H) (a b : Color)
+    (start : H.Dart) (hOut : (configJordanPartition H.dual c f h_inj).outside start)
+    (h_no_cross : ∀ c_dart ∈ (configJordanPartition H.dual c f h_inj).contour,
+      ¬ (∃ (d : H.Dart), KempeChain H.dual (faceColoringToVertexColoringOfDual H fc) a b start d ∧
+        ∃ (w : Walk H.dual start d), c_dart ∈ Walk.toList H.dual w))
+    (d : H.Dart) (hIn : (configJordanPartition H.dual c f h_inj).inside d) :
+    (swapFaceKempeChain H fc a b start).color d = fc.color d := by
+  dsimp [swapFaceKempeChain, vertexColoringOfDualToFaceColoring, faceColoringToVertexColoringOfDual]
+  exact kempe_swap_interior_invariant H.dual c f h_inj hSep
+    (faceColoringToVertexColoringOfDual H fc) a b start hOut h_no_cross d hIn
+
 end Hypermap
 
 
