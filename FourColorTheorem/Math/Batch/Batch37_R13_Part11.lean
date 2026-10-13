@@ -1,4 +1,4 @@
-import FourColorTheorem.Math.Batch.Runner
+import FourColorTheorem.Math.Batch.Runner13
 
 namespace Math
 namespace Batch
@@ -18,22 +18,22 @@ def batch37_indices : List Nat :=
   [593, 594, 604, 606]
 
 /-- Unified in-kernel certification for Batch 37 (Ring 13, Part 11). -/
-theorem cert_batch37_r13 : checkRingBatch 13 batch37_indices = true := by
+theorem cert_batch37_r13 : checkRingBatch13 batch37_indices = true := by
   native_decide
 
 -- Individual configuration certificates extracted deductively from the batch theorem:
 
-theorem cert_config_593_d_red : checkIdxFast (buildSMData 13 sharedPow3) 593 = true :=
-  certified_of_batch 13 batch37_indices cert_batch37_r13 593 (by decide)
+theorem cert_config_593_d_red : checkIdxFast13 (buildSMData 13 sharedPow3) 593 = true :=
+  certified_of_batch13 batch37_indices cert_batch37_r13 593 (by decide)
 
-theorem cert_config_594_d_red : checkIdxFast (buildSMData 13 sharedPow3) 594 = true :=
-  certified_of_batch 13 batch37_indices cert_batch37_r13 594 (by decide)
+theorem cert_config_594_d_red : checkIdxFast13 (buildSMData 13 sharedPow3) 594 = true :=
+  certified_of_batch13 batch37_indices cert_batch37_r13 594 (by decide)
 
-theorem cert_config_604_d_red : checkIdxFast (buildSMData 13 sharedPow3) 604 = true :=
-  certified_of_batch 13 batch37_indices cert_batch37_r13 604 (by decide)
+theorem cert_config_604_d_red : checkIdxFast13 (buildSMData 13 sharedPow3) 604 = true :=
+  certified_of_batch13 batch37_indices cert_batch37_r13 604 (by decide)
 
-theorem cert_config_606_d_red : checkIdxFast (buildSMData 13 sharedPow3) 606 = true :=
-  certified_of_batch 13 batch37_indices cert_batch37_r13 606 (by decide)
+theorem cert_config_606_d_red : checkIdxFast13 (buildSMData 13 sharedPow3) 606 = true :=
+  certified_of_batch13 batch37_indices cert_batch37_r13 606 (by decide)
 
 end Batch
 end Math

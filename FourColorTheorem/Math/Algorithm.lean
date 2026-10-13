@@ -114,6 +114,8 @@ theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.b
     IsDReducible ComputableReducer.birkhoff :=
   dreducible_of_computable ComputableReducer.birkhoff birkhoff_empty_consistent_subset hSound
 
+open Classical
+
 /-- Elimination Witness Synthesis Theorem:
     Any mathematically D-reducible configuration constructively admits a canonical
     Kempe elimination witness of rank ≤ 1. -/
@@ -128,18 +130,14 @@ noncomputable def elimination_witness_of_dreducible (c : Configuration) (h : IsD
       · rename_i hExt; exact hExt
       · contradiction,
     step_case := by
-      intro b hb _
+      intro b hb hpos
       have hCases := h b hb
       cases hCases with
       | inl hExt =>
-        -- rank b = 0, but premise had rank b > 0
-        dsimp [rank]
+        dsimp [rank] at hpos
         have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
-        -- impossible since rank b > 0
-        intro hpos
         omega
       | inr hKempe =>
-        intro _
         rcases hKempe with ⟨b', hb', hEquiv, hExt'⟩
         refine ⟨b', hb', hEquiv, ?_⟩
         dsimp [rank]
@@ -147,7 +145,7 @@ noncomputable def elimination_witness_of_dreducible (c : Configuration) (h : IsD
         have hnotExt : ¬ extendsToInterior c b := by
           intro hExt
           have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
-          rename_i hpos
+          dsimp [rank] at hpos
           omega
         have hrb : (if extendsToInterior c b then 0 else 1) = 1 := if_neg hnotExt
         rw [hr', hrb]
