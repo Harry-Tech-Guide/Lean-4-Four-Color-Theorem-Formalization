@@ -25,3 +25,4 @@ import FourColorTheorem.Math.Batch.R6to10
 import FourColorTheorem.Math.Batch.R11
 import FourColorTheorem.Math.Batch.R12
 import FourColorTheorem.Math.Batch.R13
+import FourColorTheorem.Math.Batch.R14
