@@ -29,3 +29,4 @@ import FourColorTheorem.Math.Batch.R14
 import FourColorTheorem.Math.Batch.CR8to10
 import FourColorTheorem.Math.Batch.CR11
 import FourColorTheorem.Math.Batch.CR12
+import FourColorTheorem.Math.Batch.CR13
