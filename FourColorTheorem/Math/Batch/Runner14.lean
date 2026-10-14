@@ -18,7 +18,8 @@ all base-3 division/modulo operations in the trace generation loop.
 def checkFast14 (c : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool := Id.run do
   let r := c.r
   let N := pow3[r]!
-  let (live0, orbits0) := genCanonicalLive c pow3
+  let (live0, orbits0, extOrbits) := genCanonicalLive c pow3
+  if extOrbits != c.X then return false
   let mut live := live0
   let mut orbits := orbits0
   let mut activeSM := sms
