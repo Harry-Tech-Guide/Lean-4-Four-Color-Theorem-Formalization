@@ -97,18 +97,27 @@ theorem find_least (P : Nat → Prop) (N : Nat) (hPN : P N) :
   · intro m hm
     exact hspec.2 m (Nat.zero_le m) hm
 
+/-- A list of darts is complete for hypermap `H` if it contains no duplicates,
+    contains every dart in `H.Dart`, and is non-empty.
+    This guarantees that topological predicates (planarity, bridgelessness)
+    evaluated on `darts` faithfully reflect the entire hypermap. -/
+def IsCompleteDarts (H : Hypermap) (darts : List H.Dart) : Prop :=
+  darts.Nodup ∧ (∀ d : H.Dart, d ∈ darts) ∧ darts ≠ []
+
 def IsCounterexampleOfSize (n : Nat) : Prop :=
   ∃ (H : Hypermap) (_ : DecidableEq H.Dart) (darts : List H.Dart),
-    darts.length = n ∧ IsPlanar H darts ∧ Hypermap.isBridgeless H darts ∧ (MapColoring H → False)
+    IsCompleteDarts H darts ∧ darts.length = n ∧ IsPlanar H darts ∧ Hypermap.isBridgeless H darts ∧ (MapColoring H → False)
 
 /-- We proceed by assuming a Minimal Counterexample exists.
 A minimal counterexample is a planar map that cannot be 4-colored, but any
 strictly smaller planar bridgeless map CAN be 4-colored. -/
 structure MinimalCounterexample (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) : Prop where
+  complete : IsCompleteDarts H darts
   is_planar : IsPlanar H darts
   is_bridgeless : Hypermap.isBridgeless H darts
   not_colorable : MapColoring H → False
   is_minimal : ∀ (H' : Hypermap) [DecidableEq H'.Dart] (darts' : List H'.Dart),
+    IsCompleteDarts H' darts' →
     darts'.length < darts.length → IsPlanar H' darts' → Hypermap.isBridgeless H' darts' → Nonempty (MapColoring H')
 
 /-- A Reduction Witness for configuration `c` in hypermap `H`:
@@ -119,6 +128,7 @@ structure ReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
   H_ext : Hypermap
   dec_ext : DecidableEq H_ext.Dart
   darts_ext : List H_ext.Dart
+  complete_ext : IsCompleteDarts H_ext darts_ext
   smaller : darts_ext.length < darts.length
   planar : @IsPlanar H_ext (@instBEqOfDecidableEq H_ext.Dart dec_ext) darts_ext darts_ext.length
   bridgeless : Hypermap.isBridgeless H_ext darts_ext
@@ -139,15 +149,15 @@ structure FullReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List
 
 /-- Core Reducibility Contradiction Theorem:
     If a configuration in a minimal counterexample admits a full reduction witness,
-    then D-reducibility strictly produces a valid 4-coloring of H, contradicting uncolorability. -/
+    then reducibility strictly produces a valid 4-coloring of H, contradicting uncolorability. -/
 theorem no_reducible_with_full_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (mc : MinimalCounterexample H darts) (c : Configuration)
     (w : FullReductionWitness H darts c)
-    (hRed : IsDReducible c) : False := by
-  have hNonempty := @MinimalCounterexample.is_minimal H _ darts mc w.H_ext w.dec_ext w.darts_ext w.smaller w.planar w.bridgeless
+    (hRed : IsReducible c) : False := by
+  have hNonempty := @MinimalCounterexample.is_minimal H _ darts mc w.H_ext w.dec_ext w.darts_ext w.complete_ext w.smaller w.planar w.bridgeless
   rcases hNonempty with ⟨col_ext⟩
   have hbnd_valid := w.valid_bnd col_ext
-  have h_cases := hRed (w.bnd_coloring col_ext) hbnd_valid
+  have h_cases := reducible_elimination c hRed (w.bnd_coloring col_ext) hbnd_valid
   cases h_cases with
   | inl hExtDirect =>
     rcases hExtDirect with ⟨full, h_match, h_full_valid⟩
@@ -322,6 +332,7 @@ def full_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
     3. Boundary restriction properness: restricting a proper coloring to the ring is proper.
     4. Topological pasting lemma: compatible exterior and interior colorings glue along the boundary cycle. -/
 structure SurgeryInvariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (f : Nat → H.Dart) where
+  complete : IsCompleteDarts (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f))
   planar : @IsPlanar (Hypermap.exciseFixed H c f) inferInstance (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)).length
   bridgeless : Hypermap.isBridgeless (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f))
   valid_bnd : ∀ (col : MapColoring (Hypermap.exciseFixed H c f)), IsValidBoundaryColoring c (fun i => col.color (f i))
@@ -335,13 +346,15 @@ structure SurgeryInvariants (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
     satisfy edge adjacency and gluing conditions, SurgeryInvariants is constructed constructively. -/
 def surgery_invariants_of_disk (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (c : Configuration) (f : Nat → H.Dart)
+    (h_complete : IsCompleteDarts (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)))
     (h_planar : @IsPlanar (Hypermap.exciseFixed H c f) inferInstance (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)).length)
     (h_bridgeless : Hypermap.isBridgeless (Hypermap.exciseFixed H c f) (Hypermap.eraseAllDarts darts ((List.range c.interiorSize).map (fun i => c.ringSize + i) |>.map f)))
     (h_edge_adj : ∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (Hypermap.exciseFixed H c f).edge.f (f i) = f j)
     (h_paste : ∀ (col : MapColoring (Hypermap.exciseFixed H c f)) (ext : Nat → Color),
       (∀ i < c.ringSize, ext i = col.color (f i)) → IsValidConfigColoring c ext → MapColoring H) :
     SurgeryInvariants H darts c f :=
-  { planar := h_planar,
+  { complete := h_complete,
+    planar := h_planar,
     bridgeless := h_bridgeless,
     valid_bnd := fun col => Hypermap.valid_boundary_coloring_of_edge_adj H c f h_edge_adj col,
     glue := h_paste }
@@ -360,6 +373,7 @@ def reduction_witness_of_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : Li
   { H_ext := H_ext,
     dec_ext := inferInstance,
     darts_ext := darts_ext,
+    complete_ext := inv.complete,
     smaller := Hypermap.exciseConfiguration_strictly_smaller darts c h_int f hf_mem,
     planar := inv.planar,
     bridgeless := inv.bridgeless,
@@ -495,11 +509,11 @@ noncomputable def reducible_reduction_witness (H : Hypermap) [DecidableEq H.Dart
   intro hApp
   exact kempe_pullback_witness H darts mc c h_int hApp
 
-/-- A key lemma: A minimal counterexample cannot contain ANY D-reducible configuration.
+/-- A key lemma: A minimal counterexample cannot contain ANY reducible configuration.
     Proved directly from the existence of a FullReductionWitness. -/
 theorem no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
-  appearsIn c H darts → IsDReducible c → False := by
+  appearsIn c H darts → IsReducible c → False := by
   intro hApp hRed
   have w := reducible_reduction_witness H darts mc c h_int hApp
   exact no_reducible_with_full_witness H darts mc c w hRed
@@ -562,23 +576,23 @@ theorem unavoidability_from_discharging (H : Hypermap) [DecidableEq H.Dart] (dar
 def rsst_from_discharging_and_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (w : PlanarDischargingWitness H darts)
     (hWit : ∀ c, c ∈ theUnavoidableSet → KempeEliminationWitness c) :
-    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c := by
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c := by
   have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
   have hc_red := dreducible_of_elimination_witness c (hWit c hc_in)
-  exact ⟨c, hc_in, hc_app, hc_red⟩
+  exact ⟨c, hc_in, hc_app, Or.inl hc_red⟩
 
 /-- Construct an RSST reducible configuration existence witness from a PlanarDischargingWitness
-    and mathematical D-reducibility directly. -/
+    and mathematical reducibility directly. -/
 def rsst_from_discharging_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (w : PlanarDischargingWitness H darts)
-    (hRed : ∀ c, c ∈ theUnavoidableSet → IsDReducible c) :
-    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c := by
+    (hRed : ∀ c, c ∈ theUnavoidableSet → IsReducible c) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c := by
   have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
   exact ⟨c, hc_in, hc_app, hRed c hc_in⟩
 
 /-- Construct an RSST reducible configuration existence witness for a maximal planar triangulation
     equipped with Euler characteristic, triangulation condition, RSST discharging elimination,
-    and mathematical D-reducibility. -/
+    and mathematical reducibility. -/
 def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (rule : Discharging.ChargeShift H.Dart)
     (E F : Int)
@@ -587,18 +601,18 @@ def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart]
     (hTriang : 2 * E = 3 * F)
     (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
       ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0)
-    (hRed : ∀ c, c ∈ theUnavoidableSet → IsDReducible c) :
-    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c :=
+    (hRed : ∀ c, c ∈ theUnavoidableSet → IsReducible c) :
+    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c :=
   let w := planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
   rsst_from_discharging_and_reducibility H darts w hRed
 
 /-- The RSST Reducible Configuration Theorem (Robertson-Sanders-Seymour-Thomas 1997):
     Every minimal counterexample to the Four Color Theorem (an internally 6-connected
     planar triangulation) contains at least one configuration from the canonical 633
-    unavoidable set that is mathematically D-reducible. -/
+    unavoidable set that is mathematically reducible (D-reducible or C-reducible). -/
 axiom rsst_unavoidable_reducible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) :
-  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsDReducible c
+  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c
 
 /-- The Unavoidability Theorem:
     Every minimal counterexample must contain at least one configuration from our unavoidable set.
@@ -614,7 +628,7 @@ theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List
     Proved constructively from the RSST Reducible Configuration Theorem and interior size lemma. -/
 theorem exists_reducible_configuration (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) :
-  ∃ c, c.interiorSize > 0 ∧ appearsIn c H darts ∧ IsDReducible c := by
+  ∃ c, c.interiorSize > 0 ∧ appearsIn c H darts ∧ IsReducible c := by
   have ⟨c, hc_in, hc_app, hc_red⟩ := rsst_unavoidable_reducible H darts mc
   have hc_int := unavoidable_interior_pos c hc_in
   exact ⟨c, hc_int, hc_app, hc_red⟩
@@ -628,28 +642,30 @@ theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (d
 
 /-- If a counterexample exists, there exists a genuine minimal counterexample (a planar, bridgeless, uncolorable map where every smaller map is colorable). -/
 theorem minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_complete : IsCompleteDarts H darts)
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) (h_not_colorable : MapColoring H → False) :
   ∃ (H' : Hypermap) (_ : DecidableEq H'.Dart) (darts' : List H'.Dart), MinimalCounterexample H' darts' := by
-  have hEx : IsCounterexampleOfSize darts.length := ⟨H, inferInstance, darts, rfl, h_planar, h_bridgeless, h_not_colorable⟩
+  have hEx : IsCounterexampleOfSize darts.length := ⟨H, inferInstance, darts, h_complete, rfl, h_planar, h_bridgeless, h_not_colorable⟩
   have ⟨n, _, hPn, hmin⟩ := find_least IsCounterexampleOfSize darts.length hEx
-  rcases hPn with ⟨H0, dec0, darts0, hlen, hplan, hbridge, hnotcol⟩
-  refine ⟨H0, dec0, darts0, ⟨hplan, hbridge, hnotcol, ?_⟩⟩
-  intro H' dec' darts' hlt hplan' hbridge'
+  rcases hPn with ⟨H0, dec0, darts0, hcomp0, hlen, hplan, hbridge, hnotcol⟩
+  refine ⟨H0, dec0, darts0, ⟨hcomp0, hplan, hbridge, hnotcol, ?_⟩⟩
+  intro H' dec' darts' hcomp' hlt hplan' hbridge'
   by_cases hcol' : Nonempty (MapColoring H')
   · exact hcol'
   · have hcolFalse : MapColoring H' → False := fun c => hcol' ⟨c⟩
-    have hEx' : IsCounterexampleOfSize darts'.length := ⟨H', dec', darts', rfl, hplan', hbridge', hcolFalse⟩
+    have hEx' : IsCounterexampleOfSize darts'.length := ⟨H', dec', darts', hcomp', rfl, hplan', hbridge', hcolFalse⟩
     rw [← hlen] at hmin
     exact False.elim (hmin darts'.length hlt hEx')
 
 /-- THE FOUR COLOR THEOREM
 Every planar, bridgeless combinatorial map admits a valid 4-coloring. -/
 theorem four_color_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_complete : IsCompleteDarts H darts)
   (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) : Nonempty (MapColoring H) := by
   by_cases h_colorable : Nonempty (MapColoring H)
   · exact h_colorable
   · have h_not : MapColoring H → False := fun c => h_colorable ⟨c⟩
-    have ⟨H', dec', darts', mc⟩ := minimal_counterexample_exists H darts h_planar h_bridgeless h_not
+    have ⟨H', dec', darts', mc⟩ := minimal_counterexample_exists H darts h_complete h_planar h_bridgeless h_not
     exact False.elim (@minimal_counterexample_impossible H' dec' darts' mc)
 
 end Math

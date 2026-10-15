@@ -9,16 +9,10 @@ import FourColorTheorem.Math.DReductionProof
 
 namespace FourColorTheorem
 
-/-- The Four Color Theorem (Reducibility Part):
-    If a configuration mathematically exists inside the hypermap H, 
-    and the native verified solver (which executes exactly the C-reduction and 
-    D-reduction algorithms) computes 	rue for its reducibility, 
-    then the configuration is strictly mathematically reducible.
-    
-    This theorem entirely links the topology of planar hypermaps, the graph coloring 
-    axioms, the Kempe chain invariants, and the base-3 hash algebra directly 
-    to the verified computational loop FastReducer.lean which evaluates the 633 
-    RSST configurations. -/
+/-- Reducibility Verification Theorem:
+    Under the semantic bridge assumption `MatchesTopology H k R c`,
+    if the verified computational solver certifies either D-reducibility or C-reducibility,
+    then the topological ring `R` in hypermap `H` is mathematically reducible `Hypermap.IsReducible H k R`. -/
 theorem reducibility_verified (c : Math.FastReducer.RConf) (md : Array Math.FastReducer.MData × Nat) (pow3 : Array Nat) (live : ByteArray) (H : Hypermap) (k : Nat) (R : Hypermap.Ring H k) :
   MatchesTopology H k R c → 
   (Math.FastReducer.check c md pow3).dReducible = true ∨ Math.FastReducer.runCReduction c pow3 live = true → 

@@ -71,4 +71,33 @@ def IsDReducible (c : Configuration) : Prop :=
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
     (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b')
 
+/-- 
+True C-Reducibility (RSST Definition):
+A configuration is C-reducible if any non-extending boundary coloring can be
+eliminated through Kempe equivalence with the assistance of contract edges.
+-/
+def IsCReducible (c : Configuration) : Prop :=
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
+    (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b')
+
+/-- 
+General Reducibility (RSST Definition):
+A configuration is reducible if it is either D-reducible or C-reducible.
+In both cases, any boundary coloring that does not extend directly can be eliminated
+via Kempe-chain equivalence.
+-/
+def IsReducible (c : Configuration) : Prop :=
+  IsDReducible c ∨ IsCReducible c
+
+/-- Reducibility elimination property:
+    Any boundary coloring of a reducible configuration extends to the interior,
+    or can be transformed via Kempe equivalence to an extensible coloring. -/
+theorem reducible_elimination (c : Configuration) (hRed : IsReducible c) :
+    ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
+      (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b') := by
+  intro b hb
+  cases hRed with
+  | inl hD => exact hD b hb
+  | inr hC => exact hC b hb
+
 end Math

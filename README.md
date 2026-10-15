@@ -37,17 +37,17 @@ A formalization of the **Four Color Theorem** in **Lean 4** (v4.11.0) without Ma
 
 ## Verification Status: All 633 RSST Configurations
 
-The 633 unavoidable configurations from RSST (1997) are verified across 161 batch files, aggregated into ring-level certificate theorems:
+The 633 unavoidable configurations from RSST (1997) are verified across 138 batch files, aggregated into ring-level certificate theorems:
 
 | Ring Size | D-Reducible Batches | C-Reducible Batches | Configurations | Status |
 |---|---|---|---|---|
-| **Ring 6** | Batch 1 (Part 1) | — | 1 config | **Certified** |
-| **Ring 7** | Batch 1 (Part 2) | — | 1 config | **Certified** |
-| **Ring 8** | Batch 1 (Part 3) | CBatch 1 | 4 configs (3 D + 1 C) | **Certified** |
-| **Ring 9** | Batch 1 (Part 4) | CBatch 2 | 8 configs (6 D + 2 C) | **Certified** |
-| **Ring 10** | Batches 2–3 | CBatches 3–4 | 21 configs (15 D + 6 C) | **Certified** |
+| **Ring 6** | Batch 1 (Part 1) | — | 1 config (1 D + 0 C) | **Certified** |
+| **Ring 7** | Batch 1 (Part 2) | — | 1 config (1 D + 0 C) | **Certified** |
+| **Ring 8** | Batch 1 (Part 3) | CBatch 1 | 5 configs (4 D + 1 C) | **Certified** |
+| **Ring 9** | Batch 1 (Part 4) | CBatch 2 | 8 configs (7 D + 1 C) | **Certified** |
+| **Ring 10** | Batches 2–3 | CBatches 3–4 | 31 configs (21 D + 10 C) | **Certified** |
 | **Ring 11** | Batches 4–10 | CBatches 5–11 | 81 configs (44 D + 37 C) | **Certified** |
-| **Ring 12** | Batches 11–26 | CBatches 12–25 | 186 configs (104 D + 82 C) | **Certified** |
+| **Ring 12** | Batches 11–26 | CBatches 12–25 | 175 configs (93 D + 82 C) | **Certified** |
 | **Ring 13** | Batches 27–39 (`R13`) | CBatches 26–49 (`CR13`) | 194 configs (52 D + 142 C) | **Certified** |
 | **Ring 14** | Batches 40–52 (`R14`) | CBatches 50–86 (`CR14`) | 137 configs (26 D + 111 C) | **Certified** |
 | **Total** | **52 Batches** | **86 CBatches** | **633 Configurations (249 D + 384 C)** | **100% Certified** |
@@ -89,7 +89,7 @@ There are **0 `sorry` statements** across the entire repository. The project axi
 1. **`Math.topological_reduction_bundle`** (`Math/MainTheorem.lean`):
    Formalizes the Jordan curve theorem partition and planar surgery properties: excising an embedded contractible disk configuration from a minimal counterexample and gluing back an interior coloring yields a valid coloring.
 2. **`Math.rsst_unavoidable_reducible`** (`Math/MainTheorem.lean`):
-   The Robertson-Sanders-Seymour-Thomas (1997) Reducible Configuration Theorem: every minimal counterexample to the Four Color Theorem contains at least one configuration from the canonical 633 unavoidable set that is mathematically D-reducible. Conditioned strictly on `MinimalCounterexample H darts` to ensure axiomatic consistency.
+   The Robertson-Sanders-Seymour-Thomas (1997) Reducible Configuration Theorem: every minimal counterexample to the Four Color Theorem contains at least one configuration from the canonical 633 unavoidable set that is mathematically reducible (D-reducible or C-reducible). Conditioned strictly on `MinimalCounterexample H darts` (which enforces `IsCompleteDarts H darts`, planarity, and bridgelessness), eliminating vacuous empty-graph instances.
 
 ---
 
