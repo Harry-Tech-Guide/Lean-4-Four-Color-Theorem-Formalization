@@ -10,6 +10,7 @@ import FourColorTheorem.Math.Topology.KempeTopology
 import FourColorTheorem.Math.Topology.Surgery
 import FourColorTheorem.Math.Topology.Euler
 import FourColorTheorem.Math.Topology.Jordan
+import FourColorTheorem.Math.MasterCertificate
 
 namespace Math
 
@@ -21,14 +22,22 @@ abbrev MapColoring (H : Hypermap) := Hypermap.FaceColoring H
 def IsPlanar (H : Hypermap) [BEq H.Dart] (darts : List H.Dart) (fuel : Nat := darts.length) : Prop :=
   Hypermap.isPlanar H fuel darts = true
 
-/-- A configuration `c` appears in hypermap `H` (on dart list `darts`) if there is an
-    injective embedding of the configuration's vertices into canonical darts such that
-    all adjacency relations are preserved. -/
+/-- A configuration `c` appears as an induced disk configuration in hypermap `H` (on dart list `darts`)
+    if there is an injective embedding of the configuration's vertices into canonical darts such that:
+    1. f is injective.
+    2. All embedded darts f(i) belong to the complete dart list.
+    3. Adjacency is preserved: c.adj i j = true → areAdjacentDarts H (f i) (f j) = true.
+    4. Induced on interior: no extra edges between interior vertices and other configuration vertices.
+    5. Ring cycle: the first c.ringSize vertices form the boundary cycle of the disk. -/
 def appearsIn (c : Configuration) (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) : Prop :=
   ∃ (f : Nat → H.Dart),
     (∀ i < c.totalNodes, ∀ j < c.totalNodes, i ≠ j → f i ≠ f j) ∧
     (∀ i < c.totalNodes, f i ∈ darts) ∧
-    (∀ i < c.totalNodes, ∀ j < c.totalNodes, c.adj i j = true → Hypermap.areAdjacentDarts H (f i) (f j) = true)
+    (∀ i < c.totalNodes, ∀ j < c.totalNodes, c.adj i j = true → Hypermap.areAdjacentDarts H (f i) (f j) = true) ∧
+    (∀ i < c.totalNodes, ∀ j < c.totalNodes, (i ≥ c.ringSize ∨ j ≥ c.ringSize) →
+      (Hypermap.areAdjacentDarts H (f i) (f j) = true ↔ c.adj i j = true)) ∧
+    (∀ i < c.ringSize, c.ringSize > 0 →
+      Hypermap.areAdjacentDarts H (f i) (f ((i + 1) % c.ringSize)) = true)
 
 /-- Removing a dart that belongs to a non-empty list of darts strictly reduces its length. -/
 theorem erase_dart_strictly_smaller {D : Type} [BEq D] [LawfulBEq D] (darts : List D) (d : D) (hd : d ∈ darts) :
@@ -134,6 +143,7 @@ structure ReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
   bridgeless : Hypermap.isBridgeless H_ext darts_ext
   bnd_coloring : MapColoring H_ext → BoundaryColoring c
   valid_bnd : ∀ col, IsValidBoundaryColoring c (bnd_coloring col)
+  bnd_contracts : ∀ col, SatisfiesContracts c.contractEdges (bnd_coloring col)
   glue : ∀ (col : MapColoring H_ext) (ext : Nat → Color),
     (∀ i < c.ringSize, ext i = bnd_coloring col i) →
     IsValidConfigColoring c ext →
@@ -157,7 +167,8 @@ theorem no_reducible_with_full_witness (H : Hypermap) [DecidableEq H.Dart] (dart
   have hNonempty := @MinimalCounterexample.is_minimal H _ darts mc w.H_ext w.dec_ext w.darts_ext w.complete_ext w.smaller w.planar w.bridgeless
   rcases hNonempty with ⟨col_ext⟩
   have hbnd_valid := w.valid_bnd col_ext
-  have h_cases := reducible_elimination c hRed (w.bnd_coloring col_ext) hbnd_valid
+  have hbnd_sat := w.bnd_contracts col_ext
+  have h_cases := reducible_elimination c hRed (w.bnd_coloring col_ext) hbnd_valid hbnd_sat
   cases h_cases with
   | inl hExtDirect =>
     rcases hExtDirect with ⟨full, h_match, h_full_valid⟩
@@ -183,42 +194,42 @@ def RealizedByFaceKempeChain (H : Hypermap) [DecidableEq H.Dart] (darts : List H
       boundaryKempeSwap c (w.bnd_coloring col) a b_col S
 
 /-- Topological Kempe Realizability:
-    In a planar hypermap, every valid elementary boundary Kempe swap is realized
+    In a planar hypermap, every admissible boundary Kempe swap is realized
     by swapping a face Kempe chain starting at some boundary dart. -/
 def TopologicalKempeRealizable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c) : Prop :=
   ∀ (col : MapColoring w.H_ext) (a b_col : Color) (S : Nat → Bool),
-    IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col) a b_col S) →
+    IsAdmissibleBoundarySwap c (w.bnd_coloring col) a b_col S →
     RealizedByFaceKempeChain H darts c w col a b_col S
 
 /-- Elementary Pullback Step Theorem:
-    Any elementary boundary Kempe swap realized by a face Kempe chain on H_ext
+    Any admissible boundary Kempe swap realized by a face Kempe chain on H_ext
     directly produces a valid exterior coloring witness. -/
 theorem elementary_pullback_of_face_chain (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c)
     (hReal : TopologicalKempeRealizable H darts c w) :
     ∀ (col : MapColoring w.H_ext) (a b_col : Color) (S : Nat → Bool),
-      IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col) a b_col S) →
+      IsAdmissibleBoundarySwap c (w.bnd_coloring col) a b_col S →
       ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c (w.bnd_coloring col) a b_col S := by
   intro col a b_col S hVal
   have ⟨start, hEq⟩ := hReal col a b_col S hVal
   exact ⟨Hypermap.swapFaceKempeChain w.H_ext col a b_col start, hEq⟩
 
 /-- Reverse Elementary Pullback Step Theorem:
-    Any elementary boundary Kempe swap realized by a face Kempe chain on H_ext
+    Any admissible boundary Kempe swap realized by a face Kempe chain on H_ext
     is invertible, allowing pullback in the reverse direction. -/
 theorem elementary_pullback_of_face_chain_rev (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c)
     (hReal : TopologicalKempeRealizable H darts c w)
     (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool)
-    (hb_val : IsValidBoundaryColoring c b) :
+    (hb_val : IsValidBoundaryColoring c b) (hAdm : IsAdmissibleBoundarySwap c b a b_col S) :
     ∀ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c b a b_col S →
       ∃ col : MapColoring w.H_ext, w.bnd_coloring col = b := by
   intro col' h
   have hInv := boundaryKempeSwap_inv c b a b_col S
   have hb_eq : b = boundaryKempeSwap c (w.bnd_coloring col') a b_col S := by
     rw [h, hInv]
-  have hVal' : IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col') a b_col S) := by
-    rw [← hb_eq]
-    exact hb_val
-  have ⟨start, hEq⟩ := hReal col' a b_col S hVal'
+  have hAdm' : IsAdmissibleBoundarySwap c (w.bnd_coloring col') a b_col S := by
+    have hSymm := admissible_swap_symm c b a b_col S hb_val hAdm
+    rwa [← h] at hSymm
+  have ⟨start, hEq⟩ := hReal col' a b_col S hAdm'
   refine ⟨Hypermap.swapFaceKempeChain w.H_ext col' a b_col start, ?_⟩
   rw [hEq]
   exact hb_eq.symm
@@ -229,7 +240,7 @@ inductive ValidKempeChain (c : Configuration) : BoundaryColoring c → BoundaryC
   | step {b1 b2 b3 : BoundaryColoring c} (a b_col : Color) (S : Nat → Bool)
       (h12 : ValidKempeChain c b1 b2)
       (hb3_eq : b3 = boundaryKempeSwap c b2 a b_col S)
-      (hb3_val : IsValidBoundaryColoring c b3) :
+      (hAdm : IsAdmissibleBoundarySwap c b2 a b_col S) :
       ValidKempeChain c b1 b3
 
 /-- Kempe Pullback Chain Theorem:
@@ -246,14 +257,13 @@ theorem pullback_of_valid_kempe_chain (H : Hypermap) [DecidableEq H.Dart] (darts
   | refl _ =>
     intro col h
     exact ⟨col, h⟩
-  | step a b_col S _ hb3_eq hb3_val ih =>
+  | step a b_col S _ hb3_eq hAdm ih =>
     intro col h
     have ⟨col2, hcol2⟩ := ih col h
     subst hb3_eq
-    have hVal : IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col2) a b_col S) := by
-      rw [hcol2]
-      exact hb3_val
-    have ⟨start, hEq⟩ := hReal col2 a b_col S hVal
+    have hAdm2 : IsAdmissibleBoundarySwap c (w.bnd_coloring col2) a b_col S := by
+      rwa [hcol2]
+    have ⟨start, hEq⟩ := hReal col2 a b_col S hAdm2
     refine ⟨Hypermap.swapFaceKempeChain w.H_ext col2 a b_col start, ?_⟩
     rw [hEq, hcol2]
 
@@ -277,16 +287,7 @@ theorem kempe_pullback_of_topological_realizable (H : Hypermap) [DecidableEq H.D
       have ⟨start, hEq⟩ := hReal col a b_col S hVal
       exact ⟨Hypermap.swapFaceKempeChain w.H_ext col a b_col start, hEq⟩
     · intro col' h
-      have hInv := boundaryKempeSwap_inv c b a b_col S
-      have hb_eq : b = boundaryKempeSwap c (w.bnd_coloring col') a b_col S := by
-        rw [h, hInv]
-      have hVal' : IsValidBoundaryColoring c (boundaryKempeSwap c (w.bnd_coloring col') a b_col S) := by
-        rw [← hb_eq]
-        exact hb_val
-      have ⟨start, hEq⟩ := hReal col' a b_col S hVal'
-      refine ⟨Hypermap.swapFaceKempeChain w.H_ext col' a b_col start, ?_⟩
-      rw [hEq]
-      exact hb_eq.symm
+      exact elementary_pullback_of_face_chain_rev H darts c w hReal b a b_col S hb_val hVal col' h
   | symm _ ih =>
     exact ⟨ih.2, ih.1⟩
   | trans _ _ ih1 ih2 =>
@@ -484,10 +485,11 @@ axiom rsst_unavoidability (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Da
 
 /-- Computational Reducibility of the RSST Unavoidable Set:
     Every configuration in the canonical 633 unavoidable set is mathematically reducible
-    (D-reducible or C-reducible), as certified by the Lean 4 computational reflection
-    theorems across all 138 batch files. -/
-axiom rsst_all_unavoidable_reducible (c : Configuration) :
-  c ∈ theUnavoidableSet → IsReducible c
+    (D-reducible or C-reducible), proven directly from the in-kernel batch certificates
+    across all 138 batch files and the RSST certificate soundness bridge. -/
+theorem rsst_all_unavoidable_reducible (c : Configuration) :
+  c ∈ theUnavoidableSet → IsReducible c :=
+  MasterCertificate.rsst_all_unavoidable_reducible c
 
 /-- The Combined RSST Reducible Configuration Theorem:
     Proved constructively by combining RSST Unavoidability and computational Reducibility. -/
