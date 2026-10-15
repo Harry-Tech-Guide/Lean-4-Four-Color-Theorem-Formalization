@@ -19,14 +19,11 @@ def containsUnavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart
   appearsIn c H darts
 
 /-- The fundamental theorem of Discharging.
-If we apply the 32 RSST rules to a planar, bridge-less graph that DOES NOT 
-contain any of the 633 unavoidable configurations, the resulting charge 
-distribution is strictly positive everywhere. 
-However, Euler's formula guarantees the sum of charges is exactly 120, 
-which means average charge is 0, contradicting positive bounded charge! -/
+Every minimal counterexample (an internally 6-connected planar triangulation)
+contains at least one configuration from the RSST 633 unavoidable set. -/
 theorem discharging_forces_unavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (h_planar : IsPlanar H darts) (h_no_bridge : Hypermap.isBridgeless H darts) : 
+  (mc : MinimalCounterexample H darts) : 
   containsUnavoidable H darts :=
-  unavoidability_theorem H darts h_planar h_no_bridge
+  unavoidability_theorem H darts mc
 
 end Math
