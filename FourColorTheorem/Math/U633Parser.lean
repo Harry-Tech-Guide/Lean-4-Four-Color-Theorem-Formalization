@@ -23,6 +23,10 @@ def parseConfig (s : String) : Configuration :=
       let mut flat := mkArray (numVertices * numVertices) false
       -- Header: n r X Y a, followed by the 2·a contract vertices; adjacency starts after that.
       let a := nums.getD 4 0
+      let mut contracts : List (Nat × Nat) := []
+      for i in [0:a] do
+        if 5 + 2 * i + 1 < nums.length then
+          contracts := contracts.concat (nums[5 + 2 * i]! - 1, nums[5 + 2 * i + 1]! - 1)
       let mut idx := 5 + 2 * a
         
       for _ in [0:numVertices] do
@@ -45,10 +49,11 @@ def parseConfig (s : String) : Configuration :=
       return {
         ringSize := ringSize,
         interiorSize := numVertices - ringSize,
-        adj := mkAdjFromFlat numVertices flat
+        adj := mkAdjFromFlat numVertices flat,
+        contractEdges := contracts
       }
   else
-    { ringSize := 0, interiorSize := 0, adj := fun _ _ => false }
+    { ringSize := 0, interiorSize := 0, adj := fun _ _ => false, contractEdges := [] }
 
 /-- Parse the entire U633 dataset into an array of Configurations at runtime. -/
 def parseAllConfigs (_ : Unit) : Array Configuration :=

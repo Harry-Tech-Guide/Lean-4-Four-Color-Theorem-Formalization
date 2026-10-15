@@ -6,11 +6,12 @@ structure Configuration where
   ringSize : Nat
   interiorSize : Nat
   adj : Nat → Nat → Bool
+  contractEdges : List (Nat × Nat) := []
 
 def Configuration.totalNodes (c : Configuration) := c.ringSize + c.interiorSize
 
 instance : Inhabited Configuration where
-  default := { ringSize := 0, interiorSize := 0, adj := fun _ _ => false }
+  default := { ringSize := 0, interiorSize := 0, adj := fun _ _ => false, contractEdges := [] }
 
 def IsValidConfigColoring (c : Configuration) (color : Nat → Color) : Prop :=
   ∀ i j, i < c.totalNodes → j < c.totalNodes → c.adj i j = true → color i ≠ color j
@@ -24,6 +25,17 @@ def extendsToInterior (c : Configuration) (b : BoundaryColoring c) : Prop :=
   ∃ (full : Nat → Color),
     (∀ i, i < c.ringSize → full i = b i) ∧
     IsValidConfigColoring c full
+
+/-- A configuration coloring respects contract edges if every contracted
+    vertex pair is assigned the same color. -/
+def IsValidContractColoring (c : Configuration) (contracts : List (Nat × Nat)) (color : Nat → Color) : Prop :=
+  IsValidConfigColoring c color ∧ ∀ uv ∈ contracts, color uv.1 = color uv.2
+
+/-- Extending a boundary coloring to the interior while respecting contract edge identifications. -/
+def extendsToInteriorWithContract (c : Configuration) (contracts : List (Nat × Nat)) (b : BoundaryColoring c) : Prop :=
+  ∃ (full : Nat → Color),
+    (∀ i, i < c.ringSize → full i = b i) ∧
+    IsValidContractColoring c contracts full
 
 /-- A single Kempe swap on a boundary subset S for colors a and b. -/
 def boundaryKempeSwap (_ : Configuration) (b : Nat → Color) (a b_col : Color) (S : Nat → Bool) : Nat → Color :=
@@ -64,8 +76,6 @@ A configuration is D-reducible if the set of boundary colorings that do NOT exte
 to the interior can be completely eliminated via Kempe equivalence.
 Specifically, for any non-extending boundary coloring, there must be a Kempe-equivalent
 boundary coloring that DOES extend.
-(Because if it extends, we can color the interior, and if we can color the interior,
-we can just apply the Kempe swap on the whole graph to get the original boundary coloring!)
 -/
 def IsDReducible (c : Configuration) : Prop :=
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
@@ -73,12 +83,15 @@ def IsDReducible (c : Configuration) : Prop :=
 
 /-- 
 True C-Reducibility (RSST Definition):
-A configuration is C-reducible if any non-extending boundary coloring can be
-eliminated through Kempe equivalence with the assistance of contract edges.
+A configuration is C-reducible if there exists a non-empty list of contract edges `contracts`
+such that any boundary coloring that does not extend to a contract-respecting interior coloring
+can be eliminated through Kempe equivalence to a boundary coloring that does extend.
 -/
 def IsCReducible (c : Configuration) : Prop :=
-  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
-    (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b')
+  ∃ contracts : List (Nat × Nat), contracts ≠ [] ∧
+    ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
+      (extendsToInteriorWithContract c contracts b ∨
+       ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInteriorWithContract c contracts b')
 
 /-- 
 General Reducibility (RSST Definition):
@@ -91,13 +104,25 @@ def IsReducible (c : Configuration) : Prop :=
 
 /-- Reducibility elimination property:
     Any boundary coloring of a reducible configuration extends to the interior,
-    or can be transformed via Kempe equivalence to an extensible coloring. -/
+    or can be transformed via Kempe equivalence to an extensible coloring.
+    Holds constructively for both D-reducible and C-reducible configurations. -/
 theorem reducible_elimination (c : Configuration) (hRed : IsReducible c) :
     ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
       (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b') := by
   intro b hb
   cases hRed with
   | inl hD => exact hD b hb
-  | inr hC => exact hC b hb
+  | inr hC =>
+    rcases hC with ⟨contracts, _, hC_elim⟩
+    have hCases := hC_elim b hb
+    cases hCases with
+    | inl hExt =>
+      rcases hExt with ⟨full, h_match, h_valid⟩
+      left
+      exact ⟨full, h_match, h_valid.1⟩
+    | inr hKempe =>
+      rcases hKempe with ⟨b', hb'_val, hEquiv, full', h_match', h_valid'⟩
+      right
+      exact ⟨b', hb'_val, hEquiv, full', h_match', h_valid'.1⟩
 
 end Math
