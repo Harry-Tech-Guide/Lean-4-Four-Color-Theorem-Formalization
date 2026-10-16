@@ -29,26 +29,47 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of C-reducible configurations certified for ring size 12. -/
 def certified_count_cr12 : Nat := 82
 
-/-- Index list of the 82 certified C-reducible configurations for ring size 12. -/
+/-- Index list of the 82 certified C-reducible configurations for ring size 12,
+    composed directly from the 14 verified in-kernel batch modules. -/
 def certified_indices_cr12 : List Nat :=
-  [ 19, 61, 62, 63, 65, 72,  -- CBatch 12 (Part 1)
-    73, 74, 79, 88, 89, 126,  -- CBatch 13 (Part 2)
-    127, 128, 130, 131, 136, 137,  -- CBatch 14 (Part 3)
-    138, 139, 140, 141, 142, 143,  -- CBatch 15 (Part 4)
-    144, 145, 147, 148, 152, 158,  -- CBatch 16 (Part 5)
-    178, 244, 245, 249, 250, 257,  -- CBatch 17 (Part 6)
-    342, 344, 345, 346, 352, 353,  -- CBatch 18 (Part 7)
-    355, 356, 357, 358, 361, 364,  -- CBatch 19 (Part 8)
-    365, 368, 370, 371, 409, 410,  -- CBatch 20 (Part 9)
-    411, 412, 414, 418, 425, 427,  -- CBatch 21 (Part 10)
-    429, 430, 431, 432, 433, 434,  -- CBatch 22 (Part 11)
-    441, 442, 451, 461, 462, 464,  -- CBatch 23 (Part 12)
-    507, 527, 556, 574, 575, 578,  -- CBatch 24 (Part 13)
-    581, 591, 598, 622  -- CBatch 25 (Part 14)
-  ]
+  cbatch12_indices ++
+  cbatch13_indices ++
+  cbatch14_indices ++
+  cbatch15_indices ++
+  cbatch16_indices ++
+  cbatch17_indices ++
+  cbatch18_indices ++
+  cbatch19_indices ++
+  cbatch20_indices ++
+  cbatch21_indices ++
+  cbatch22_indices ++
+  cbatch23_indices ++
+  cbatch24_indices ++
+  cbatch25_indices
 
 theorem certified_count_cr12_eq : certified_indices_cr12.length = certified_count_cr12 := by
   rfl
+
+/-- All 14 Ring 12 C-reduction batch certificates combined into a single verifiable theorem. -/
+theorem cr12_batches_verified :
+    checkCRingBatch 12 cbatch12_indices = true ∧
+    checkCRingBatch 12 cbatch13_indices = true ∧
+    checkCRingBatch 12 cbatch14_indices = true ∧
+    checkCRingBatch 12 cbatch15_indices = true ∧
+    checkCRingBatch 12 cbatch16_indices = true ∧
+    checkCRingBatch 12 cbatch17_indices = true ∧
+    checkCRingBatch 12 cbatch18_indices = true ∧
+    checkCRingBatch 12 cbatch19_indices = true ∧
+    checkCRingBatch 12 cbatch20_indices = true ∧
+    checkCRingBatch 12 cbatch21_indices = true ∧
+    checkCRingBatch 12 cbatch22_indices = true ∧
+    checkCRingBatch 12 cbatch23_indices = true ∧
+    checkCRingBatch 12 cbatch24_indices = true ∧
+    checkCRingBatch 12 cbatch25_indices = true :=
+  ⟨cert_cbatch12_r12, cert_cbatch13_r12, cert_cbatch14_r12, cert_cbatch15_r12,
+   cert_cbatch16_r12, cert_cbatch17_r12, cert_cbatch18_r12, cert_cbatch19_r12,
+   cert_cbatch20_r12, cert_cbatch21_r12, cert_cbatch22_r12, cert_cbatch23_r12,
+   cert_cbatch24_r12, cert_cbatch25_r12⟩
 
 end Batch
 end Math

@@ -22,19 +22,31 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of C-reducible configurations certified for ring size 11. -/
 def certified_count_cr11 : Nat := 37
 
-/-- Index list of the 37 certified C-reducible configurations for ring size 11. -/
+/-- Index list of the 37 certified C-reducible configurations for ring size 11,
+    composed directly from the 7 verified in-kernel batch modules. -/
 def certified_indices_cr11 : List Nat :=
-  [ 14, 38, 39, 41, 42,  -- CBatch 05 (Part 1)
-    46, 48, 51, 53, 54,  -- CBatch 06 (Part 2)
-    55, 57, 59, 113, 115,  -- CBatch 07 (Part 3)
-    118, 121, 122, 123, 124,  -- CBatch 08 (Part 4)
-    125, 134, 135, 241, 329,  -- CBatch 09 (Part 5)
-    331, 333, 335, 338, 339, 340,  -- CBatch 10 (Part 6)
-    341, 367, 402, 403, 426, 569   -- CBatch 11 (Part 7)
-  ]
+  cbatch05_indices ++
+  cbatch06_indices ++
+  cbatch07_indices ++
+  cbatch08_indices ++
+  cbatch09_indices ++
+  cbatch10_indices ++
+  cbatch11_indices
 
 theorem certified_count_cr11_eq : certified_indices_cr11.length = certified_count_cr11 := by
   rfl
+
+/-- All 7 Ring 11 C-reduction batch certificates combined into a single verifiable theorem. -/
+theorem cr11_batches_verified :
+    checkCRingBatch 11 cbatch05_indices = true ∧
+    checkCRingBatch 11 cbatch06_indices = true ∧
+    checkCRingBatch 11 cbatch07_indices = true ∧
+    checkCRingBatch 11 cbatch08_indices = true ∧
+    checkCRingBatch 11 cbatch09_indices = true ∧
+    checkCRingBatch 11 cbatch10_indices = true ∧
+    checkCRingBatch 11 cbatch11_indices = true :=
+  ⟨cert_cbatch05_r11, cert_cbatch06_r11, cert_cbatch07_r11, cert_cbatch08_r11,
+   cert_cbatch09_r11, cert_cbatch10_r11, cert_cbatch11_r11⟩
 
 end Batch
 end Math

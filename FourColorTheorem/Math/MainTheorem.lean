@@ -143,7 +143,7 @@ structure ReductionWitness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
   bridgeless : Hypermap.isBridgeless H_ext darts_ext
   bnd_coloring : MapColoring H_ext → BoundaryColoring c
   valid_bnd : ∀ col, IsValidBoundaryColoring c (bnd_coloring col)
-  bnd_contracts : ∀ col, SatisfiesContracts c.contractEdges (bnd_coloring col)
+  bnd_contracts : ∀ col, extendsToContracted c (bnd_coloring col)
   glue : ∀ (col : MapColoring H_ext) (ext : Nat → Color),
     (∀ i < c.ringSize, ext i = bnd_coloring col i) →
     IsValidConfigColoring c ext →

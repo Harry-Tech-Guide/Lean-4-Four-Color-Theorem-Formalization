@@ -19,16 +19,24 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of C-reducible configurations certified for rings 8, 9, 10. -/
 def certified_count_cr8to10 : Nat := 12
 
-/-- Index list of the 12 certified C-reducible configurations for rings 8, 9, 10. -/
+/-- Index list of the 12 certified C-reducible configurations for rings 8, 9, 10,
+    composed directly from the 4 verified in-kernel batch modules. -/
 def certified_indices_cr8to10 : List Nat :=
-  [ 3,                             -- Ring 8 (CBatch 01)
-    25,                            -- Ring 9 (CBatch 02)
-    10, 28, 31, 33, 34,            -- Ring 10 (CBatch 03, Part 1)
-    35, 111, 116, 326, 327         -- Ring 10 (CBatch 04, Part 2)
-  ]
+  cbatch01_indices ++
+  cbatch02_indices ++
+  cbatch03_indices ++
+  cbatch04_indices
 
 theorem certified_count_cr8to10_eq : certified_indices_cr8to10.length = certified_count_cr8to10 := by
   rfl
+
+/-- All 4 Rings 8-10 C-reduction batch certificates combined into a single verifiable theorem. -/
+theorem cr8to10_batches_verified :
+    checkCRingBatch 8 cbatch01_indices = true ∧
+    checkCRingBatch 9 cbatch02_indices = true ∧
+    checkCRingBatch 10 cbatch03_indices = true ∧
+    checkCRingBatch 10 cbatch04_indices = true :=
+  ⟨cert_cbatch01_r8, cert_cbatch02_r9, cert_cbatch03_r10, cert_cbatch04_r10⟩
 
 end Batch
 end Math

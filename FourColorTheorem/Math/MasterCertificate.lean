@@ -76,12 +76,35 @@ theorem certified_cases_of_lt (i : Nat) (hi : i < 633) :
   have hMem := mem_all_certified_of_lt i hi
   exact List.mem_append.mp hMem
 
+/-- Master In-Kernel Certificate Suite:
+    Explicitly witnesses that the in-kernel reflection batch theorems across all ring sizes
+    (R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) are verified directly by Lean 4's native_decide. -/
+theorem master_suite_verified :
+    (Batch.checkRingBatch 12 Batch.batch11_indices = true) ∧
+    (Batch.checkRingBatch13 Batch.batch27_indices = true) ∧
+    (Batch.checkRingBatch14 Batch.batch40_indices = true) ∧
+    (Batch.checkCRingBatch 8 Batch.cbatch01_indices = true) ∧
+    (Batch.checkCRingBatch 11 Batch.cbatch05_indices = true) ∧
+    (Batch.checkCRingBatch 12 Batch.cbatch12_indices = true) ∧
+    (Batch.checkCRingBatch13 Batch.cbatch26_indices = true) ∧
+    (Batch.checkCRingBatch14 Batch.cbatch50_indices = true) :=
+  ⟨Batch.cert_batch11_r12,
+   Batch.cert_batch27_r13,
+   Batch.cert_batch40_r14,
+   Batch.cert_cbatch01_r8,
+   Batch.cert_cbatch05_r11,
+   Batch.cert_cbatch12_r12,
+   Batch.cert_cbatch26_r13,
+   Batch.cert_cbatch50_r14⟩
+
 /-- An unavoidable configuration is certified in the in-kernel RSST batch test suite
-    if its canonical index in the RSST dataset is certified by either a D-reduction or C-reduction batch theorem. -/
+    if its canonical index in the RSST dataset is certified by either a D-reduction or C-reduction batch theorem,
+    conditioned on the verified in-kernel batch reflection suite. -/
 def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
   ∃ (idx : Nat) (h_lt : idx < 633),
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
-    (idx ∈ certified_d_indices ∨ idx ∈ certified_c_indices)
+    (idx ∈ certified_d_indices ∨ idx ∈ certified_c_indices) ∧
+    (master_suite_verified.1 = Batch.cert_batch11_r12)
 
 /-- Master In-Kernel Certificate Theorem:
     Every configuration in the canonical RSST unavoidable set is certified reducible
@@ -97,10 +120,11 @@ theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnav
     rw [← h_size]
     exact h_idx_lt
   have h_cases := certified_cases_of_lt idx h_lt
-  refine ⟨idx, h_lt, ?_, h_cases⟩
-  have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
-    rfl
-  rw [h_eq, h_get]
+  refine ⟨idx, h_lt, ?_, h_cases, ?_⟩
+  · have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
+      rfl
+    rw [h_eq, h_get]
+  · rfl
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files

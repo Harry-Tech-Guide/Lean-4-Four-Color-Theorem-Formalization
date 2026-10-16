@@ -28,25 +28,45 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of D-reducible configurations certified for ring size 14. -/
 def certified_count_r14 : Nat := 26
 
-/-- Index list of the 26 certified D-reducible configurations for ring size 14. -/
+/-- Index list of the 26 certified D-reducible configurations for ring size 14,
+    composed directly from the 13 verified in-kernel batch modules. -/
 def certified_indices_r14 : List Nat :=
-  [ 109, 214,  -- Batch 40 (Part 1)
-    222, 223,  -- Batch 41 (Part 2)
-    224, 237,  -- Batch 42 (Part 3)
-    238, 239,  -- Batch 43 (Part 4)
-    240, 278,  -- Batch 44 (Part 5)
-    279, 305,  -- Batch 45 (Part 6)
-    312, 313,  -- Batch 46 (Part 7)
-    315, 316,  -- Batch 47 (Part 8)
-    397, 400,  -- Batch 48 (Part 9)
-    486, 493,  -- Batch 49 (Part 10)
-    494, 495,  -- Batch 50 (Part 11)
-    545, 547,  -- Batch 51 (Part 12)
-    548, 552   -- Batch 52 (Part 13)
-  ]
+  batch40_indices ++
+  batch41_indices ++
+  batch42_indices ++
+  batch43_indices ++
+  batch44_indices ++
+  batch45_indices ++
+  batch46_indices ++
+  batch47_indices ++
+  batch48_indices ++
+  batch49_indices ++
+  batch50_indices ++
+  batch51_indices ++
+  batch52_indices
 
 theorem certified_count_r14_eq : certified_indices_r14.length = certified_count_r14 := by
   rfl
+
+/-- All 13 Ring 14 D-reduction batch certificates combined into a single verifiable theorem. -/
+theorem r14_batches_verified :
+    checkRingBatch14 batch40_indices = true ∧
+    checkRingBatch14 batch41_indices = true ∧
+    checkRingBatch14 batch42_indices = true ∧
+    checkRingBatch14 batch43_indices = true ∧
+    checkRingBatch14 batch44_indices = true ∧
+    checkRingBatch14 batch45_indices = true ∧
+    checkRingBatch14 batch46_indices = true ∧
+    checkRingBatch14 batch47_indices = true ∧
+    checkRingBatch14 batch48_indices = true ∧
+    checkRingBatch14 batch49_indices = true ∧
+    checkRingBatch14 batch50_indices = true ∧
+    checkRingBatch14 batch51_indices = true ∧
+    checkRingBatch14 batch52_indices = true :=
+  ⟨cert_batch40_r14, cert_batch41_r14, cert_batch42_r14, cert_batch43_r14,
+   cert_batch44_r14, cert_batch45_r14, cert_batch46_r14, cert_batch47_r14,
+   cert_batch48_r14, cert_batch49_r14, cert_batch50_r14, cert_batch51_r14,
+   cert_batch52_r14⟩
 
 end Batch
 end Math

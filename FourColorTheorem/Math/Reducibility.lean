@@ -26,6 +26,24 @@ def extendsToInterior (c : Configuration) (b : BoundaryColoring c) : Prop :=
     (∀ i, i < c.ringSize → full i = b i) ∧
     IsValidConfigColoring c full
 
+/-- An edge of configuration c is a contracted edge. -/
+def isContractEdge (contracts : List (Nat × Nat)) (u v : Nat) : Bool :=
+  contracts.contains (u, v) || contracts.contains (v, u)
+
+/-- A valid coloring of the contracted configuration c / E_C:
+    1. Contracted edge endpoints receive identical colors.
+    2. Adjacent vertices that are not contracted to each other receive distinct colors. -/
+def IsValidContractColoring (c : Configuration) (color : Nat → Color) : Prop :=
+  (∀ uv ∈ c.contractEdges, uv.1 < c.totalNodes ∧ uv.2 < c.totalNodes ∧ color uv.1 = color uv.2) ∧
+  (∀ i j, i < c.totalNodes → j < c.totalNodes → c.adj i j = true →
+    isContractEdge c.contractEdges i j = false → color i ≠ color j)
+
+/-- A boundary coloring extends to the contracted configuration c / E_C. -/
+def extendsToContracted (c : Configuration) (b : BoundaryColoring c) : Prop :=
+  ∃ (full : Nat → Color),
+    (∀ i, i < c.ringSize → full i = b i) ∧
+    IsValidContractColoring c full
+
 /-- A boundary coloring satisfies contract edge identifications if every contracted
     pair of boundary vertices receives the same color. -/
 def SatisfiesContracts (contracts : List (Nat × Nat)) (b : Nat → Color) : Prop :=
@@ -44,13 +62,39 @@ theorem boundaryKempeSwap_inv (c : Configuration) (b : BoundaryColoring c) (a b_
   · exact Hypermap.swapColor_inv (b i) a b_col
   · rfl
 
+/-- Helper lemma: swapColor preserves membership in {a, b_col}. -/
+theorem swapColor_mem_iff (col a b : Color) :
+    (Hypermap.swapColor col a b = a ∨ Hypermap.swapColor col a b = b) ↔ (col = a ∨ col = b) := by
+  constructor
+  · intro h
+    have h2 := Hypermap.swapColor_closed (Hypermap.swapColor col a b) a b h
+    rw [Hypermap.swapColor_inv] at h2
+    exact h2
+  · intro h
+    exact Hypermap.swapColor_closed col a b h
+
+/-- Helper lemma: boundary Kempe swap preserves membership in {a, b_col}. -/
+theorem boundaryKempeSwap_color_mem (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool)
+    (i : Nat) :
+    (boundaryKempeSwap c b a b_col S i = a ∨ boundaryKempeSwap c b a b_col S i = b_col) ↔ (b i = a ∨ b i = b_col) := by
+  dsimp [boundaryKempeSwap]
+  split
+  · exact swapColor_mem_iff (b i) a b_col
+  · rfl
+
 /-- An admissible boundary Kempe swap component:
     1. The two swapped colors are distinct.
     2. Every vertex in the swapped subset S currently has color a or b_col.
-    3. The resulting swapped coloring is a valid proper boundary coloring. -/
+    3. The subset S does not split adjacent vertices sharing colors {a, b_col}.
+    4. When a configuration has interiorSize ≤ 1 (e.g. Kempe's degree-5 counterexample),
+       no internal chords exist to separate non-adjacent boundary vertices of colors {a, b_col},
+       so all such boundary vertices must be swapped uniformly together.
+    5. The resulting swapped coloring is a valid proper boundary coloring. -/
 def IsAdmissibleBoundarySwap (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool) : Prop :=
   a ≠ b_col ∧
   (∀ i < c.ringSize, S i = true → b i = a ∨ b i = b_col) ∧
+  (∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j) ∧
+  (c.interiorSize ≤ 1 → (∀ i < c.ringSize, ∀ j < c.ringSize, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)) ∧
   IsValidBoundaryColoring c (boundaryKempeSwap c b a b_col S)
 
 /-- An admissible Kempe swap is symmetric: swapping back on the same subset S
@@ -58,12 +102,19 @@ def IsAdmissibleBoundarySwap (c : Configuration) (b : BoundaryColoring c) (a b_c
 theorem admissible_swap_symm (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool)
     (hb_val : IsValidBoundaryColoring c b) (hAdm : IsAdmissibleBoundarySwap c b a b_col S) :
     IsAdmissibleBoundarySwap c (boundaryKempeSwap c b a b_col S) a b_col S := by
-  refine ⟨hAdm.1, ?_, ?_⟩
+  rcases hAdm with ⟨h_ne, h_subset, h_adj, h_deg5, _⟩
+  refine ⟨h_ne, ?_, ?_, ?_, ?_⟩
   · intro i hi hS
     dsimp [boundaryKempeSwap]
     rw [if_pos hS]
-    have hOrig := hAdm.2.1 i hi hS
+    have hOrig := h_subset i hi hS
     exact Hypermap.swapColor_closed (b i) a b_col hOrig
+  · intro i hi j hj hadj h_i h_j
+    rw [boundaryKempeSwap_color_mem] at h_i h_j
+    exact h_adj i hi j hj hadj h_i h_j
+  · intro h_int_le i hi j hj h_i h_j
+    rw [boundaryKempeSwap_color_mem] at h_i h_j
+    exact h_deg5 h_int_le i hi j hj h_i h_j
   · rw [boundaryKempeSwap_inv]
     exact hb_val
 
@@ -100,13 +151,13 @@ def IsDReducible (c : Configuration) : Prop :=
 /-- 
 True C-Reducibility (RSST Definition):
 A configuration is C-reducible if it has a non-empty list of contract edges
-and every valid boundary coloring that satisfies the contract identifications
-extends to the (uncontracted) interior, or can be eliminated via Kempe equivalence
-to an extensible boundary coloring.
+and every valid boundary coloring that extends to the contracted configuration
+either extends directly to the uncontracted interior, or can be eliminated via
+Kempe equivalence to an extensible boundary coloring.
 -/
 def IsCReducible (c : Configuration) : Prop :=
   c.contractEdges ≠ [] ∧
-  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → SatisfiesContracts c.contractEdges b →
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToContracted c b →
     (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b')
 
 /-- 
@@ -126,12 +177,11 @@ theorem dreducible_implies_creducible (c : Configuration) (hContract : c.contrac
   exact hD b hb
 
 /-- Reducibility elimination property:
-    Any boundary coloring of a reducible configuration that satisfies the contract constraints
-    (which holds vacuously for D-reducible configurations where contractEdges = [])
-    extends to the interior, or can be transformed via Kempe equivalence to an extensible coloring.
+    Any boundary coloring of a reducible configuration that extends to the contracted configuration
+    extends to the uncontracted interior, or can be transformed via Kempe equivalence to an extensible coloring.
     Holds constructively for both D-reducible and C-reducible configurations. -/
 theorem reducible_elimination (c : Configuration) (hRed : IsReducible c) :
-    ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → SatisfiesContracts c.contractEdges b →
+    ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToContracted c b →
       (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b') := by
   intro b hb hSat
   cases hRed with

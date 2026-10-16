@@ -31,28 +31,51 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of D-reducible configurations certified for ring size 12. -/
 def certified_count_r12 : Nat := 93
 
-/-- Index list of the 93 certified D-reducible configurations for ring size 12. -/
+/-- Index list of the 93 certified D-reducible configurations for ring size 12,
+    composed directly from the 16 verified in-kernel batch modules. -/
 def certified_indices_r12 : List Nat :=
-  [ 21, 64, 66, 67, 68,            -- Batch 11 (Part 1)
-    75, 78, 80, 83, 84, 85,        -- Batch 12 (Part 2)
-    91, 92, 93, 96, 97, 98,        -- Batch 13 (Part 3)
-    99, 108, 132, 146, 149, 150,   -- Batch 14 (Part 4)
-    153, 154, 155, 156, 157, 172,  -- Batch 15 (Part 5)
-    173, 174, 175, 176, 235, 242,  -- Batch 16 (Part 6)
-    243, 246, 247, 347, 350, 351,  -- Batch 17 (Part 7)
-    359, 360, 363, 366, 369, 374,  -- Batch 18 (Part 8)
-    375, 382, 386, 387, 388, 389,  -- Batch 19 (Part 9)
-    390, 391, 392, 405, 406, 407,  -- Batch 20 (Part 10)
-    408, 413, 415, 416, 417, 419,  -- Batch 21 (Part 11)
-    420, 421, 422, 428, 450, 452,  -- Batch 22 (Part 12)
-    481, 483, 484, 490, 522, 555,  -- Batch 23 (Part 13)
-    559, 560, 572, 573, 576, 577,  -- Batch 24 (Part 14)
-    579, 580, 590, 597, 599,       -- Batch 25 (Part 15)
-    605, 609, 610, 623, 632        -- Batch 26 (Part 16)
-  ]
+  batch11_indices ++
+  batch12_indices ++
+  batch13_indices ++
+  batch14_indices ++
+  batch15_indices ++
+  batch16_indices ++
+  batch17_indices ++
+  batch18_indices ++
+  batch19_indices ++
+  batch20_indices ++
+  batch21_indices ++
+  batch22_indices ++
+  batch23_indices ++
+  batch24_indices ++
+  batch25_indices ++
+  batch26_indices
 
 theorem certified_count_r12_eq : certified_indices_r12.length = certified_count_r12 := by
   rfl
+
+/-- All 16 Ring 12 D-reduction batch certificates combined into a single verifiable theorem. -/
+theorem r12_batches_verified :
+    checkRingBatch 12 batch11_indices = true ∧
+    checkRingBatch 12 batch12_indices = true ∧
+    checkRingBatch 12 batch13_indices = true ∧
+    checkRingBatch 12 batch14_indices = true ∧
+    checkRingBatch 12 batch15_indices = true ∧
+    checkRingBatch 12 batch16_indices = true ∧
+    checkRingBatch 12 batch17_indices = true ∧
+    checkRingBatch 12 batch18_indices = true ∧
+    checkRingBatch 12 batch19_indices = true ∧
+    checkRingBatch 12 batch20_indices = true ∧
+    checkRingBatch 12 batch21_indices = true ∧
+    checkRingBatch 12 batch22_indices = true ∧
+    checkRingBatch 12 batch23_indices = true ∧
+    checkRingBatch 12 batch24_indices = true ∧
+    checkRingBatch 12 batch25_indices = true ∧
+    checkRingBatch 12 batch26_indices = true :=
+  ⟨cert_batch11_r12, cert_batch12_r12, cert_batch13_r12, cert_batch14_r12,
+   cert_batch15_r12, cert_batch16_r12, cert_batch17_r12, cert_batch18_r12,
+   cert_batch19_r12, cert_batch20_r12, cert_batch21_r12, cert_batch22_r12,
+   cert_batch23_r12, cert_batch24_r12, cert_batch25_r12, cert_batch26_r12⟩
 
 end Batch
 end Math

@@ -52,49 +52,99 @@ reflection mechanism without external scripts or unproven axioms.
 /-- Total number of C-reducible configurations certified for ring size 14. -/
 def certified_count_cr14 : Nat := 111
 
-/-- Index list of the 111 certified C-reducible configurations for ring size 14. -/
+/-- Index list of the 111 certified C-reducible configurations for ring size 14,
+    composed directly from the 37 verified in-kernel batch modules. -/
 def certified_indices_cr14 : List Nat :=
-  [ 202, 206, 212,  -- CBatch 50 (Part 1)
-    215, 216, 218,  -- CBatch 51 (Part 2)
-    220, 221, 225,  -- CBatch 52 (Part 3)
-    226, 227, 228,  -- CBatch 53 (Part 4)
-    229, 230, 231,  -- CBatch 54 (Part 5)
-    232, 233, 234,  -- CBatch 55 (Part 6)
-    236, 269, 276,  -- CBatch 56 (Part 7)
-    277, 280, 281,  -- CBatch 57 (Part 8)
-    282, 283, 285,  -- CBatch 58 (Part 9)
-    286, 287, 288,  -- CBatch 59 (Part 10)
-    289, 290, 291,  -- CBatch 60 (Part 11)
-    292, 293, 294,  -- CBatch 61 (Part 12)
-    295, 296, 297,  -- CBatch 62 (Part 13)
-    298, 299, 300,  -- CBatch 63 (Part 14)
-    301, 302, 303,  -- CBatch 64 (Part 15)
-    304, 306, 307,  -- CBatch 65 (Part 16)
-    308, 309, 310,  -- CBatch 66 (Part 17)
-    311, 314, 317,  -- CBatch 67 (Part 18)
-    318, 319, 320,  -- CBatch 68 (Part 19)
-    321, 322, 393,  -- CBatch 69 (Part 20)
-    398, 485, 487,  -- CBatch 70 (Part 21)
-    488, 489, 492,  -- CBatch 71 (Part 22)
-    496, 497, 498,  -- CBatch 72 (Part 23)
-    499, 500, 501,  -- CBatch 73 (Part 24)
-    502, 503, 504,  -- CBatch 74 (Part 25)
-    505, 506, 508,  -- CBatch 75 (Part 26)
-    509, 510, 512,  -- CBatch 76 (Part 27)
-    515, 516, 518,  -- CBatch 77 (Part 28)
-    530, 531, 532,  -- CBatch 78 (Part 29)
-    533, 534, 535,  -- CBatch 79 (Part 30)
-    540, 541, 542,  -- CBatch 80 (Part 31)
-    543, 546, 549,  -- CBatch 81 (Part 32)
-    551, 553, 554,  -- CBatch 82 (Part 33)
-    561, 562, 563,  -- CBatch 83 (Part 34)
-    596, 612, 613,  -- CBatch 84 (Part 35)
-    614, 617, 618,  -- CBatch 85 (Part 36)
-    619, 620, 629  -- CBatch 86 (Part 37)
-  ]
+  cbatch50_indices ++
+  cbatch51_indices ++
+  cbatch52_indices ++
+  cbatch53_indices ++
+  cbatch54_indices ++
+  cbatch55_indices ++
+  cbatch56_indices ++
+  cbatch57_indices ++
+  cbatch58_indices ++
+  cbatch59_indices ++
+  cbatch60_indices ++
+  cbatch61_indices ++
+  cbatch62_indices ++
+  cbatch63_indices ++
+  cbatch64_indices ++
+  cbatch65_indices ++
+  cbatch66_indices ++
+  cbatch67_indices ++
+  cbatch68_indices ++
+  cbatch69_indices ++
+  cbatch70_indices ++
+  cbatch71_indices ++
+  cbatch72_indices ++
+  cbatch73_indices ++
+  cbatch74_indices ++
+  cbatch75_indices ++
+  cbatch76_indices ++
+  cbatch77_indices ++
+  cbatch78_indices ++
+  cbatch79_indices ++
+  cbatch80_indices ++
+  cbatch81_indices ++
+  cbatch82_indices ++
+  cbatch83_indices ++
+  cbatch84_indices ++
+  cbatch85_indices ++
+  cbatch86_indices
 
 theorem certified_count_cr14_eq : certified_indices_cr14.length = certified_count_cr14 := by
   rfl
+
+/-- All 37 Ring 14 C-reduction batch certificates combined into a single verifiable theorem. -/
+theorem cr14_batches_verified :
+    checkCRingBatch14 cbatch50_indices = true ∧
+    checkCRingBatch14 cbatch51_indices = true ∧
+    checkCRingBatch14 cbatch52_indices = true ∧
+    checkCRingBatch14 cbatch53_indices = true ∧
+    checkCRingBatch14 cbatch54_indices = true ∧
+    checkCRingBatch14 cbatch55_indices = true ∧
+    checkCRingBatch14 cbatch56_indices = true ∧
+    checkCRingBatch14 cbatch57_indices = true ∧
+    checkCRingBatch14 cbatch58_indices = true ∧
+    checkCRingBatch14 cbatch59_indices = true ∧
+    checkCRingBatch14 cbatch60_indices = true ∧
+    checkCRingBatch14 cbatch61_indices = true ∧
+    checkCRingBatch14 cbatch62_indices = true ∧
+    checkCRingBatch14 cbatch63_indices = true ∧
+    checkCRingBatch14 cbatch64_indices = true ∧
+    checkCRingBatch14 cbatch65_indices = true ∧
+    checkCRingBatch14 cbatch66_indices = true ∧
+    checkCRingBatch14 cbatch67_indices = true ∧
+    checkCRingBatch14 cbatch68_indices = true ∧
+    checkCRingBatch14 cbatch69_indices = true ∧
+    checkCRingBatch14 cbatch70_indices = true ∧
+    checkCRingBatch14 cbatch71_indices = true ∧
+    checkCRingBatch14 cbatch72_indices = true ∧
+    checkCRingBatch14 cbatch73_indices = true ∧
+    checkCRingBatch14 cbatch74_indices = true ∧
+    checkCRingBatch14 cbatch75_indices = true ∧
+    checkCRingBatch14 cbatch76_indices = true ∧
+    checkCRingBatch14 cbatch77_indices = true ∧
+    checkCRingBatch14 cbatch78_indices = true ∧
+    checkCRingBatch14 cbatch79_indices = true ∧
+    checkCRingBatch14 cbatch80_indices = true ∧
+    checkCRingBatch14 cbatch81_indices = true ∧
+    checkCRingBatch14 cbatch82_indices = true ∧
+    checkCRingBatch14 cbatch83_indices = true ∧
+    checkCRingBatch14 cbatch84_indices = true ∧
+    checkCRingBatch14 cbatch85_indices = true ∧
+    checkCRingBatch14 cbatch86_indices = true :=
+  ⟨cert_cbatch50_r14, cert_cbatch51_r14, cert_cbatch52_r14, cert_cbatch53_r14,
+   cert_cbatch54_r14, cert_cbatch55_r14, cert_cbatch56_r14, cert_cbatch57_r14,
+   cert_cbatch58_r14, cert_cbatch59_r14, cert_cbatch60_r14, cert_cbatch61_r14,
+   cert_cbatch62_r14, cert_cbatch63_r14, cert_cbatch64_r14, cert_cbatch65_r14,
+   cert_cbatch66_r14, cert_cbatch67_r14, cert_cbatch68_r14, cert_cbatch69_r14,
+   cert_cbatch70_r14, cert_cbatch71_r14, cert_cbatch72_r14, cert_cbatch73_r14,
+   cert_cbatch74_r14, cert_cbatch75_r14, cert_cbatch76_r14, cert_cbatch77_r14,
+   cert_cbatch78_r14, cert_cbatch79_r14, cert_cbatch80_r14, cert_cbatch81_r14,
+   cert_cbatch82_r14, cert_cbatch83_r14, cert_cbatch84_r14, cert_cbatch85_r14,
+   cert_cbatch86_r14⟩
 
 end Batch
 end Math
