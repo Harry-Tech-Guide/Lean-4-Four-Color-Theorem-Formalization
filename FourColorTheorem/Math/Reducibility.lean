@@ -91,15 +91,15 @@ def IsChordlessRing (c : Configuration) : Prop :=
     1. The two swapped colors are distinct.
     2. Every vertex in the swapped subset S currently has color a or b_col.
     3. The subset S does not split adjacent vertices sharing colors {a, b_col}.
-    4. Planar non-crossing on chordless boundary cycles: on a chordless ring with no interior
-       chords (IsChordlessRing c ∧ c.interiorSize ≤ 1), non-crossing Kempe chains cannot split
-       boundary vertices of colors {a, b_col} into disconnected components, so they must be swapped uniformly.
+    4. Planar non-crossing on chordless boundary cycles: on a chordless ring (IsChordlessRing c),
+       non-crossing Kempe chains cannot split boundary vertices of colors {a, b_col} into
+       disconnected components, so they must be swapped uniformly.
     5. The resulting swapped coloring is a valid proper boundary coloring. -/
 def IsAdmissibleBoundarySwap (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool) : Prop :=
   a ≠ b_col ∧
   (∀ i < c.ringSize, S i = true → b i = a ∨ b i = b_col) ∧
   (∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j) ∧
-  (IsChordlessRing c ∧ c.interiorSize ≤ 1 → (∀ i < c.ringSize, ∀ j < c.ringSize, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)) ∧
+  (IsChordlessRing c → (∀ i < c.ringSize, ∀ j < c.ringSize, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)) ∧
   IsValidBoundaryColoring c (boundaryKempeSwap c b a b_col S)
 
 /-- An admissible Kempe swap is symmetric: swapping back on the same subset S
@@ -117,9 +117,9 @@ theorem admissible_swap_symm (c : Configuration) (b : BoundaryColoring c) (a b_c
   · intro i hi j hj hadj h_i h_j
     rw [boundaryKempeSwap_color_mem] at h_i h_j
     exact h_adj i hi j hj hadj h_i h_j
-  · intro ⟨h_chordless, h_int_le⟩ i hi j hj h_i h_j
+  · intro h_chordless i hi j hj h_i h_j
     rw [boundaryKempeSwap_color_mem] at h_i h_j
-    exact h_deg5 ⟨h_chordless, h_int_le⟩ i hi j hj h_i h_j
+    exact h_deg5 h_chordless i hi j hj h_i h_j
   · rw [boundaryKempeSwap_inv]
     exact hb_val
 

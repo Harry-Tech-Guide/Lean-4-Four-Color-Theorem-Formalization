@@ -11,6 +11,7 @@ import FourColorTheorem.Math.Topology.Surgery
 import FourColorTheorem.Math.Topology.Euler
 import FourColorTheorem.Math.Topology.Jordan
 import FourColorTheorem.Math.MasterCertificate
+import FourColorTheorem.Math.TestDischarging
 
 namespace Math
 
@@ -476,7 +477,8 @@ def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart]
 
 /-- The RSST Discharging Principle:
     Every minimal counterexample to the Four Color Theorem (an internally 6-connected
-    planar triangulation) admits a PlanarDischargingWitness under the 32 RSST discharging rules,
+    planar triangulation) admits a PlanarDischargingWitness under the 32 RSST discharging rules
+    and the verified cartwheel presentation trees (Discharging.DischargingTreesVerified),
     conserving total Euler charge equal to 120. -/
 axiom rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) :

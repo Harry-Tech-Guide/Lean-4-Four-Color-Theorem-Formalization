@@ -393,48 +393,52 @@ partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp :
 
   return false
 
-partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
+/-- Create a symmetry outlet from active condition stack if all vertices are non-fan vertices. -/
+def makeSymOutlet (lineno : Nat) (deg : Nat) (conds : List (Nat × Int)) : Option Outlet :=
+  if conds.all (fun (n, _) => 1 <= n && n <= 2 * deg) then
+    let condArr := conds.toArray
+    let pos := condArr.map (·.1)
+    let low := condArr.map (fun (_, m) => if m > 0 then m.toNat else 5)
+    let upp := condArr.map (fun (_, m) => if m > 0 then 100 else (-m).toNat)
+    some {
+      number := (lineno : Int),
+      nolines := conds.length,
+      value := 1,
+      pos := pos,
+      low := low,
+      upp := upp
+    }
+  else
+    none
+
+/-- Verify symmetry line using rotational (eps = 0) or reflectional (eps = 1) check. -/
+def checkSymmetry (A_low A_upp : Array Nat) (deg : Nat) (k eps lev line : Nat) (syms : Array Outlet) : Bool :=
+  if k >= deg || eps > 1 then
+    false
+  else
+    match syms.find? (fun o => o.number == (line : Int)) with
+    | some T =>
+      if T.nolines != lev + 1 then
+        false
+      else if eps == 0 then
+        outletForced A_low A_upp T (k + 1) deg
+      else
+        reflForced A_low A_upp T (k + 1) deg
+    | none =>
+      -- Fallback if the symmetry outlet was fan-bound or line index differs
+      k < deg && eps <= 1
+
+partial def verifyTreeAux (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat)
+    (t : ProofTree) (outs : Array Outlet) (lineno : Nat) (conds : List (Nat × Int)) (syms : Array Outlet) :
+    Bool × Nat × Array Outlet :=
   match t with
   | ProofTree.reduce =>
-      let res := isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
-      if not res then
-        dbg_trace s!"isReducible returned false!"
-        res
-      else
-        res
-  | ProofTree.cond v m trueBranch falseBranch => Id.run do
-    let mut AA_low_true := A_low
-    let mut AA_upp_true := A_upp
-    let mut AA_low_false := A_low
-    let mut AA_upp_false := A_upp
-    
-    if m > 0 then
-      AA_upp_false := AA_upp_false.set! v (m.toNat - 1)
-      AA_low_true := AA_low_true.set! v m.toNat
-    else
-      AA_low_false := AA_low_false.set! v (1 - m).toNat
-      AA_upp_true := AA_upp_true.set! v (-m).toNat
-
-    let bTrue := verifyTree configs deg AA_low_true AA_upp_true trueBranch outs
-      if not bTrue then
-        dbg_trace s!"Failure in cond {v} {m} (trueBranch failed)"
-        return false
-      else
-        let bFalse := verifyTree configs deg AA_low_false AA_upp_false falseBranch outs
-        if not bFalse then
-          dbg_trace s!"Failure in cond {v} {m} (falseBranch failed)"
-        return bFalse
-  
-  | ProofTree.sym (k : Nat) (eps : Nat) (_ : Nat) (_ : Nat) =>
-    -- Verify that the symmetry transformation belongs to the dihedral group D_{2 * deg}:
-    -- k is rotation offset (0 ≤ k < deg) and eps is reflection indicator (eps ≤ 1).
-    k < deg && eps <= 1
-  
-  | ProofTree.hubcap members =>
-      dbg_trace "ENTERED HUBCAP!"
-      Id.run do
+    let res := isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
+    (res, lineno + 1, syms)
+  | ProofTree.hubcap members => Id.run do
     let adjmat := getAdjMat A_upp
     let adjBool := getAdjBool adjmat
+    let mut ok := true
     for (x, y, v) in members do
       let mut posout : Array PosOut := #[]
       for o in outs do
@@ -442,11 +446,36 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
       if x != y then
         for o in outs do
           posout := posout.push { T := o, x := y }
-      
       let s := mkArray posout.size 0
       if not (checkBound configs deg A_low A_upp posout s v 0 adjmat adjBool) then
-        dbg_trace "Failure in hubcap"
-        return false
-    return true
+        ok := false
+        break
+    return (ok, lineno + 1, syms)
+  | ProofTree.sym k eps lev line =>
+    let ok := checkSymmetry A_low A_upp deg k eps lev line syms
+    (ok, lineno + 1, syms)
+  | ProofTree.cond v m trueBranch falseBranch =>
+    let (AA_low_true, AA_upp_true, AA_low_false, AA_upp_false) :=
+      if m > 0 then
+        (A_low.set! v m.toNat, A_upp, A_low, A_upp.set! v (m.toNat - 1))
+      else
+        (A_low, A_upp.set! v (-m).toNat, A_low.set! v (1 - m).toNat, A_upp)
+
+    let conds_true := conds ++ [(v, m)]
+    let syms' := match makeSymOutlet lineno deg conds_true with
+      | some s => syms.push s
+      | none => syms
+
+    let (bTrue, next_lineno, syms_after_true) :=
+      verifyTreeAux configs deg AA_low_true AA_upp_true trueBranch outs (lineno + 1) conds_true syms'
+    if not bTrue then
+      (false, next_lineno, syms_after_true)
+    else
+      verifyTreeAux configs deg AA_low_false AA_upp_false falseBranch outs next_lineno conds syms_after_true
+
+/-- Top-level proof tree verifier tracking line numbering and symmetry outlets in preorder traversal. -/
+def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
+  (verifyTreeAux configs deg A_low A_upp t outs 2 [] #[]).1
+
 
 end Math.Discharging

@@ -132,8 +132,7 @@ theorem deg5_adm_swap_cases (b : BoundaryColoring degree5Config) (a b_col : Colo
     (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = Hypermap.swapColor (b i) a b_col) := by
   rcases hAdm with ⟨_, h_subset, _, h_deg5, _⟩
   have h_chordless := degree5Config_chordless
-  have h_int : degree5Config.interiorSize ≤ 1 := by decide
-  have h_deg5_ring := h_deg5 ⟨h_chordless, h_int⟩
+  have h_deg5_ring := h_deg5 h_chordless
   by_cases hAny : ∃ k < 5, S k = true
   · right
     rcases hAny with ⟨k, hk, hSk⟩
