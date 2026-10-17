@@ -76,11 +76,11 @@ theorem certified_cases_of_lt (i : Nat) (hi : i < 633) :
   have hMem := mem_all_certified_of_lt i hi
   exact List.mem_append.mp hMem
 
-/-- Master In-Kernel Certificate Suite:
-    Explicitly witnesses that all in-kernel reflection batch theorems across ALL 10 ring suites
+/-- Master In-Kernel Certificate Suite Proposition:
+    Explicitly states that all in-kernel reflection batch theorems across ALL 10 ring suites
     (R6to10, R11, R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) — comprising all 138 batch
     reflection files covering all 633 configurations — are verified directly by Lean 4's native_decide. -/
-theorem master_suite_verified :
+def MasterSuiteVerifiedProp : Prop :=
     (Batch.checkRingBatch 6 Batch.batch01_r6_indices = true ∧
      Batch.checkRingBatch 7 Batch.batch01_r7_indices = true ∧
      Batch.checkRingBatch 8 Batch.batch01_r8_indices = true ∧
@@ -221,7 +221,13 @@ theorem master_suite_verified :
      Batch.checkCRingBatch14 Batch.cbatch83_indices = true ∧
      Batch.checkCRingBatch14 Batch.cbatch84_indices = true ∧
      Batch.checkCRingBatch14 Batch.cbatch85_indices = true ∧
-     Batch.checkCRingBatch14 Batch.cbatch86_indices = true) :=
+     Batch.checkCRingBatch14 Batch.cbatch86_indices = true)
+
+/-- Master In-Kernel Certificate Suite Theorem:
+    Explicitly witnesses that all in-kernel reflection batch theorems across ALL 10 ring suites
+    (R6to10, R11, R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) — comprising all 138 batch
+    reflection files covering all 633 configurations — are verified directly by Lean 4's native_decide. -/
+theorem master_suite_verified : MasterSuiteVerifiedProp :=
   ⟨Batch.r6to10_batches_verified,
    Batch.r11_batches_verified,
    Batch.r12_batches_verified,
@@ -233,16 +239,20 @@ theorem master_suite_verified :
    Batch.cr13_batches_verified,
    Batch.cr14_batches_verified⟩
 
+
 /-- An unavoidable configuration is certified in the in-kernel RSST batch test suite
-    if its canonical index in the RSST dataset is certified by either a D-reduction or C-reduction batch theorem. -/
+    if the master suite of all 138 batch reflection theorems holds, and its canonical
+    index in the RSST dataset is certified by either a D-reduction or C-reduction batch theorem. -/
 def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
+  MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
     (idx ∈ certified_d_indices ∨ idx ∈ certified_c_indices)
 
 /-- Master In-Kernel Certificate Theorem:
     Every configuration in the canonical RSST unavoidable set is certified reducible
-    by the in-kernel batch suite (either D-reducible or C-reducible). -/
+    by the in-kernel batch suite (either D-reducible or C-reducible), witnessed directly
+    by the master suite proof of all 138 computational batch theorems. -/
 theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnavoidableSet) :
     isCertifiedUnavoidableConfig c := by
   have hMemData : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
@@ -254,7 +264,7 @@ theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnav
     rw [← h_size]
     exact h_idx_lt
   have h_cases := certified_cases_of_lt idx h_lt
-  refine ⟨idx, h_lt, ?_, h_cases⟩
+  refine ⟨master_suite_verified, idx, h_lt, ?_, h_cases⟩
   have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
     rfl
   rw [h_eq, h_get]
