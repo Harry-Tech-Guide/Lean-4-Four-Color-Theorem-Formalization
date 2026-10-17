@@ -327,7 +327,60 @@ def powers3 (k : Nat) : Array Nat := Id.run do
     p := p * 3
   return a
 
-/-- Full D-reducibility check of one configuration. -/
+/-- Check that NO proper coloring of the contracted configuration restricts to a trace in `live`.
+    Equivalently: every proper coloring of the contracted configuration extends to the original configuration! -/
+partial def checkContractExact (earlier : Array (Array Nat)) (alias : Array Nat) (n r v : Nat)
+    (col : Array Nat) (pow3 : Array Nat) (live : ByteArray) : Bool :=
+  if v >= n then Id.run do
+    let mut idx := 0
+    for i in [0:r] do
+      let nxt := if i + 1 == r then 0 else i + 1
+      let x := col[i]! ^^^ col[nxt]!
+      if x == 0 then return true
+      let d_i := x - 1
+      idx := idx + d_i * pow3[i]!
+    if live.get! idx == 1 then
+      return false
+    return true
+  else Id.run do
+    let root_v := alias[v]!
+    if root_v < v then
+      let c := col[root_v]!
+      for u in earlier[v]! do
+        if alias[u]! != root_v && col[u]! == c then
+          return true
+      let col' := col.set! v c
+      return checkContractExact earlier alias n r (v + 1) col' pow3 live
+    else
+      let mut used : Nat := 0
+      for u in earlier[v]! do
+        if alias[u]! != root_v then
+          used := used ||| (1 <<< col[u]!)
+      let mut col' := col
+      for c in [0:4] do
+        if (used >>> c) &&& 1 == 0 then
+          col' := col'.set! v c
+          if not (checkContractExact earlier alias n r (v + 1) col' pow3 live) then
+            return false
+      return true
+
+/-- Test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
+def runContractCheck (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
+  let mut alias := mkArray c.n 0
+  for i in [0:c.n] do alias := alias.set! i i
+  for _ in [0:c.n] do
+    for (u, v) in c.contractEdges do
+      let root_u := alias[u]!
+      let root_v := alias[v]!
+      let mn := min root_u root_v
+      alias := alias.set! u mn
+      alias := alias.set! v mn
+      alias := alias.set! root_u mn
+      alias := alias.set! root_v mn
+  let col : Array Nat := mkArray c.n 0
+  return checkContractExact c.earlier alias c.n c.r 1 col pow3 live
+
+/-- Full reducibility check (D-reducibility and C-reducibility) of one configuration. -/
 def check (c : RConf) (md : Array MData × Nat) (pow3 : Array Nat) : Result := Id.run do
   let r := c.r
   let N := pow3[r]!
@@ -369,7 +422,7 @@ def check (c : RConf) (md : Array MData × Nat) (pow3 : Array Nat) : Result := I
           live := live.set! idx 0
     changed := cnt != nlive
     nlive := cnt
-  let cRed := if nlive > 0 && c.contract > 0 then false else false
+  let cRed := if nlive > 0 && c.contract > 0 then runContractCheck c pow3 live else false
   return { ringColourings := ringCols, nonExtendable := nonext, finalLive := nlive,
            iterations := iters, dReducible := nlive == 0,
            xMatches := extOrbits == c.X, cReducible := cRed }
