@@ -56,6 +56,29 @@ theorem deg5BadColoring_valid : IsValidBoundaryColoring degree5Config deg5BadCol
   rw [h_eq] at h_all_j
   simp at h_all_j
 
+def checkDeg5Chordless : Bool :=
+  (List.range 5).all (fun i =>
+    (List.range 5).all (fun j =>
+      if degree5Config.adj i j then (j == (i + 1) % 5 || i == (j + 1) % 5) else true))
+
+theorem checkDeg5Chordless_true : checkDeg5Chordless = true := by rfl
+
+theorem degree5Config_chordless : IsChordlessRing degree5Config := by
+  intro i hi j hj hadj
+  have hi_mem : i ∈ List.range 5 := List.mem_range.mpr hi
+  have hj_mem : j ∈ List.range 5 := List.mem_range.mpr hj
+  have h_all_i := List.all_eq_true.mp checkDeg5Chordless_true i hi_mem
+  have h_all_j := List.all_eq_true.mp h_all_i j hj_mem
+  rw [hadj] at h_all_j
+  dsimp at h_all_j
+  cases h_or : (j == (i + 1) % 5 || i == (j + 1) % 5) with
+  | true =>
+    simp only [Bool.or_eq_true, beq_iff_eq] at h_or
+    exact h_or
+  | false =>
+    rw [h_or] at h_all_j
+    contradiction
+
 def deg5_surj (b : BoundaryColoring degree5Config) : Prop :=
   ∀ c : Color, ∃ i < 5, b i = c
 
@@ -108,8 +131,9 @@ theorem deg5_adm_swap_cases (b : BoundaryColoring degree5Config) (a b_col : Colo
     (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = b i) ∨
     (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = Hypermap.swapColor (b i) a b_col) := by
   rcases hAdm with ⟨_, h_subset, _, h_deg5, _⟩
+  have h_chordless := degree5Config_chordless
   have h_int : degree5Config.interiorSize ≤ 1 := by decide
-  have h_deg5_ring := h_deg5 h_int
+  have h_deg5_ring := h_deg5 ⟨h_chordless, h_int⟩
   by_cases hAny : ∃ k < 5, S k = true
   · right
     rcases hAny with ⟨k, hk, hSk⟩

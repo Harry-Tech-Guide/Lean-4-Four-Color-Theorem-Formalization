@@ -82,19 +82,24 @@ theorem boundaryKempeSwap_color_mem (c : Configuration) (b : BoundaryColoring c)
   · exact swapColor_mem_iff (b i) a b_col
   · rfl
 
+/-- A configuration has a chordless ring boundary if the only edges between ring vertices are the cycle edges. -/
+def IsChordlessRing (c : Configuration) : Prop :=
+  ∀ i < c.ringSize, ∀ j < c.ringSize,
+    c.adj i j = true → (j = (i + 1) % c.ringSize ∨ i = (j + 1) % c.ringSize)
+
 /-- An admissible boundary Kempe swap component:
     1. The two swapped colors are distinct.
     2. Every vertex in the swapped subset S currently has color a or b_col.
     3. The subset S does not split adjacent vertices sharing colors {a, b_col}.
-    4. When a configuration has interiorSize ≤ 1 (e.g. Kempe's degree-5 counterexample),
-       no internal chords exist to separate non-adjacent boundary vertices of colors {a, b_col},
-       so all such boundary vertices must be swapped uniformly together.
+    4. Planar non-crossing on chordless boundary cycles: on a chordless ring with no interior
+       chords (IsChordlessRing c ∧ c.interiorSize ≤ 1), non-crossing Kempe chains cannot split
+       boundary vertices of colors {a, b_col} into disconnected components, so they must be swapped uniformly.
     5. The resulting swapped coloring is a valid proper boundary coloring. -/
 def IsAdmissibleBoundarySwap (c : Configuration) (b : BoundaryColoring c) (a b_col : Color) (S : Nat → Bool) : Prop :=
   a ≠ b_col ∧
   (∀ i < c.ringSize, S i = true → b i = a ∨ b i = b_col) ∧
   (∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j) ∧
-  (c.interiorSize ≤ 1 → (∀ i < c.ringSize, ∀ j < c.ringSize, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)) ∧
+  (IsChordlessRing c ∧ c.interiorSize ≤ 1 → (∀ i < c.ringSize, ∀ j < c.ringSize, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)) ∧
   IsValidBoundaryColoring c (boundaryKempeSwap c b a b_col S)
 
 /-- An admissible Kempe swap is symmetric: swapping back on the same subset S
@@ -112,9 +117,9 @@ theorem admissible_swap_symm (c : Configuration) (b : BoundaryColoring c) (a b_c
   · intro i hi j hj hadj h_i h_j
     rw [boundaryKempeSwap_color_mem] at h_i h_j
     exact h_adj i hi j hj hadj h_i h_j
-  · intro h_int_le i hi j hj h_i h_j
+  · intro ⟨h_chordless, h_int_le⟩ i hi j hj h_i h_j
     rw [boundaryKempeSwap_color_mem] at h_i h_j
-    exact h_deg5 h_int_le i hi j hj h_i h_j
+    exact h_deg5 ⟨h_chordless, h_int_le⟩ i hi j hj h_i h_j
   · rw [boundaryKempeSwap_inv]
     exact hb_val
 

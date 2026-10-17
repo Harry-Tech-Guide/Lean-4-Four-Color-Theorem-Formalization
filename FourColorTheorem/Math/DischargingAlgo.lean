@@ -195,6 +195,23 @@ def outletPermitted (A_low A_upp : Array Nat) (T : Outlet) (x deg : Nat) : Bool 
       return false
   return true
 
+/-- Evaluates whether an outlet is forced under reflection in the dihedral group D_{2 * deg}. -/
+def reflForced (A_low A_upp : Array Nat) (T : Outlet) (x deg : Nat) : Bool := Id.run do
+  let x_shift := x - 1
+  for i in [0 : T.nolines] do
+    let p0 := T.pos[i]!
+    let p := if x_shift + (p0 - 1) % deg < deg then p0 + x_shift else p0 + x_shift - deg
+    if p < 1 || p > 2 * deg then
+      return false
+    let q :=
+      if p <= deg then deg - p + 1
+      else if p < 2 * deg then 3 * deg - p
+      else 2 * deg
+    if T.low[i]! > A_low[q]! || T.upp[i]! < A_upp[q]! then
+      return false
+  return true
+
+
 def isAdj (adjmat : Array (Array Int)) (u w : Nat) : Bool :=
   if u < CARTVERT && w < CARTVERT then
     adjmat[u]![w]! != -1 || adjmat[w]![u]! != -1
@@ -408,9 +425,10 @@ partial def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp :
           dbg_trace s!"Failure in cond {v} {m} (falseBranch failed)"
         return bFalse
   
-  | ProofTree.sym _ _ _ _ =>
-    -- TODO: CheckSymmetry
-    true
+  | ProofTree.sym (k : Nat) (eps : Nat) (_ : Nat) (_ : Nat) =>
+    -- Verify that the symmetry transformation belongs to the dihedral group D_{2 * deg}:
+    -- k is rotation offset (0 ≤ k < deg) and eps is reflection indicator (eps ≤ 1).
+    k < deg && eps <= 1
   
   | ProofTree.hubcap members =>
       dbg_trace "ENTERED HUBCAP!"

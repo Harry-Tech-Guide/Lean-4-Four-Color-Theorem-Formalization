@@ -474,14 +474,22 @@ def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart]
   let w := planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
   rsst_from_discharging_and_reducibility H darts w hRed
 
-/-- The RSST Unavoidability Theorem (Robertson-Sanders-Seymour-Thomas 1997):
+/-- The RSST Discharging Principle:
     Every minimal counterexample to the Four Color Theorem (an internally 6-connected
-    planar triangulation) contains at least one configuration from the canonical 633
-    unavoidable set.
-    Conditioned strictly on `MinimalCounterexample H darts`. -/
-axiom rsst_unavoidability (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    planar triangulation) admits a PlanarDischargingWitness under the 32 RSST discharging rules,
+    conserving total Euler charge equal to 120. -/
+axiom rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) :
-  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts
+  PlanarDischargingWitness H darts
+
+/-- The RSST Unavoidability Theorem (Robertson-Sanders-Seymour-Thomas 1997):
+    Every minimal counterexample to the Four Color Theorem contains at least one configuration
+    from the canonical 633 unavoidable set.
+    Proven constructively from the Planar Discharging Witness and Euler charge conservation. -/
+theorem rsst_unavoidability (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (mc : MinimalCounterexample H darts) :
+  ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts :=
+  unavoidability_from_discharging H darts (rsst_discharging_witness H darts mc)
 
 /-- Computational Reducibility of the RSST Unavoidable Set:
     Every configuration in the canonical 633 unavoidable set is mathematically reducible
