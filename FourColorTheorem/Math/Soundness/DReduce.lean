@@ -2,6 +2,7 @@ import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Batch.Runner
 import FourColorTheorem.Math.Soundness.ExtendSoundness
+import FourColorTheorem.Math.Soundness.Representation
 
 set_option linter.constructorNameAsVariable false
 
@@ -162,15 +163,6 @@ Here we formalize the exact hypotheses connecting the verified array computation
 - `StepResponseHypothesis`: Lemma (b), uncovered status guarantees winning response strictly reducing rank.
 - `ExtendSoundnessHypothesis`: Lemma (d), rank 0 colorings extend to interior.
 -/
-
-/-- Representation Hypothesis (Lemma (a)):
-    Every joint planar partition is represented by some balanced signed matching in `sms`. -/
-def RepresentationHypothesis (c : Configuration) (sms : Array SMData) : Prop :=
-  ∀ (b : BoundaryColoring c) (θ : ColorPairing)
-    (equiv_ab equiv_cd : Nat → Nat → Prop),
-    IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
-    ∃ (sm : SMData), sm ∈ sms.data ∧
-      ∃ (S : Nat → Bool), IsValidSwapChoice c b θ equiv_ab equiv_cd S
 
 /-- Extension Soundness Hypothesis (Lemma (d)):
     Any boundary coloring whose rank is 0 extends directly to the interior. -/

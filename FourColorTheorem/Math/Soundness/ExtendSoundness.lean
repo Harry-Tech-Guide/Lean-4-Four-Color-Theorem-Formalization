@@ -2,6 +2,8 @@ import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.FastReducer
 
+set_option linter.unusedVariables false
+
 namespace Math
 namespace Soundness
 
