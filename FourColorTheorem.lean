@@ -5,6 +5,7 @@ import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Kempe
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Degree5
+import FourColorTheorem.Math.Degree4
 import FourColorTheorem.Math.Discharging
 import FourColorTheorem.Math.Rules
 import FourColorTheorem.Math.Algorithm
