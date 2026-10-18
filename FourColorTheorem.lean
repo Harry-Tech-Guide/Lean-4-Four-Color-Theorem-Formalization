@@ -34,3 +34,4 @@ import FourColorTheorem.Math.Batch.CR11
 import FourColorTheorem.Math.Batch.CR12
 import FourColorTheorem.Math.Batch.CR13
 import FourColorTheorem.Math.Batch.CR14
+import FourColorTheorem.Math.Soundness.DReduce

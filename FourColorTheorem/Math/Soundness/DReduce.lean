@@ -168,49 +168,78 @@ def rconfOfConfig (c : Configuration) (earlier : Array (Array Nat)) : RConf wher
   adj := Array.ofFn fun (i : Fin c.totalNodes) =>
     (Array.range c.totalNodes).filter (fun j => c.adj i.val j)
 
+structure ReducerState where
+  live : ByteArray
+  orbits : Array Orbit6
+  activeSM : Array SMData
+  ranks : Array Nat
+  iter : Nat
+  changed : Bool
+
+/-- A single deterministic elimination round of the FastReducer algorithm. -/
+def reducerStep (N : Nat) (st : ReducerState) : ReducerState := Id.run do
+  let iter := st.iter + 1
+  let mut cover := zeros N
+  let mut nextSM : Array SMData := Array.mkEmpty st.activeSM.size
+  for sm in st.activeSM do
+    if allFitLive sm st.live 0 0 then
+      cover := markFitCover sm 0 0 cover
+      nextSM := nextSM.push sm
+  let mut nextOrbits : Array Orbit6 := Array.mkEmpty st.orbits.size
+  let mut live := st.live
+  let mut ranks := st.ranks
+  for orb in st.orbits do
+    if cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1 then
+      nextOrbits := nextOrbits.push orb
+    else
+      live := live.set! orb.j0 0
+      live := live.set! orb.j1 0
+      live := live.set! orb.j2 0
+      live := live.set! orb.j3 0
+      live := live.set! orb.j4 0
+      live := live.set! orb.j5 0
+      ranks := ranks.set! orb.j0 iter
+      ranks := ranks.set! orb.j1 iter
+      ranks := ranks.set! orb.j2 iter
+      ranks := ranks.set! orb.j3 iter
+      ranks := ranks.set! orb.j4 iter
+      ranks := ranks.set! orb.j5 iter
+  let changed := nextOrbits.size != st.orbits.size
+  return {
+    live := live,
+    orbits := nextOrbits,
+    activeSM := nextSM,
+    ranks := ranks,
+    iter := iter,
+    changed := changed
+  }
+
+/-- Structurally recursive fixed-point elimination loop bounded by fuel. -/
+def runReducerLoop (N : Nat) : Nat → ReducerState → ReducerState
+  | 0, st => st
+  | fuel + 1, st =>
+    if st.changed && !st.orbits.isEmpty then
+      runReducerLoop N fuel (reducerStep N st)
+    else st
+
 /-- Construct the elimination rank array from FastReducer's fixed-point computation.
     Runs the exact same greatest-fixed-point elimination loop as `checkFast`,
     recording for every orbit `orb` the iteration `iter` at which it was eliminated.
     Colorings that extend directly to the interior have rank 0. -/
-def computeEliminationRanks (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Array Nat := Id.run do
+def computeEliminationRanks (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Array Nat :=
   let r := rc.r
   let N := pow3.getD r 1
   let (live0, orbits0) := initialLiveFast rc pow3
-  let mut live := live0
-  let mut orbits := orbits0
-  let mut activeSM := sms
-  let mut ranks := mkArray N 0
-  let mut iter := 0
-  let mut changed := true
-  while changed && !orbits.isEmpty do
-    iter := iter + 1
-    let mut cover := zeros N
-    let mut nextSM : Array SMData := Array.mkEmpty activeSM.size
-    for sm in activeSM do
-      if allFitLive sm live 0 0 then
-        cover := markFitCover sm 0 0 cover
-        nextSM := nextSM.push sm
-    activeSM := nextSM
-    let mut nextOrbits : Array Orbit6 := Array.mkEmpty orbits.size
-    for orb in orbits do
-      if cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1 then
-        nextOrbits := nextOrbits.push orb
-      else
-        live := live.set! orb.j0 0
-        live := live.set! orb.j1 0
-        live := live.set! orb.j2 0
-        live := live.set! orb.j3 0
-        live := live.set! orb.j4 0
-        live := live.set! orb.j5 0
-        ranks := ranks.set! orb.j0 iter
-        ranks := ranks.set! orb.j1 iter
-        ranks := ranks.set! orb.j2 iter
-        ranks := ranks.set! orb.j3 iter
-        ranks := ranks.set! orb.j4 iter
-        ranks := ranks.set! orb.j5 iter
-    changed := nextOrbits.size != orbits.size
-    orbits := nextOrbits
-  return ranks
+  let initSt : ReducerState := {
+    live := live0,
+    orbits := orbits0,
+    activeSM := sms,
+    ranks := mkArray N 0,
+    iter := 0,
+    changed := true
+  }
+  (runReducerLoop N (orbits0.size + 1) initSt).ranks
+
 
 /-- Canonical elimination rank of a boundary coloring, CONSTRUCTED from the checker's fixed-point. -/
 def constructedRank (c : Configuration) (earlier : Array (Array Nat))
@@ -251,6 +280,7 @@ theorem dreducible_of_hypotheses (c : Configuration) (rank : BoundaryColoring c 
 theorem step_response_of_rank_zero (c : Configuration) :
     StepResponseHypothesis c (fun _ => 0) := by
   intro b hb hr_pos
+  dsimp at hr_pos
   omega
 
 /-- Base condition for constructed rank: rank 0 colorings are accepted by FastReducer extend. -/
@@ -296,7 +326,7 @@ theorem fast_d_sound_rank0 (c : Configuration) (earlier : Array (Array Nat))
     rank := fun _ => 0,
     base := fun b hb _ =>
       extend_soundness_of_extend c earlier h_earlier h_irrefl b hb (h_all_ext b hb),
-    step := fun b hb hr_pos => by omega
+    step := fun b hb hr_pos => by dsimp at hr_pos; omega
   }
   exact dreducible_of_rank_witness c W
 
@@ -340,6 +370,25 @@ theorem fast_d_sound' (c : Configuration) (earlier : Array (Array Nat))
     IsDReducible c := by
   let W := constructedRankWitness c earlier sms pow3 h_earlier h_irrefl hbase hstep
   exact dreducible_of_rank_witness c W
+
+/-- D-reducibility deduction combining base extension with representation hypothesis (Lemma a). -/
+theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (hbase : ConstructedRankBase c earlier sms pow3)
+    (h_step_rep : ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
+      constructedRank c earlier sms pow3 b > 0 →
+      ∃ θ : ColorPairing, ∀ (equiv_ab equiv_cd : Nat → Nat → Prop),
+        IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
+        ∃ sm ∈ sms.data, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
+          ∃ t, t < 1 <<< sm.p ∧
+            (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
+              constructedRank c earlier sms pow3 b) :
+    IsDReducible c := by
+  have hstep := step_of_representation c earlier sms pow3 h_step_rep
+  exact fast_d_sound' c earlier sms pow3 h_check h_earlier h_irrefl hbase hstep
 
 end Soundness
 end Math

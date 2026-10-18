@@ -192,17 +192,24 @@ def initialLive (c : RConf) (pow3 : Array Nat) : ByteArray × Nat := Id.run do
         live := live.set! j 1
   return (live, extOrbits)
 
+/-- Fuel-bounded computation of all non-crossing partial matchings. -/
+def ncMatchingsFuel : Nat → Nat → Nat → Array (Array (Nat × Nat))
+  | 0, _, _ => #[#[]]
+  | fuel + 1, lo, hi =>
+    if lo ≥ hi then #[#[]] else Id.run do
+      let mut res := ncMatchingsFuel fuel (lo + 1) hi
+      for k in [lo + 1 : hi] do
+        let left := ncMatchingsFuel fuel (lo + 1) k
+        let right := ncMatchingsFuel fuel (k + 1) hi
+        for m1 in left do
+          for m2 in right do
+            res := res.push ((#[(lo, k)] ++ m1) ++ m2)
+      return res
+
 /-- All non-crossing partial matchings of the positions `lo … hi-1`. -/
-partial def ncMatchings (lo hi : Nat) : Array (Array (Nat × Nat)) :=
-  if lo ≥ hi then #[#[]] else Id.run do
-    let mut res := ncMatchings (lo + 1) hi
-    for k in [lo + 1 : hi] do
-      let left := ncMatchings (lo + 1) k
-      let right := ncMatchings (k + 1) hi
-      for m1 in left do
-        for m2 in right do
-          res := res.push ((#[(lo, k)] ++ m1) ++ m2)
-    return res
+def ncMatchings (lo hi : Nat) : Array (Array (Nat × Nat)) :=
+  ncMatchingsFuel (hi - lo) lo hi
+
 
 /-- Pre-computed index deltas of a matching for θ = 1 (colour digit 0 on unmatched edges).
 For pair `k = (x, y)`:
