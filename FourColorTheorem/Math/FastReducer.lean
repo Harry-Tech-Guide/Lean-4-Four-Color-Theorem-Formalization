@@ -118,21 +118,30 @@ def popcount (x : Nat) : Nat := Id.run do
     k := k >>> 1
   return c
 
-/-- Backtracking: can vertices `v … n-1` be 4-coloured, given colours of `0 … v-1` in `col`?
-The colour array is threaded linearly, so it is updated in place. -/
-partial def extend (earlier : Array (Array Nat)) (n v : Nat) (col : Array Nat) : Bool × Array Nat :=
-  if v ≥ n then (true, col) else Id.run do
-    let mut used : Nat := 0
-    for u in earlier[v]! do
-      used := used ||| (1 <<< col[u]!)
-    let mut col := col
-    for c in [0:4] do
-      if (used >>> c) &&& 1 == 0 then
-        col := col.set! v c
-        let (ok, col') := extend earlier n (v + 1) col
-        col := col'
-        if ok then return (true, col)
-    return (false, col)
+/-- Check if color `c` is free among all earlier neighbors of a vertex. -/
+def colorFree (nbrs : Array Nat) (col : Array Nat) (c : Nat) : Bool :=
+  nbrs.data.all (fun x => col.getD x 0 != c)
+
+/-- Backtracking: can vertices `v … n-1` be 4-coloured, given colours of `0 … v-1` in `col`? -/
+def extend (earlier : Array (Array Nat)) (n v : Nat) (col : Array Nat) : Bool × Array Nat :=
+  if h : v < n then
+    let nbrs := earlier.getD v #[]
+    let res0 := if colorFree nbrs col 0 then extend earlier n (v + 1) (col.set! v 0) else (false, col)
+    if res0.1 then res0 else
+    let res1 := if colorFree nbrs col 1 then extend earlier n (v + 1) (col.set! v 1) else (false, col)
+    if res1.1 then res1 else
+    let res2 := if colorFree nbrs col 2 then extend earlier n (v + 1) (col.set! v 2) else (false, col)
+    if res2.1 then res2 else
+    let res3 := if colorFree nbrs col 3 then extend earlier n (v + 1) (col.set! v 3) else (false, col)
+    if res3.1 then res3 else
+    (false, col)
+  else
+    (true, col)
+termination_by n - v
+decreasing_by
+  all_goals
+    change n - (v + 1) < n - v
+    omega
 
 /-- The six permutations of the edge-colour digits `{0,1,2}` (= colours `{1,2,3}`). -/
 def perms : Array (Array Nat) :=

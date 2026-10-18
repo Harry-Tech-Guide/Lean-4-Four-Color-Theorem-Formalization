@@ -1,6 +1,7 @@
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Batch.Runner
+import FourColorTheorem.Math.Soundness.ExtendSoundness
 
 set_option linter.constructorNameAsVariable false
 
@@ -175,6 +176,18 @@ def RepresentationHypothesis (c : Configuration) (sms : Array SMData) : Prop :=
     Any boundary coloring whose rank is 0 extends directly to the interior. -/
 def ExtendSoundnessHypothesis (c : Configuration) (rank : BoundaryColoring c → Nat) : Prop :=
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → rank b = 0 → extendsToInterior c b
+
+/-- Unconditional Lemma (d): If rank 0 colorings are certified by the FastReducer extend search,
+    then ExtendSoundnessHypothesis holds. -/
+theorem extend_soundness_hypothesis_of_extend (c : Configuration) (earlier : Array (Array Nat))
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (rank : BoundaryColoring c → Nat)
+    (h_rank0 : ∀ b, rank b = 0 → (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true) :
+    ExtendSoundnessHypothesis c rank := by
+  intro b hb hr0
+  have h_ok := h_rank0 b hr0
+  exact extend_soundness_of_extend c earlier h_earlier h_irrefl b hb h_ok
 
 /-- Step Winning Response Hypothesis (Lemma (b)):
     Any coloring with rank > 0 has, for some θ, a winning response against every partition. -/
