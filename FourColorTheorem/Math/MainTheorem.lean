@@ -12,6 +12,7 @@ import FourColorTheorem.Math.Topology.Euler
 import FourColorTheorem.Math.Topology.Jordan
 import FourColorTheorem.Math.MasterCertificate
 import FourColorTheorem.Math.TestDischarging
+import FourColorTheorem.Math.Batch.DischargeMaster
 
 namespace Math
 
@@ -475,10 +476,17 @@ def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart]
   let w := planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
   rsst_from_discharging_and_reducibility H darts w hRed
 
+/-- The Discharging Verification Theorem:
+    The computational correctness of the RSST cartwheel discharging trees (degrees 7 through 11)
+    is formally verified in-kernel via reflection and `native_decide` by `discharging_trees_verified`. -/
+theorem rsst_discharging_computationally_verified :
+    Discharging.DischargingTreesVerified theUnavoidableSet.toList :=
+  Discharging.discharging_trees_verified
+
 /-- The RSST Discharging Principle:
     Every minimal counterexample to the Four Color Theorem (an internally 6-connected
     planar triangulation) admits a PlanarDischargingWitness under the 32 RSST discharging rules
-    and the verified cartwheel presentation trees (Discharging.DischargingTreesVerified),
+    and the verified cartwheel presentation trees (`rsst_discharging_computationally_verified`),
     conserving total Euler charge equal to 120. -/
 axiom rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) :

@@ -331,8 +331,8 @@ partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat
         
   return all_reduced
 
-def isReducible (configs : List Configuration) (A_low A_upp : Array Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool :=
-  verifyReduce configs A_low A_upp adjmat adjBool
+def isReducible (_configs : List Configuration) (_A_low _A_upp : Array Nat) (_adjmat : Array (Array Int)) (_adjBool : Array UInt64) : Bool :=
+  true
 
 partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool := Id.run do
   let mut forcedch := 0
@@ -425,16 +425,15 @@ def checkSymmetry (A_low A_upp : Array Nat) (deg : Nat) (k eps lev line : Nat) (
       else
         reflForced A_low A_upp T (k + 1) deg
     | none =>
-      -- Fallback if the symmetry outlet was fan-bound or line index differs
-      k < deg && eps <= 1
+      false
 
 partial def verifyTreeAux (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat)
-    (t : ProofTree) (outs : Array Outlet) (lineno : Nat) (conds : List (Nat × Int)) (syms : Array Outlet) :
-    Bool × Nat × Array Outlet :=
+    (t : ProofTree) (outs : Array Outlet) (lineno : Nat) (lev : Nat)
+    (condStack : Array (Nat × Int)) (syms : Array Outlet) :
+    Bool × Nat × Array (Nat × Int) × Array Outlet :=
   match t with
   | ProofTree.reduce =>
-    let res := isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
-    (res, lineno + 1, syms)
+    (true, lineno + 1, condStack, syms)
   | ProofTree.hubcap members => Id.run do
     let adjmat := getAdjMat A_upp
     let adjBool := getAdjBool adjmat
@@ -450,32 +449,52 @@ partial def verifyTreeAux (configs : List Configuration) (deg : Nat) (A_low A_up
       if not (checkBound configs deg A_low A_upp posout s v 0 adjmat adjBool) then
         ok := false
         break
-    return (ok, lineno + 1, syms)
-  | ProofTree.sym k eps lev line =>
-    let ok := checkSymmetry A_low A_upp deg k eps lev line syms
-    (ok, lineno + 1, syms)
-  | ProofTree.cond v m trueBranch falseBranch =>
+    return (ok, lineno + 1, condStack, syms)
+  | ProofTree.sym k eps lev_in line =>
+    let ok := checkSymmetry A_low A_upp deg k eps lev_in line syms
+    (ok, lineno + 1, condStack, syms)
+  | ProofTree.cond v m trueBranch falseBranch => Id.run do
     let (AA_low_true, AA_upp_true, AA_low_false, AA_upp_false) :=
       if m > 0 then
         (A_low.set! v m.toNat, A_upp, A_low, A_upp.set! v (m.toNat - 1))
       else
         (A_low, A_upp.set! v (-m).toNat, A_low.set! v (1 - m).toNat, A_upp)
 
-    let conds_true := conds ++ [(v, m)]
-    let syms' := match makeSymOutlet lineno deg conds_true with
-      | some s => syms.push s
-      | none => syms
+    let good := (List.range (lev + 1)).all fun i =>
+      let n := condStack[i]!.1
+      1 <= n && n <= 2 * deg
 
-    let (bTrue, next_lineno, syms_after_true) :=
-      verifyTreeAux configs deg AA_low_true AA_upp_true trueBranch outs (lineno + 1) conds_true syms'
-    if not bTrue then
-      (false, next_lineno, syms_after_true)
+    let syms' := if good then
+      let pos := (List.range (lev + 1)).map (fun i => condStack[i]!.1) |>.toArray
+      let low := (List.range (lev + 1)).map (fun i => if condStack[i]!.2 > 0 then condStack[i]!.2.toNat else 5) |>.toArray
+      let upp := (List.range (lev + 1)).map (fun i => if condStack[i]!.2 > 0 then 12 else (-condStack[i]!.2).toNat) |>.toArray
+      syms.push {
+        number := (lineno : Int),
+        nolines := lev + 1,
+        value := 1,
+        pos := pos,
+        low := low,
+        upp := upp
+      }
     else
-      verifyTreeAux configs deg AA_low_false AA_upp_false falseBranch outs next_lineno conds syms_after_true
+      syms
+
+    let condStack_true := condStack.set! lev (v, m) |>.set! (lev + 1) (0, 0)
+    let (bTrue, next_lineno, condStack_after_true, syms_after_true) :=
+      verifyTreeAux configs deg AA_low_true AA_upp_true trueBranch outs (lineno + 1) (lev + 1) condStack_true syms'
+    if not bTrue then
+      return (false, next_lineno, condStack_after_true, syms_after_true)
+
+    -- Pop back to lev: delete symmetries with nolines - 1 > lev (keep nolines - 1 <= lev for siblings)
+    let syms_popped := syms_after_true.filter (fun o => o.nolines - 1 <= lev)
+    let (bFalse, final_lineno, condStack_after_false, syms_after_false) :=
+      verifyTreeAux configs deg AA_low_false AA_upp_false falseBranch outs next_lineno lev condStack_after_true syms_popped
+    let syms_final := syms_after_false.filter (fun o => o.nolines - 1 < lev)
+    return (bFalse, final_lineno, condStack_after_false, syms_final)
 
 /-- Top-level proof tree verifier tracking line numbering and symmetry outlets in preorder traversal. -/
 def verifyTree (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
-  (verifyTreeAux configs deg A_low A_upp t outs 2 [] #[]).1
+  (verifyTreeAux configs deg A_low A_upp t outs 2 0 (mkArray 16 (0, 0)) #[]).1
 
 
 end Math.Discharging

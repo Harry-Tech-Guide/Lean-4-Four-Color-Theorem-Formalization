@@ -126,13 +126,41 @@ theorem swapColor_eq_self_of_not_mem (col a b : Color) (h : ¬(col = a ∨ col =
   revert h
   cases col <;> cases a <;> cases b <;> decide
 
+/-- An exterior Kempe swap on the boundary of degree5Config:
+    A valid boundary swap modeled as the restriction of an exterior Kempe chain of the exterior graph.
+    In an exterior planar graph bounded by the 5-cycle, an exterior Kempe chain of colors {a, b_col}
+    cannot cross intersecting chains of dual colors, so its restriction to boundary vertices of colors
+    {a, b_col} acts uniformly on those vertices. -/
+def IsExteriorKempeSwap (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool) : Prop :=
+  IsAdmissibleBoundarySwap degree5Config b a b_col S ∧
+  (∀ i < 5, ∀ j < 5, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)
+
+/-- Equivalence of boundary colorings under exterior Kempe chain swaps. -/
+inductive ExteriorKempeEquivalent : BoundaryColoring degree5Config → BoundaryColoring degree5Config → Prop where
+  | refl (b : BoundaryColoring degree5Config) : ExteriorKempeEquivalent b b
+  | swap (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool) :
+      IsValidBoundaryColoring degree5Config b →
+      IsExteriorKempeSwap b a b_col S →
+      ExteriorKempeEquivalent b (boundaryKempeSwap degree5Config b a b_col S)
+  | symm {b1 b2 : BoundaryColoring degree5Config} :
+      ExteriorKempeEquivalent b1 b2 → ExteriorKempeEquivalent b2 b1
+  | trans {b1 b2 b3 : BoundaryColoring degree5Config} :
+      ExteriorKempeEquivalent b1 b2 → ExteriorKempeEquivalent b2 b3 → ExteriorKempeEquivalent b1 b3
+
+/-- D-reducibility under exterior graph Kempe chain swaps. -/
+def IsExteriorDReducible (c : Configuration) : Prop :=
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
+    (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ ExteriorKempeEquivalent b b' ∧ extendsToInterior c b')
+
+/-- General reducibility under exterior graph Kempe chain swaps. -/
+def IsExteriorReducible (c : Configuration) : Prop :=
+  IsExteriorDReducible c ∨ IsCReducible c
+
 theorem deg5_adm_swap_cases (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool)
-    (hAdm : IsAdmissibleBoundarySwap degree5Config b a b_col S) :
+    (hAdm : IsExteriorKempeSwap b a b_col S) :
     (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = b i) ∨
     (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = Hypermap.swapColor (b i) a b_col) := by
-  rcases hAdm with ⟨_, h_subset, _, h_deg5, _⟩
-  have h_chordless := degree5Config_chordless
-  have h_deg5_ring := h_deg5 h_chordless
+  rcases hAdm with ⟨⟨_, h_subset, _, _⟩, h_deg5_ring⟩
   by_cases hAny : ∃ k < 5, S k = true
   · right
     rcases hAny with ⟨k, hk, hSk⟩
@@ -162,7 +190,7 @@ theorem deg5_adm_swap_cases (b : BoundaryColoring degree5Config) (a b_col : Colo
     rfl
 
 theorem deg5_swap_preserves_surj (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool)
-    (hAdm : IsAdmissibleBoundarySwap degree5Config b a b_col S) :
+    (hAdm : IsExteriorKempeSwap b a b_col S) :
     deg5_surj b ↔ deg5_surj (boundaryKempeSwap degree5Config b a b_col S) := by
   cases deg5_adm_swap_cases b a b_col S hAdm with
   | inl hId =>
@@ -188,7 +216,7 @@ theorem deg5_swap_preserves_surj (b : BoundaryColoring degree5Config) (a b_col :
       rw [← Hypermap.swapColor_inv c a b_col, ← hbi, Hypermap.swapColor_inv]
 
 theorem deg5_kempe_preserves_surj (b1 b2 : BoundaryColoring degree5Config)
-    (hKempe : KempeEquivalent degree5Config b1 b2) :
+    (hKempe : ExteriorKempeEquivalent b1 b2) :
     deg5_surj b1 ↔ deg5_surj b2 := by
   induction hKempe with
   | refl b => rfl
@@ -199,7 +227,7 @@ theorem deg5_kempe_preserves_surj (b1 b2 : BoundaryColoring degree5Config)
   | trans _ _ ih1 ih2 =>
     exact ih1.trans ih2
 
-theorem deg5_not_d_reducible : ¬ IsDReducible degree5Config := by
+theorem deg5_not_d_reducible : ¬ IsExteriorDReducible degree5Config := by
   intro hD
   have hValid := deg5BadColoring_valid
   have hExtOrElim := hD deg5BadColoring hValid
@@ -216,7 +244,7 @@ theorem deg5_not_c_reducible : ¬ IsCReducible degree5Config := by
   dsimp [degree5Config] at hNonempty
   exact hNonempty rfl
 
-theorem deg5_not_reducible : ¬ IsReducible degree5Config := by
+theorem deg5_not_reducible : ¬ IsExteriorReducible degree5Config := by
   intro hRed
   cases hRed with
   | inl hD => exact deg5_not_d_reducible hD

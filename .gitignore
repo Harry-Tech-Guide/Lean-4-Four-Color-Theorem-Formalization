@@ -12,4 +12,6 @@ __pycache__/
 Thumbs.db
 out*.txt
 *output*.txt
-test_*.lean
+*.exe
+*.et
+scratch/
