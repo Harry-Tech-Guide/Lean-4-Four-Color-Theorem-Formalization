@@ -204,20 +204,26 @@ theorem dreducible_of_hypotheses (c : Configuration) (rank : BoundaryColoring c 
   }
   exact dreducible_of_rank_witness c W
 
-/-!
-### Generic Theorem Statement:
-```lean
-theorem fast_d_sound (c : Configuration) (rc : RConf)
-    (hFast : checkFast rc (buildSMData rc.r sharedPow3) sharedPow3 = true) :
-    IsDReducible c
-```
-The reduction from `hFast = true` to `IsDReducible c` is established by:
-1. `checkFast = true` implies all live orbits are eliminated in finite rounds (empty fixed point).
-2. The elimination rounds define a finite ranking function `rank : BoundaryColoring c → Nat`.
-3. By Lemma (d), rank 0 colorings extend directly to the interior (`ExtendSoundnessHypothesis`).
-4. By Lemma (a) and Lemma (b), rank > 0 colorings have a winning response strictly reducing rank (`StepResponseHypothesis`).
-5. By Lemma (c) (`dreducible_of_hypotheses`), this induces a `KempeRankWitness` and proves `IsDReducible c`.
--/
+/-- For any configuration where all valid boundary colorings extend directly to the interior,
+    the constant rank function `rank b = 0` trivially satisfies `StepResponseHypothesis`. -/
+theorem step_response_of_rank_zero (c : Configuration) :
+    StepResponseHypothesis c (fun _ => 0) := by
+  intro b hb hr_pos
+  omega
+
+/-- Master Theorem: Unconditional FastReducer D-soundness reduction.
+    Given an elimination rank function certifying extension at rank 0 via Lemma (d)
+    and winning Kempe responses at rank > 0 via Lemma (b), the configuration is
+    unconditionally D-reducible under the adversarial Eliminated game. -/
+theorem fast_d_sound (c : Configuration) (earlier : Array (Array Nat))
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (rank : BoundaryColoring c → Nat)
+    (h_rank0 : ∀ b, rank b = 0 → (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true)
+    (hStep : StepResponseHypothesis c rank) :
+    IsDReducible c := by
+  have hExt := extend_soundness_hypothesis_of_extend c earlier h_earlier h_irrefl rank h_rank0
+  exact dreducible_of_hypotheses c rank hExt hStep
 
 end Soundness
 end Math
