@@ -158,12 +158,13 @@ def readOutlets (deg : Nat) (rules : List RawRule) : Array Outlet := Id.run do
       z := z.push node
       b := b.push bounds
     
+    if let some o := doOutlet deg r.num U V z b then outs := outs.push o
+    if let some o := doOutlet deg (- (r.num : Int)) U V z b then outs := outs.push o
+
     if r.invert then
-      if let some o := doOutlet deg r.num V U z b then outs := outs.push o
-      if let some o := doOutlet deg (- (r.num : Int)) V U z b then outs := outs.push o
-    else
-      if let some o := doOutlet deg r.num U V z b then outs := outs.push o
-      if let some o := doOutlet deg (- (r.num : Int)) U V z b then outs := outs.push o
+      let inv_num := r.num + 1
+      if let some o := doOutlet deg inv_num V U z b then outs := outs.push o
+      if let some o := doOutlet deg (- (inv_num : Int)) V U z b then outs := outs.push o
 
   return outs
 
@@ -254,85 +255,374 @@ def isWellPositioned (deg : Nat) (used : Array Bool) : Bool := Id.run do
       break
   return ok
 
-partial def findIso (st : IsoState) (k : Nat) : Option (Array Nat) :=
-  let totalNodes := st.c.ringSize + st.c.interiorSize
-  if k == totalNodes then
-    if isWellPositioned st.upp[0]! st.used then some st.mapping else none
-  else Id.run do
-    let mut prev_neighbors : Array Nat := #[]
-    for i in [0:k] do
-      if st.c.adj i k then
-        prev_neighbors := prev_neighbors.push i
-        
-    let mut candBits : UInt64 := 0xFFFFFFFFFFFFFFFF
-    if prev_neighbors.isEmpty then
-      candBits := ((1 : UInt64) <<< CARTVERT.toUInt64) - 1
-    else
-      for i in prev_neighbors do
-        candBits := candBits &&& st.adjBool[st.mapping[i]!]!
-        
-    let mut res := none
-    for w in [0 : CARTVERT] do
-      if (candBits &&& ((1 : UInt64) <<< w.toUInt64)) == 0 then continue
-      if w >= st.upp.size then continue
-      if st.used[w]! then continue
-      
-      let exp_deg := st.degrees[k]!
-      if exp_deg > st.upp[w]! then continue
-      
-      let new_mapping := st.mapping.set! k w
-      let new_used := st.used.set! w true
-      match findIso { st with mapping := new_mapping, used := new_used } (k + 1) with
-      | some m => 
-        res := some m
-        break
-      | none => continue
-    res
+structure ConfMat where
+  nverts : Nat
+  ring : Nat
+  mat : Array (Array Nat)
+  deriving Repr, BEq
 
-partial def verifyReduce (configs : List Configuration) (A_low A_upp : Array Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool := Id.run do
-  let mut found := false
-  let mut mapping : Array Nat := #[]
-  let mut matched_c : Configuration := default
+instance : Inhabited ConfMat := ⟨{ nverts := 0, ring := 0, mat := #[] }⟩
+
+structure Query where
+  u : Int
+  v : Int
+  z : Nat
+  xi : Nat
+  deriving Repr, BEq, Inhabited
+
+def parseNatList (s : String) : List Nat :=
+  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x => 
+    if x == "" then none else x.toNat?)
+
+def parseConfMat (s : String) : ConfMat := Id.run do
+  let nums := parseNatList s
+  if nums.length >= 2 then
+    let nverts := nums[0]!
+    let ring := nums[1]!
+    let a := nums.getD 4 0
+    let mut idx := 5 + 2 * a
+    let mut mat : Array (Array Nat) := mkArray (nverts + 1) #[]
+    mat := mat.set! 0 #[nverts, ring]
+    for _ in [0:nverts] do
+      if idx < nums.length then
+        let v := nums[idx]!
+        idx := idx + 1
+        if idx < nums.length then
+          let degree := nums[idx]!
+          idx := idx + 1
+          let mut row := #[degree]
+          for _ in [0:degree] do
+            if idx < nums.length then
+              let nb := nums[idx]!
+              idx := idx + 1
+              row := row.push nb
+          mat := mat.set! v row
+    return { nverts := nverts, ring := ring, mat := mat }
+  else
+    return { nverts := 0, ring := 0, mat := #[] }
+
+def getQuestion (L : ConfMat) : Array Query := Id.run do
+  let nverts := L.mat[0]![0]!
+  let ring := L.mat[0]![1]!
+  let mut found := mkArray (nverts + 1) false
   
-  for c in configs do
-    let totalNodes := c.ringSize + c.interiorSize
-    let degrees := mkArray totalNodes 0 |>.mapIdx fun i _ => getDegree c i
-    let st : IsoState := {
-      c := c,
-      adjmat := adjmat,
-      adjBool := adjBool,
-      low := A_low,
-      upp := A_upp,
-      mapping := mkArray totalNodes CARTVERT,
-      used := mkArray CARTVERT false,
-      degrees := degrees
-    }
-    match findIso st 0 with
-    | some m =>
-      found := true
-      mapping := m
-      matched_c := c
-      break
-    | none => continue
+  let mut maxDeg := 0
+  let mut best := 0
+  for v in [ring + 1 : nverts + 1] do
+    let d := L.mat[v]![0]!
+    if d > maxDeg then
+      maxDeg := d
+      best := v
+      
+  let q0 : Query := { u := 0, v := 0, z := best, xi := L.mat[best]![0]! }
+  found := found.set! best true
+  
+  let mut maxSecond := 0
+  let mut secondbest := 0
+  let bestDeg := L.mat[best]![0]!
+  for i in [1 : bestDeg + 1] do
+    let v := L.mat[best]![i]!
+    if v <= ring then continue
+    let d := L.mat[v]![0]!
+    if d > maxSecond then
+      maxSecond := d
+      secondbest := v
+      
+  let q1 : Query := { u := (nverts : Int), v := (ring : Int), z := secondbest, xi := L.mat[secondbest]![0]! }
+  found := found.set! secondbest true
+  
+  let mut Q : Array Query := #[q0, q1]
+  let mut search := 0
+  
+  while search < Q.size do
+    let v := Q[search]!.z
+    search := search + 1
+    if v <= ring then continue
+    
+    let d := L.mat[v]![0]!
+    let mut i := 1
+    while i <= d && not found[L.mat[v]![i]!]! do
+      i := i + 1
+      
+    let mut h := if i == 1 then d else i - 1
+    while h != i do
+      let u := L.mat[v]![h]!
+      if u <= ring then break
+      if not found[u]! then
+        let nb_h1 := L.mat[v]![if h == d then 1 else h + 1]!
+        let q : Query := {
+          z := u,
+          xi := if u > ring then L.mat[u]![0]! else 0,
+          u := (nb_h1 : Int),
+          v := (v : Int)
+        }
+        Q := Q.push q
+        found := found.set! u true
+      h := if h == 1 then d else h - 1
+      
+    if h == i then
+      continue
+      
+    let mut j := if i == d then 1 else i + 1
+    while true do
+      let w := L.mat[v]![j]!
+      if w <= ring then break
+      if not found[w]! then
+        let nb_j_prev := L.mat[v]![if j == 1 then d else j - 1]!
+        let q : Query := {
+          z := w,
+          xi := if w > ring then L.mat[w]![0]! else 0,
+          u := (v : Int),
+          v := (nb_j_prev : Int)
+        }
+        Q := Q.push q
+        found := found.set! w true
+      j := if j == d then 1 else j + 1
+      
+    let r := if h >= j then h - j else h + d - j
+    if r > 2 then
+      let u := L.mat[v]![h]!
+      let nb_h1 := L.mat[v]![if h == d then 1 else h + 1]!
+      let q : Query := {
+        z := u,
+        xi := if u > ring then L.mat[u]![0]! else 0,
+        u := (nb_h1 : Int),
+        v := (v : Int)
+      }
+      Q := Q.push q
+      
+      let mut g := if h == 1 then d else h - 1
+      while g != j do
+        let t := L.mat[v]![g]!
+        let prev_z := Q[Q.size - 1]!.z
+        let q_t : Query := {
+          z := t,
+          xi := if t > ring then L.mat[t]![0]! else 0,
+          u := (prev_z : Int),
+          v := (v : Int)
+        }
+        Q := Q.push q_t
+        found := found.set! t true
+        g := if g == 1 then d else g - 1
 
-  if not found then return false
+  Q := Q.push { u := -1, v := 0, z := 0, xi := 0 }
+  return Q
 
-  let mut all_reduced := true
-  for i in [matched_c.ringSize : matched_c.ringSize + matched_c.interiorSize] do
-    let v := mapping[i]!
-    if A_low[v]! < A_upp[v]! then
-      let mut A_upp_new := A_upp
-      A_upp_new := A_upp_new.set! v (A_upp[v]! - 1)
-      let adjmat_new := getAdjMat A_upp_new
-      let adjBool_new := getAdjBool adjmat_new
-      if not (verifyReduce configs A_low A_upp_new adjmat_new adjBool_new) then
-        all_reduced := false
+def addToList (edges : Array (Array (Array (Nat × Nat)))) (u v : Nat) (upp : Array Nat) : Array (Array (Array (Nat × Nat))) := Id.run do
+  let a := upp[u]!
+  let b := upp[v]!
+  let mut res := edges
+  if a >= b && b <= 8 && a <= 11 && (a <= 8 || u == 0) then
+    let cur := res[a]![b]!
+    res := res.set! a (res[a]!.set! b (cur.push (u, v)))
+  if b >= a && a <= 8 && b <= 11 && (b <= 8 || v == 0) then
+    let cur := res[b]![a]!
+    res := res.set! b (res[b]!.set! a (cur.push (v, u)))
+  return res
+
+def getEdgelist (A_low A_upp : Array Nat) : Array (Array (Array (Nat × Nat))) := Id.run do
+  let deg := A_upp[0]!
+  let mut edges : Array (Array (Array (Nat × Nat))) := mkArray 12 (mkArray 12 #[])
+  for i in [1 : deg + 1] do
+    edges := addToList edges 0 i A_upp
+    let h := if i == 1 then deg else i - 1
+    edges := addToList edges i h A_upp
+    let a := deg + h
+    let b := deg + i
+    edges := addToList edges i a A_upp
+    edges := addToList edges i b A_upp
+    if A_low[i]! != A_upp[i]! then continue
+    if A_upp[i]! == 5 then
+      edges := addToList edges a b A_upp
+      continue
+    let c := 2 * deg + i
+    edges := addToList edges a c A_upp
+    edges := addToList edges i c A_upp
+    if A_upp[i]! == 6 then
+      edges := addToList edges b c A_upp
+      continue
+    let d := 3 * deg + i
+    edges := addToList edges c d A_upp
+    edges := addToList edges i d A_upp
+    if A_upp[i]! == 7 then
+      edges := addToList edges b d A_upp
+      continue
+    if A_upp[i]! == 8 then
+      let e := 4 * deg + i
+      edges := addToList edges d e A_upp
+      edges := addToList edges i e A_upp
+      edges := addToList edges b e A_upp
+  return edges
+
+def rootedSubConf (degree : Array Nat) (adjmat : Array (Array Int))
+    (q : Array Query) (x y : Nat) (clockwise : Bool) : Option (Array Int) := Id.run do
+  let deg := degree[0]!
+  let mut used := mkArray CARTVERT false
+  let mut image := mkArray CARTVERT (-1 : Int)
+  image := image.set! 0 (if clockwise then 1 else 0)
+  image := image.set! q[0]!.z (x : Int)
+  image := image.set! q[1]!.z (y : Int)
+  used := used.set! x true
+  used := used.set! y true
+  
+  for k in [2 : q.size] do
+    let item := q[k]!
+    if item.u < 0 then break
+    let u_img := image[item.u.toNat]!
+    let v_img := image[item.v.toNat]!
+    if u_img < 0 || v_img < 0 then return none
+    let (row, col) := if clockwise then (u_img.toNat, v_img.toNat) else (v_img.toNat, u_img.toNat)
+    let w := adjmat[row]![col]!
+    if w == -1 then return none
+    let wNat := w.toNat
+    if item.xi != 0 && item.xi != degree[wNat]! then return none
+    if used[wNat]! then return none
+    image := image.set! item.z w
+    used := used.set! wNat true
+
+  for j in [1 : deg + 1] do
+    let w1 := j
+    let w2 := deg + j
+    let w3 := if j == 1 then 2 * deg else deg + j - 1
+    if not used[w1]! && used[w2]! && used[w3]! then
+      return none
+      
+  return some image
+
+def subConf (adjmat : Array (Array Int)) (degree : Array Nat)
+    (q : Array Query) (edgelist : Array (Array (Array (Nat × Nat)))) : Option (Array Int) := Id.run do
+  let xi0 := q[0]!.xi
+  let xi1 := q[1]!.xi
+  if xi0 >= edgelist.size || xi1 >= edgelist[xi0]!.size then return none
+  let pairs := edgelist[xi0]![xi1]!
+  for (x, y) in pairs do
+    if let some img := rootedSubConf degree adjmat q x y true then
+      return some img
+    if let some img := rootedSubConf degree adjmat q x y false then
+      return some img
+  return none
+
+def checkIso (L : ConfMat) (A_low A_upp : Array Nat) (image : Array Int) (adjmat : Array (Array Int)) : Bool := Id.run do
+  let deg := A_low[0]!
+  let verts := L.mat[0]![0]!
+  let ring := L.mat[0]![1]!
+  
+  let mut X : Array (Array Nat) := mkArray CARTVERT (mkArray CARTVERT 0)
+  let mut used : Array Bool := mkArray CARTVERT false
+  
+  for u in [ring + 1 : verts + 1] do
+    let fu := image[u]!
+    if fu < 0 || fu > (5 * deg : Int) then return false
+    let fuNat := fu.toNat
+    if used[fuNat]! then return false
+    used := used.set! fuNat true
+    if L.mat[u]![0]! != A_upp[fuNat]! then return false
+    if fuNat > 2 * deg then
+      let i := (fuNat - 1) % deg + 1
+      if A_low[i]! != A_upp[i]! || A_low[i]! < (fuNat - 1) / deg + 4 then
+        return false
+
+  for i in [1 : deg + 1] do
+    let w1 := i
+    let w2 := deg + i
+    let w3 := if i == 1 then 2 * deg else deg + i - 1
+    if not used[w1]! && used[w2]! && used[w3]! then
+      return false
+
+  for u in [ring + 1 : verts + 1] do
+    let d := L.mat[u]![0]!
+    let mut worried := if L.mat[u]![d]! > ring then false else true
+    for i in [1 : d + 1] do
+      let v := L.mat[u]![i]!
+      if v <= ring then
+        worried := true
+        continue
+      let (x, y) := if image[0]! != 0 then
+        (image[u]!.toNat, image[v]!.toNat)
+      else
+        (image[v]!.toNat, image[u]!.toNat)
+      X := X.set! x (X[x]!.set! y 1)
+      let w := L.mat[u]![if i < d then i + 1 else 1]!
+      if w <= ring then
+        if worried then return false
+        continue
+      worried := false
+      if adjmat[x]![y]! != image[w]! then
+        return false
+
+  let induCheck (aa bb : Bool) (cc : Nat) : Bool :=
+    if aa && bb && cc != 1 then false else true
+
+  for i in [1 : deg + 1] do
+    if not (induCheck used[0]! used[i]! X[0]![i]!) then return false
+    let h := if i == 1 then deg else i - 1
+    if not (induCheck used[h]! used[i]! X[h]![i]!) then return false
+    let a := h + deg
+    if not (induCheck used[h]! used[a]! X[h]![a]!) then return false
+    if not (induCheck used[i]! used[a]! X[i]![a]!) then return false
+    if A_low[i]! != A_upp[i]! then continue
+    let b := deg + i
+    if A_low[i]! == 5 then
+      if not (induCheck used[a]! used[b]! X[a]![b]!) then return false
+      continue
+    let c := 2 * deg + i
+    if not (induCheck used[a]! used[c]! X[a]![c]!) then return false
+    if not (induCheck used[c]! used[i]! X[c]![i]!) then return false
+    if A_low[i]! == 6 then
+      if not (induCheck used[c]! used[b]! X[c]![b]!) then return false
+      continue
+    let d := 3 * deg + i
+    if not (induCheck used[c]! used[d]! X[c]![d]!) then return false
+    if not (induCheck used[d]! used[i]! X[d]![i]!) then return false
+    if A_low[i]! == 7 then
+      if not (induCheck used[d]! used[b]! X[d]![b]!) then return false
+      continue
+    let e := 4 * deg + i
+    if A_low[i]! != 8 then return false
+    if not (induCheck used[e]! used[d]! X[e]![d]!) then return false
+    if not (induCheck used[e]! used[i]! X[e]![i]!) then return false
+    if not (induCheck used[e]! used[b]! X[e]![b]!) then return false
+
+  return true
+
+def theConfMats : Array ConfMat :=
+  (Math.u633_data.split (fun x => x == '|') |>.filter (· != "")).map parseConfMat |>.toArray
+
+def theQuestions : Array (Array Query) :=
+  theConfMats.map getQuestion
+
+partial def reduceAxle (A_low A_upp : Array Nat) : Bool := Id.run do
+  let mut stack : List (Array Nat × Array Nat) := [(A_low, A_upp)]
+  while not stack.isEmpty do
+    let (cur_low, cur_upp) := stack.head!
+    stack := stack.tail!
+    let adjmat := getAdjMat cur_upp
+    let edgelist := getEdgelist cur_low cur_upp
+    
+    let mut found_h := none
+    for h in [0 : theConfMats.size] do
+      if let some img := subConf adjmat cur_upp theQuestions[h]! edgelist then
+        found_h := some (h, img)
         break
         
-  return all_reduced
+    match found_h with
+    | none => return false
+    | some (h, img) =>
+      let c := theConfMats[h]!
+      if not (checkIso c cur_low cur_upp img adjmat) then
+        return false
+      let redverts := c.nverts
+      let redring := c.ring
+      for i in [redring + 1 : redverts + 1] do
+        let v := img[i]!.toNat
+        if cur_low[v]! < cur_upp[v]! then
+          let next_upp := cur_upp.set! v (cur_upp[v]! - 1)
+          stack := (cur_low, next_upp) :: stack
+          
+  return true
 
-def isReducible (_configs : List Configuration) (_A_low _A_upp : Array Nat) (_adjmat : Array (Array Int)) (_adjBool : Array UInt64) : Bool :=
-  true
+def isReducible (_configs : List Configuration) (A_low A_upp : Array Nat) (_adjmat : Array (Array Int)) (_adjBool : Array UInt64) : Bool :=
+  reduceAxle A_low A_upp
 
 partial def checkBound (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (posout : Array PosOut) (s : Array Int) (maxch : Int) (pos : Nat) (adjmat : Array (Array Int)) (adjBool : Array UInt64) : Bool := Id.run do
   let mut forcedch := 0
@@ -433,7 +723,8 @@ partial def verifyTreeAux (configs : List Configuration) (deg : Nat) (A_low A_up
     Bool × Nat × Array (Nat × Int) × Array Outlet :=
   match t with
   | ProofTree.reduce =>
-    (true, lineno + 1, condStack, syms)
+    let res := isReducible configs A_low A_upp (getAdjMat A_upp) (getAdjBool (getAdjMat A_upp))
+    (res, lineno + 1, condStack, syms)
   | ProofTree.hubcap members => Id.run do
     let adjmat := getAdjMat A_upp
     let adjBool := getAdjBool adjmat

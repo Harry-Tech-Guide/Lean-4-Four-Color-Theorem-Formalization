@@ -126,125 +126,93 @@ theorem swapColor_eq_self_of_not_mem (col a b : Color) (h : ¬(col = a ∨ col =
   revert h
   cases col <;> cases a <;> cases b <;> decide
 
-/-- An exterior Kempe swap on the boundary of degree5Config:
-    A valid boundary swap modeled as the restriction of an exterior Kempe chain of the exterior graph.
-    In an exterior planar graph bounded by the 5-cycle, an exterior Kempe chain of colors {a, b_col}
-    cannot cross intersecting chains of dual colors, so its restriction to boundary vertices of colors
-    {a, b_col} acts uniformly on those vertices. -/
-def IsExteriorKempeSwap (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool) : Prop :=
-  IsAdmissibleBoundarySwap degree5Config b a b_col S ∧
-  (∀ i < 5, ∀ j < 5, (b i = a ∨ b i = b_col) → (b j = a ∨ b j = b_col) → S i = S j)
+def deg5AdversaryEquiv (b : BoundaryColoring degree5Config) (a b_col : Color) : Nat → Nat → Prop :=
+  fun i j => (b i = a ∨ b i = b_col) ∧ (b j = a ∨ b j = b_col)
 
-/-- Equivalence of boundary colorings under exterior Kempe chain swaps. -/
-inductive ExteriorKempeEquivalent : BoundaryColoring degree5Config → BoundaryColoring degree5Config → Prop where
-  | refl (b : BoundaryColoring degree5Config) : ExteriorKempeEquivalent b b
-  | swap (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool) :
-      IsValidBoundaryColoring degree5Config b →
-      IsExteriorKempeSwap b a b_col S →
-      ExteriorKempeEquivalent b (boundaryKempeSwap degree5Config b a b_col S)
-  | symm {b1 b2 : BoundaryColoring degree5Config} :
-      ExteriorKempeEquivalent b1 b2 → ExteriorKempeEquivalent b2 b1
-  | trans {b1 b2 b3 : BoundaryColoring degree5Config} :
-      ExteriorKempeEquivalent b1 b2 → ExteriorKempeEquivalent b2 b3 → ExteriorKempeEquivalent b1 b3
+theorem deg5AdversaryEquiv_planar (b : BoundaryColoring degree5Config) (a b_col : Color) :
+    IsPlanarRingPartition degree5Config b a b_col (deg5AdversaryEquiv b a b_col) := by
+  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
+  · intro i _ h; exact ⟨h, h⟩
+  · intro i _ j _ h; exact ⟨h.2, h.1⟩
+  · intro i _ j _ l _ hij hjl; exact ⟨hij.1, hjl.2⟩
+  · intro i _ j _ h; exact h.1
+  · intro i _ j _ _ hi hj; exact ⟨hi, hj⟩
+  · intro i j l m _ _ _ _ hil hjm; exact ⟨hil.1, hjm.1⟩
 
-/-- D-reducibility under exterior graph Kempe chain swaps. -/
-def IsExteriorDReducible (c : Configuration) : Prop :=
-  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → 
-    (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ ExteriorKempeEquivalent b b' ∧ extendsToInterior c b')
+theorem deg5_eliminated_not_surj (b : BoundaryColoring degree5Config)
+    (hElim : Eliminated degree5Config b) :
+    deg5_surj b → False := by
+  induction hElim with
+  | ext b' hExt =>
+    intro hSurj
+    exact deg5_bad_not_extensible b' hSurj hExt
+  | kempe b' a b_col resp _ _ hValid _ ih =>
+    intro hSurj
+    let equiv := deg5AdversaryEquiv b' a b_col
+    have hPlanar := deg5AdversaryEquiv_planar b' a b_col
+    have hSwapChoice := hValid equiv hPlanar
+    have ihNext := ih equiv hPlanar
+    let S := resp equiv
+    have hCases : (∀ i < 5, S i = false) ∨ (∀ i < 5, b' i = a ∨ b' i = b_col → S i = true) := by
+      by_cases hAny : ∃ k < 5, S k = true
+      · right
+        rcases hAny with ⟨k, hk, hSk⟩
+        intro i hi hMem_i
+        have hMem_k := hSwapChoice.1 k hk hSk
+        have hEquiv_ik : equiv i k := ⟨hMem_i, hMem_k⟩
+        have hSeq : S i = S k := hSwapChoice.2 i hi k hk hEquiv_ik
+        rw [hSeq, hSk]
+      · left
+        intro i hi
+        by_cases hSi : S i = true
+        · exact False.elim (hAny ⟨i, hi, hSi⟩)
+        · cases h : S i with | true => contradiction | false => rfl
+    cases hCases with
+    | inl hAllFalse =>
+      have hSurjNext : deg5_surj (boundaryKempeSwap degree5Config b' a b_col S) := by
+        intro c
+        rcases hSurj c with ⟨i, hi, hbi⟩
+        refine ⟨i, hi, ?_⟩
+        dsimp [boundaryKempeSwap]
+        rw [hAllFalse i hi]
+        dsimp
+        exact hbi
+      exact ihNext hSurjNext
+    | inr hAllTrue =>
+      have hSurjNext : deg5_surj (boundaryKempeSwap degree5Config b' a b_col S) := by
+        intro c
+        rcases hSurj (Hypermap.swapColor c a b_col) with ⟨i, hi, hbi⟩
+        refine ⟨i, hi, ?_⟩
+        dsimp [boundaryKempeSwap]
+        by_cases hMem : b' i = a ∨ b' i = b_col
+        · rw [hAllTrue i hi hMem]
+          dsimp
+          rw [hbi, Hypermap.swapColor_inv]
+        · have hNotS : S i = false := by
+            by_cases hSi : S i = true
+            · exact False.elim (hMem (hSwapChoice.1 i hi hSi))
+            · cases h : S i with | true => contradiction | false => rfl
+          rw [hNotS]
+          dsimp
+          have hNotMem : ¬(Hypermap.swapColor c a b_col = a ∨ Hypermap.swapColor c a b_col = b_col) := by
+            rw [hbi] at hMem
+            exact hMem
+          rw [swapColor_mem_iff] at hNotMem
+          rw [hbi, swapColor_eq_self_of_not_mem c a b_col hNotMem]
+      exact ihNext hSurjNext
 
-/-- General reducibility under exterior graph Kempe chain swaps. -/
-def IsExteriorReducible (c : Configuration) : Prop :=
-  IsExteriorDReducible c ∨ IsCReducible c
-
-theorem deg5_adm_swap_cases (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool)
-    (hAdm : IsExteriorKempeSwap b a b_col S) :
-    (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = b i) ∨
-    (∀ i < 5, boundaryKempeSwap degree5Config b a b_col S i = Hypermap.swapColor (b i) a b_col) := by
-  rcases hAdm with ⟨⟨_, h_subset, _, _⟩, h_deg5_ring⟩
-  by_cases hAny : ∃ k < 5, S k = true
-  · right
-    rcases hAny with ⟨k, hk, hSk⟩
-    have hkb := h_subset k hk hSk
-    intro i hi
-    dsimp [boundaryKempeSwap]
-    by_cases hMem : b i = a ∨ b i = b_col
-    · have hSi := h_deg5_ring i hi k hk hMem hkb
-      rw [hSi, hSk]
-      rfl
-    · have hSi_false : S i = false := by
-        cases hSi : S i with
-        | true => exfalso; exact hMem (h_subset i hi hSi)
-        | false => rfl
-      rw [hSi_false]
-      dsimp
-      exact (swapColor_eq_self_of_not_mem (b i) a b_col hMem).symm
-  · left
-    have hS_all_false : ∀ i < 5, S i = false := by
-      intro i hi
-      cases hSi : S i with
-      | true => exfalso; exact hAny ⟨i, hi, hSi⟩
-      | false => rfl
-    intro i hi
-    dsimp [boundaryKempeSwap]
-    rw [hS_all_false i hi]
-    rfl
-
-theorem deg5_swap_preserves_surj (b : BoundaryColoring degree5Config) (a b_col : Color) (S : Nat → Bool)
-    (hAdm : IsExteriorKempeSwap b a b_col S) :
-    deg5_surj b ↔ deg5_surj (boundaryKempeSwap degree5Config b a b_col S) := by
-  cases deg5_adm_swap_cases b a b_col S hAdm with
-  | inl hId =>
-    constructor
-    · intro hSurj c
-      rcases hSurj c with ⟨i, hi, hbi⟩
-      refine ⟨i, hi, ?_⟩
-      rw [hId i hi, hbi]
-    · intro hSurj c
-      rcases hSurj c with ⟨i, hi, hbi⟩
-      refine ⟨i, hi, ?_⟩
-      rw [← hbi, hId i hi]
-  | inr hSwap =>
-    constructor
-    · intro hSurj c
-      have ⟨i, hi, hbi⟩ := hSurj (Hypermap.swapColor c a b_col)
-      refine ⟨i, hi, ?_⟩
-      rw [hSwap i hi, hbi, Hypermap.swapColor_inv]
-    · intro hSurj c
-      have ⟨i, hi, hbi⟩ := hSurj (Hypermap.swapColor c a b_col)
-      refine ⟨i, hi, ?_⟩
-      rw [hSwap i hi] at hbi
-      rw [← Hypermap.swapColor_inv c a b_col, ← hbi, Hypermap.swapColor_inv]
-
-theorem deg5_kempe_preserves_surj (b1 b2 : BoundaryColoring degree5Config)
-    (hKempe : ExteriorKempeEquivalent b1 b2) :
-    deg5_surj b1 ↔ deg5_surj b2 := by
-  induction hKempe with
-  | refl b => rfl
-  | swap b a b_col S _ hAdm =>
-    exact deg5_swap_preserves_surj b a b_col S hAdm
-  | symm _ ih =>
-    exact ih.symm
-  | trans _ _ ih1 ih2 =>
-    exact ih1.trans ih2
-
-theorem deg5_not_d_reducible : ¬ IsExteriorDReducible degree5Config := by
+theorem deg5_not_d_reducible : ¬ IsDReducible degree5Config := by
   intro hD
-  have hValid := deg5BadColoring_valid
-  have hExtOrElim := hD deg5BadColoring hValid
-  cases hExtOrElim with
-  | inl hExt =>
-    exact deg5_bad_not_extensible deg5BadColoring deg5BadColoring_surj hExt
-  | inr hElim =>
-    rcases hElim with ⟨b', _, hKempe, hExt'⟩
-    have hSurj' : deg5_surj b' := (deg5_kempe_preserves_surj deg5BadColoring b' hKempe).mp deg5BadColoring_surj
-    exact deg5_bad_not_extensible b' hSurj' hExt'
+  have hElim := hD deg5BadColoring deg5BadColoring_valid
+  exact deg5_eliminated_not_surj deg5BadColoring hElim deg5BadColoring_surj
 
 theorem deg5_not_c_reducible : ¬ IsCReducible degree5Config := by
   intro ⟨hNonempty, _⟩
   dsimp [degree5Config] at hNonempty
   exact hNonempty rfl
 
-theorem deg5_not_reducible : ¬ IsExteriorReducible degree5Config := by
+/-- The degree-5 vertex configuration is NOT reducible under the main IsReducible definition. -/
+theorem deg5_not_reducible : ¬ IsReducible degree5Config := by
   intro hRed
   cases hRed with
   | inl hD => exact deg5_not_d_reducible hD

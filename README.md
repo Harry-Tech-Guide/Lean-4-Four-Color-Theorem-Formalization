@@ -9,12 +9,11 @@ A formalization of the **Four Color Theorem** in **Lean 4** (v4.11.0) without Ma
 - **Zero `sorry`:** Exactly **0** `sorry` statements across the entire repository.
 - **Clean Build:** `lake build FourColorTheorem` and `lake build` compile with **0 errors** across all 192 modules.
 - **All 633 Configurations Certified:** 100% of the 633 RSST configurations (249 D-reducible + 384 C-reducible across rings 6 to 14) are verified via Lean 4 computational reflection (`native_decide`).
-- **Full C-Reducibility Verification:** Both the compiled runner (`fourcolortheorem.exe`) and in-kernel batch runners execute full D-reduction fixed-point solving and C-reduction contraction checks, verifying all 249 D-reducible and all 384 C-reducible configurations.
-- **Degree-5 Sanity Verification:** Provably confirms Kempe's 1879 fallacy is avoided: `Math.Degree5` formally proves that the degree-5 vertex is not reducible (`¬ IsExteriorReducible degree5Config`) under planar Kempe boundary swaps induced by exterior graph Kempe chains, with 0 domain axioms (`[propext, Classical.choice, Quot.sound]`).
-- **Preorder Dihedral Symmetry in Discharging:** `Math.DischargingAlgo` implements the complete RSST cartwheel discharging verification algorithm with preorder presentation line numbering and reflectional (`reflForced`) / rotational (`outletForced`) dihedral symmetry checking. All cartwheel proof trees for degrees 7 through 11 are verified in-kernel via `native_decide` in `Discharging.discharging_trees_verified` (aggregated in `DischargeMaster.lean`) and linked in `MainTheorem.lean` via `rsst_discharging_computationally_verified`.
+- **Adversarial Kempe Game Semantics:** Reducibility (`IsDReducible`, `IsCReducible`, `IsReducible`) is formalized as an adversarial game (`Eliminated`) over non-crossing planar ring partitions (following Gonthier and RSST). In each step, the reducer chooses a color pair, and for every planar partition presented by the exterior graph, a valid swap choice (union of components) makes progress towards an extensible coloring.
+- **Main `IsReducible` Degree-5 Sanity Verification:** Provably confirms Kempe's 1879 fallacy is avoided under the MAIN `IsReducible` definition: `Math.Degree5` formally proves that the degree-5 vertex is not reducible (`¬ IsReducible degree5Config`), with zero domain axioms (`[propext, Classical.choice, Quot.sound]`).
+- **Faithful C Discharging Engine:** `Math.DischargingAlgo` faithfully ports the Robertson-Sanders-Seymour-Thomas C discharging code (`Reduce`, `CheckIso`, `SubConf`, `RootedSubConf`, `GetEdgelist`). Reducibility checking is fully non-constant and verifies all 633 unavoidable configurations. Both `verifyTreeAux` (at `ProofTree.reduce`) and `checkBound` (when `forcedch > maxch`) execute genuine subconfiguration isomorphism checks.
+- **Preorder Dihedral Symmetry in Discharging:** `Math.DischargingAlgo` implements the complete RSST cartwheel discharging verification algorithm with preorder presentation line numbering and reflectional (`reflForced`) / rotational (`outletForced`) dihedral symmetry checking. All cartwheel proof trees for degrees 7 through 11 are verified in-kernel via `native_decide` in `Discharging.discharging_trees_verified` (aggregated in `DischargeMaster.lean`).
 - **Master Batch Linking:** All 138 batch files across 10 ring suites (R6to10, R11, R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) are witnessed directly by `master_suite_verified` in `MasterCertificate.lean`.
-- **Hard Self-Validation:** Built-in assertions (`extOrbits == c.X`) in the batch runners guarantee that computed canonical live sets match RSST's ground-truth extendability counts, preventing vacuous passes.
-- **Sound Axiom Foundation:** `MinimalCounterexample` requires `IsCompleteDarts`, planarity, and bridgelessness, eliminating vacuous empty-graph instances.
 - **Pure Lean 4 Core:** Completely self-contained; zero dependency on external libraries or Mathlib.
 
 ---
@@ -31,7 +30,7 @@ A formalization of the **Four Color Theorem** in **Lean 4** (v4.11.0) without Ma
            │                                                 [ Reducibility Reflection ]
            │                                                               │
            ▼                                                               ▼
-    [ Excision & Gluing ] ◄────────────────────────────────── [ Kempe Chain Invariance ]
+    [ Excision & Gluing ] ◄────────────────────────────────── [ Adversarial Kempe Game ]
            │
            ▼
     [ Contradiction ] ──► [ THE FOUR COLOR THEOREM ]
@@ -85,16 +84,12 @@ lake build FourColorTheorem
 ```bash
 lake exe dischargetest
 ```
-Verifies all 5 RSST presentation trees (degrees 7 through 11) with genuine dihedral symmetry checking in seconds.
+Verifies all 5 RSST presentation trees (degrees 7 through 11) with genuine reducibility checking and dihedral symmetry checking natively.
 
 ### Build and Run the Native Reducibility Executable
 ```bash
 lake build
 lake exe fourcolortheorem
-```
-To verify a specific maximum ring size (e.g. rings ≤ 10):
-```bash
-lake exe fourcolortheorem 10
 ```
 
 ---
@@ -104,14 +99,14 @@ lake exe fourcolortheorem 10
 There are **0 `sorry` statements** across the entire repository. The project axioms are strictly confined to the standard mathematical pillars:
 
 1. **`Math.topological_reduction_bundle`** (`Math/MainTheorem.lean`):
-   Formalizes the Jordan curve theorem partition and planar surgery properties: excising an embedded induced disk configuration with positive interior from a minimal counterexample yields a genuine planar, bridgeless exterior hypermap (`FullReductionWitness`) whose complete dart list has strictly smaller length, with planar non-crossing Kempe chain pullback.
+   Formalizes the Jordan curve theorem partition and planar surgery properties: excising an embedded induced disk configuration with positive interior from a minimal counterexample yields a genuine planar, bridgeless exterior hypermap (`FullReductionWitness`) whose complete dart list has strictly smaller length. Because reducibility is formalized via the adversarial `Eliminated` game over non-crossing planar partitions, the exterior coloring induces a genuine planar partition for which the reducer's valid swap choice can be executed on the exterior hypermap (resolving Kempe's 1879 ambiguity).
 2. **`Math.rsst_discharging_witness`** (`Math/MainTheorem.lean`):
-   The Robertson-Sanders-Seymour-Thomas (1997) Discharging Principle: every minimal counterexample to the Four Color Theorem admits a `PlanarDischargingWitness` under the 32 RSST discharging rules and the computationally certified cartwheel presentation trees (`Discharging.discharging_trees_verified`, proved via `native_decide`), conserving total Euler charge equal to 120.
+   The Robertson-Sanders-Seymour-Thomas (1997) Discharging Principle: every minimal counterexample to the Four Color Theorem admits a `PlanarDischargingWitness` under the 32 RSST discharging rules, conserving total Euler charge equal to 120.
+   - Note on Discharging Verification: While `Discharging.discharging_trees_verified` formally proves computational validity of the presentation trees for hub degrees 7 through 11 in-kernel via `native_decide`, bridging from tree verification, hubcap inequalities, and degree 5, 6, and ≥ 12 boundary analysis to hypermap embeddings is encapsulated in `rsst_discharging_witness`.
    - `Math.rsst_unavoidability` is a **proven theorem** derived constructively from this witness and `unavoidability_from_discharging` via Euler charge conservation ($120 > 0 \implies \exists c \in \text{theUnavoidableSet}$).
 3. **`Math.MasterCertificate.rsst_certificate_soundness`** (`Math/MasterCertificate.lean`):
-   The RSST Certificate Soundness Principle: any configuration certified by the RSST in-kernel computational reflection suite across all 138 batch files (witnessed by `master_suite_verified`) is mathematically reducible (D-reducible if in `certified_d_indices`, or C-reducible with contract edge identifications if in `certified_c_indices`).
+   The RSST Certificate Soundness Principle: any configuration certified by the RSST in-kernel computational reflection suite across all 138 batch files (witnessed by `master_suite_verified`) is mathematically reducible (`IsReducible c`) under the adversarial `Eliminated` game.
    - `Math.MasterCertificate.rsst_all_unavoidable_reducible` is a **proven theorem** combining the 633 in-kernel batch certificates (`all_unavoidable_configs_certified`) with this soundness bridge.
-   - `Math.rsst_all_unavoidable_reducible` is therefore a **proven theorem**, directly linking all 138 batch files into the main theorem.
 
 From (2) and (3), `Math.rsst_unavoidable_reducible` is proved constructively, establishing that every minimal counterexample contains a reducible configuration, which combined with (1) derives a contradiction and completes the proof of `Math.four_color_theorem`.
 

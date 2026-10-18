@@ -50,12 +50,16 @@ def ReducibilitySoundness (c : Configuration) : Prop :=
 /-- A Kempe elimination witness for a configuration `c`:
     Assigns each valid boundary coloring a rank `r : Nat` such that:
     - rank 0 colorings extend directly to the interior.
-    - rank > 0 colorings admit a valid boundary Kempe swap to a coloring of strictly smaller rank. -/
+    - rank > 0 colorings admit a color pair a ≠ b_col such that for every planar
+      partition equiv, there is a valid swap choice S reducing the rank. -/
 structure KempeEliminationWitness (c : Configuration) where
   rank : BoundaryColoring c → Nat
   base_case : ∀ b, IsValidBoundaryColoring c b → rank b = 0 → extendsToInterior c b
   step_case : ∀ b, IsValidBoundaryColoring c b → rank b > 0 →
-    ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ rank b' < rank b
+    ∃ (a b_col : Color), a ≠ b_col ∧
+      ∀ (equiv : Nat → Nat → Prop), IsPlanarRingPartition c b a b_col equiv →
+        ∃ (S : Nat → Bool), IsValidSwapChoice c b a b_col equiv S ∧
+          rank (boundaryKempeSwap c b a b_col S) < rank b
 
 /-- Fundamental Reducibility Induction Theorem:
     Every configuration equipped with a Kempe elimination witness is mathematically D-reducible.
@@ -63,30 +67,28 @@ structure KempeEliminationWitness (c : Configuration) where
 theorem dreducible_of_elimination_witness (c : Configuration) (w : KempeEliminationWitness c) :
     IsDReducible c := by
   intro b hb
-  have h_ind : ∀ n, ∀ b, IsValidBoundaryColoring c b → w.rank b ≤ n →
-      (extendsToInterior c b ∨ ∃ b', IsValidBoundaryColoring c b' ∧ kempeEquivalent c b b' ∧ extendsToInterior c b') := by
+  have h_ind : ∀ n b, w.rank b ≤ n → IsValidBoundaryColoring c b → Eliminated c b := by
     intro n
     induction n with
     | zero =>
-      intro b hb hle
+      intro b hle hb
       have hr0 : w.rank b = 0 := Nat.le_zero.mp hle
-      exact Or.inl (w.base_case b hb hr0)
+      exact Eliminated.ext b (w.base_case b hb hr0)
     | succ n ih =>
-      intro b hb hle
+      intro b hle hb
       by_cases hr0 : w.rank b = 0
-      · exact Or.inl (w.base_case b hb hr0)
+      · exact Eliminated.ext b (w.base_case b hb hr0)
       · have hpos : w.rank b > 0 := Nat.pos_of_ne_zero hr0
-        rcases w.step_case b hb hpos with ⟨b', hb', hEquiv, hlt⟩
-        have hle' : w.rank b' ≤ n := Nat.le_of_lt_succ (Nat.lt_of_lt_of_le hlt hle)
-        have ih_b' := ih b' hb' hle'
-        cases ih_b' with
-        | inl hExt' =>
-          exact Or.inr ⟨b', hb', hEquiv, hExt'⟩
-        | inr hTrans =>
-          rcases hTrans with ⟨b'', hb'', hEquiv'', hExt''⟩
-          have hEquivTotal := KempeEquivalent.trans hEquiv hEquiv''
-          exact Or.inr ⟨b'', hb'', hEquivTotal, hExt''⟩
-  exact h_ind (w.rank b) b hb (Nat.le_refl _)
+        rcases w.step_case b hb hpos with ⟨a, b_col, h_ne, hSteps⟩
+        apply Eliminated.kempe_choice c b a b_col hb h_ne
+        intro equiv hEquiv
+        rcases hSteps equiv hEquiv with ⟨S, hSwap, hlt⟩
+        refine ⟨S, hSwap, ?_⟩
+        have hle' : w.rank (boundaryKempeSwap c b a b_col S) ≤ n :=
+          Nat.le_of_lt_succ (Nat.lt_of_lt_of_le hlt hle)
+        have hValSwapped := swap_preserves_valid c b a b_col equiv S hb hEquiv hSwap
+        exact ih (boundaryKempeSwap c b a b_col S) hle' hValSwapped
+  exact h_ind (w.rank b) b (Nat.le_refl _) hb
 
 /-- Reducibility Soundness Theorem:
     Proven directly by combining an elimination witness with the induction theorem. -/
@@ -114,47 +116,9 @@ theorem birkhoff_d_reducible (hSound : ReducibilitySoundness ComputableReducer.b
     IsDReducible ComputableReducer.birkhoff :=
   dreducible_of_computable ComputableReducer.birkhoff birkhoff_empty_consistent_subset hSound
 
-open Classical
-
-/-- Elimination Witness Synthesis Theorem:
-    Any mathematically D-reducible configuration constructively admits a canonical
-    Kempe elimination witness of rank ≤ 1. -/
-noncomputable def elimination_witness_of_dreducible (c : Configuration) (h : IsDReducible c) :
-    KempeEliminationWitness c :=
-  let rank : BoundaryColoring c → Nat := fun b => if extendsToInterior c b then 0 else 1
-  { rank := rank,
-    base_case := by
-      intro b _ hr0
-      dsimp [rank] at hr0
-      split at hr0
-      · rename_i hExt; exact hExt
-      · contradiction,
-    step_case := by
-      intro b hb hpos
-      have hCases := h b hb
-      cases hCases with
-      | inl hExt =>
-        dsimp [rank] at hpos
-        have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
-        omega
-      | inr hKempe =>
-        rcases hKempe with ⟨b', hb', hEquiv, hExt'⟩
-        refine ⟨b', hb', hEquiv, ?_⟩
-        dsimp [rank]
-        have hr' : (if extendsToInterior c b' then 0 else 1) = 0 := if_pos hExt'
-        have hnotExt : ¬ extendsToInterior c b := by
-          intro hExt
-          have hr0 : (if extendsToInterior c b then 0 else 1) = 0 := if_pos hExt
-          dsimp [rank] at hpos
-          omega
-        have hrb : (if extendsToInterior c b then 0 else 1) = 1 := if_neg hnotExt
-        rw [hr', hrb]
-        exact Nat.zero_lt_one }
-
-/-- Exact Mathematical Equivalence between D-Reducibility and Kempe Elimination Witness. -/
-theorem dreducible_iff_elimination_witness (c : Configuration) :
-    IsDReducible c ↔ Nonempty (KempeEliminationWitness c) :=
-  ⟨fun h => ⟨elimination_witness_of_dreducible c h⟩,
-   fun ⟨w⟩ => dreducible_of_elimination_witness c w⟩
+/-- The Birkhoff Diamond is mathematically reducible under reducibility soundness. -/
+theorem birkhoff_is_reducible (hSound : ReducibilitySoundness ComputableReducer.birkhoff) : 
+    IsReducible ComputableReducer.birkhoff :=
+  Or.inl (birkhoff_d_reducible hSound)
 
 end Math
