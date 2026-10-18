@@ -50,16 +50,16 @@ def ReducibilitySoundness (c : Configuration) : Prop :=
 /-- A Kempe elimination witness for a configuration `c`:
     Assigns each valid boundary coloring a rank `r : Nat` such that:
     - rank 0 colorings extend directly to the interior.
-    - rank > 0 colorings admit a color pair a ≠ b_col such that for every planar
-      partition equiv, there is a valid swap choice S reducing the rank. -/
+    - rank > 0 colorings admit a color pairing θ such that for every joint planar
+      partition (equiv_ab, equiv_cd), there is a valid swap choice S reducing the rank. -/
 structure KempeEliminationWitness (c : Configuration) where
   rank : BoundaryColoring c → Nat
   base_case : ∀ b, IsValidBoundaryColoring c b → rank b = 0 → extendsToInterior c b
   step_case : ∀ b, IsValidBoundaryColoring c b → rank b > 0 →
-    ∃ (a b_col : Color), a ≠ b_col ∧
-      ∀ (equiv : Nat → Nat → Prop), IsPlanarRingPartition c b a b_col equiv →
-        ∃ (S : Nat → Bool), IsValidSwapChoice c b a b_col equiv S ∧
-          rank (boundaryKempeSwap c b a b_col S) < rank b
+    ∃ (θ : ColorPairing),
+      ∀ (equiv_ab equiv_cd : Nat → Nat → Prop), IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
+        ∃ (S : Nat → Bool), IsValidSwapChoice c b θ equiv_ab equiv_cd S ∧
+          rank (boundaryKempeSwap c b θ S) < rank b
 
 /-- Fundamental Reducibility Induction Theorem:
     Every configuration equipped with a Kempe elimination witness is mathematically D-reducible.
@@ -79,15 +79,15 @@ theorem dreducible_of_elimination_witness (c : Configuration) (w : KempeEliminat
       by_cases hr0 : w.rank b = 0
       · exact Eliminated.ext b (w.base_case b hb hr0)
       · have hpos : w.rank b > 0 := Nat.pos_of_ne_zero hr0
-        rcases w.step_case b hb hpos with ⟨a, b_col, h_ne, hSteps⟩
-        apply Eliminated.kempe_choice c b a b_col hb h_ne
-        intro equiv hEquiv
-        rcases hSteps equiv hEquiv with ⟨S, hSwap, hlt⟩
+        rcases w.step_case b hb hpos with ⟨θ, hSteps⟩
+        apply Eliminated.kempe_choice c b θ hb
+        intro equiv_ab equiv_cd hEquiv
+        rcases hSteps equiv_ab equiv_cd hEquiv with ⟨S, hSwap, hlt⟩
         refine ⟨S, hSwap, ?_⟩
-        have hle' : w.rank (boundaryKempeSwap c b a b_col S) ≤ n :=
+        have hle' : w.rank (boundaryKempeSwap c b θ S) ≤ n :=
           Nat.le_of_lt_succ (Nat.lt_of_lt_of_le hlt hle)
-        have hValSwapped := swap_preserves_valid c b a b_col equiv S hb hEquiv hSwap
-        exact ih (boundaryKempeSwap c b a b_col S) hle' hValSwapped
+        have hValSwapped := swap_preserves_valid c b θ equiv_ab equiv_cd S hb hEquiv hSwap
+        exact ih (boundaryKempeSwap c b θ S) hle' hValSwapped
   exact h_ind (w.rank b) b (Nat.le_refl _) hb
 
 /-- Reducibility Soundness Theorem:

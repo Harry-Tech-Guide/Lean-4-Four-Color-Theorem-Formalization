@@ -1,47 +1,33 @@
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Coloring
 
+set_option linter.constructorNameAsVariable false
+
 namespace Math
 
 /-!
-# Degree-4 Vertex Configuration Analysis: Kempe Reducibility vs Adversarial Formalization
+# Degree-4 Vertex Configuration: Unconditional Reducibility under Kempe Semantics
 
-This module investigates the degree-4 vertex configuration (a 4-cycle ring with one
-interior vertex adjacent to all 4 ring vertices, with no contract edges), modeled on
-`Degree5.lean`.
+This module formally proves that the degree-4 vertex configuration (a 4-cycle ring with one
+interior vertex adjacent to all 4 ring vertices, with no contract edges) is unconditionally
+reducible (`IsReducible degree4Config`), validating Kempe's classical 1879 argument.
 
-## Findings on `IsPlanarRingPartition` and `Eliminated`:
-In Kempe's classical 1879 argument for a degree-4 vertex:
-For any ring coloring using all 4 colors, opposite vertices (0, 2) have colors (a, c)
-and opposite vertices (1, 3) have colors (b, d).
-In any planar exterior graph, if (0, 2) are connected by an (a, c) Kempe chain,
-then by the Jordan Curve Theorem, (1, 3) CANNOT be connected by a (b, d) Kempe chain.
-Hence, the reducer adapts by swapping either (0, 2) or (1, 3).
-
-HOWEVER, in the current formalization (`Reducibility.lean`):
-1. In `Eliminated.kempe`:
-   The reducer must choose a single pair of colors `(a, b_col)` OUTSIDE the universal
-   quantifier `∀ (equiv : Nat → Nat → Prop)`. The reducer cannot adaptively choose
-   the color pair after observing the exterior connectivity.
-2. In `IsPlanarRingPartition`:
-   The equivalence relation `equiv` is restricted by condition 4 to only relate vertices
-   colored in `{a, b_col}`: `equiv i j → (b i = a ∨ b i = b_col)`.
-   Consequently, condition 6 (`equiv i l → equiv j m → equiv i j`) is vacuously true
-   whenever vertices `j` and `m` have colors outside `{a, b_col}`.
-   Thus, for any chosen pair `(a, b_col)`, the adversary can always legally present the
-   universal relation `equiv i j := (b i = a ∨ b i = b_col) ∧ (b j = a ∨ b j = b_col)`,
-   forcing ALL vertices of colors {a, b_col} into a single equivalence class.
-3. Under this adversarial relation, the only valid swap choices either do nothing or
-   swap all vertices of colors {a, b_col} simultaneously (a global transposition on Color).
-   This preserves surjectivity of the boundary coloring onto all 4 colors.
-4. Since no surjective boundary coloring can extend to an interior vertex adjacent to all
-   4 ring vertices, NO surjective boundary coloring can ever be eliminated!
-
-Therefore, under the current definitions of `IsPlanarRingPartition` and `Eliminated`,
-the degree-4 configuration is provably NOT reducible: `¬ IsReducible degree4Config`.
-Proving `IsReducible degree4Config` unconditionally would require either:
-- A joint planar topology linking all 4 colors (e.g. Gonthier's signed matchings / hypermaps), or
-- Allowing the reducer's color choice to depend on the exterior graph's Kempe connectivity.
+## Mathematical Argument:
+Given any valid boundary coloring `b` of the 4-ring:
+1. If at least one color is unused on the ring, `b` directly extends to the interior vertex
+   adjacent to all 4 ring vertices (`deg4_extends_of_unused_color`).
+2. If all 4 colors are used, opposite vertices (0, 2) have distinct colors (a, c) and
+   opposite vertices (1, 3) have distinct colors (b, d).
+   The reducer selects the pairing θ = {{a, c}, {b, d}}.
+   For every joint planar ring partition (π_ac, π_bd) presented by the adversary:
+   - If 0 ~ 2 in π_ac, then by non-crossing planarity (`cross_ab_cd`), vertices 1 and 3
+     cannot be related in π_bd (they would cross). Hence the reducer swaps {1}, changing
+     vertex 1's color to d and leaving color b completely unused on the ring.
+   - If 0 ≁ 2 in π_ac, the reducer swaps {0}, changing vertex 0's color to c and leaving
+     color a completely unused on the ring.
+   In both cases, only 3 colors remain on the ring, so the swapped coloring extends to the interior.
+3. Therefore, every boundary coloring is eliminated, proving `IsDReducible degree4Config`
+   and hence `IsReducible degree4Config` unconditionally.
 -/
 
 def deg4Adj (i j : Nat) : Bool :=
@@ -57,31 +43,6 @@ def degree4Config : Configuration := {
   adj := deg4Adj,
   contractEdges := []
 }
-
-/-- A boundary coloring using all 4 colors on the 4-ring. -/
-def deg4BadColoring : BoundaryColoring degree4Config := fun i =>
-  if i == 0 then Color.c0
-  else if i == 1 then Color.c1
-  else if i == 2 then Color.c2
-  else Color.c3
-
-def checkDeg4Valid : Bool :=
-  (List.range 4).all (fun i =>
-    (List.range 4).all (fun j =>
-      if degree4Config.adj i j then deg4BadColoring i != deg4BadColoring j else true))
-
-theorem checkDeg4Valid_true : checkDeg4Valid = true := by rfl
-
-theorem deg4BadColoring_valid : IsValidBoundaryColoring degree4Config deg4BadColoring := by
-  intro i j hi hj hadj
-  have hi_mem : i ∈ List.range 4 := List.mem_range.mpr hi
-  have hj_mem : j ∈ List.range 4 := List.mem_range.mpr hj
-  have h_all_i := List.all_eq_true.mp checkDeg4Valid_true i hi_mem
-  have h_all_j := List.all_eq_true.mp h_all_i j hj_mem
-  rw [hadj] at h_all_j
-  intro h_eq
-  rw [h_eq] at h_all_j
-  simp at h_all_j
 
 def checkDeg4Chordless : Bool :=
   (List.range 4).all (fun i =>
@@ -106,144 +67,239 @@ theorem degree4Config_chordless : IsChordlessRing degree4Config := by
     rw [h_or] at h_all_j
     contradiction
 
-def deg4_surj (b : BoundaryColoring degree4Config) : Prop :=
-  ∀ c : Color, ∃ i < 4, b i = c
+/-- Any boundary coloring with an unused color extends directly to the interior vertex. -/
+theorem deg4_extends_of_unused_color (b : BoundaryColoring degree4Config)
+    (hb : IsValidBoundaryColoring degree4Config b)
+    (c : Color) (hc : ∀ i < 4, b i ≠ c) :
+    extendsToInterior degree4Config b := by
+  refine ⟨fun i => if i < 4 then b i else c, ?_, ?_⟩
+  · intro i hi
+    have hi4 : i < 4 := hi
+    dsimp
+    rw [if_pos hi4]
+  · intro i j hi hj hadj
+    dsimp [Configuration.totalNodes, degree4Config] at hi hj
+    dsimp
+    by_cases hi4 : i < 4 <;> by_cases hj4 : j < 4
+    · rw [if_pos hi4, if_pos hj4]
+      exact hb i j hi4 hj4 hadj
+    · rw [if_pos hi4, if_neg hj4]
+      have hj_eq : j = 4 := by omega
+      subst hj_eq
+      intro h_eq
+      exact hc i hi4 h_eq
+    · rw [if_neg hi4, if_pos hj4]
+      have hi_eq : i = 4 := by omega
+      subst hi_eq
+      intro h_eq
+      exact hc j hj4 h_eq.symm
+    · have : i = 4 ∧ j = 4 := by omega
+      rcases this with ⟨rfl, rfl⟩
+      dsimp [degree4Config, deg4Adj] at hadj
+      contradiction
 
-theorem deg4BadColoring_surj : deg4_surj deg4BadColoring := by
-  intro c
-  cases c with
-  | c0 => exact ⟨0, by decide, rfl⟩
-  | c1 => exact ⟨1, by decide, rfl⟩
-  | c2 => exact ⟨2, by decide, rfl⟩
-  | c3 => exact ⟨3, by decide, rfl⟩
+def allCols : List Color := [Color.c0, Color.c1, Color.c2, Color.c3]
 
-theorem deg4_bad_not_extensible (b : BoundaryColoring degree4Config)
-    (h_surj : deg4_surj b) :
-    ¬ extendsToInterior degree4Config b := by
-  intro ⟨full, hmatch, hvalid⟩
-  have ⟨i0, hi0, hb0⟩ := h_surj Color.c0
-  have ⟨i1, hi1, hb1⟩ := h_surj Color.c1
-  have ⟨i2, hi2, hb2⟩ := h_surj Color.c2
-  have ⟨i3, hi3, hb3⟩ := h_surj Color.c3
-  have hf0 : full i0 = Color.c0 := by rw [hmatch i0 hi0, hb0]
-  have hf1 : full i1 = Color.c1 := by rw [hmatch i1 hi1, hb1]
-  have hf2 : full i2 = Color.c2 := by rw [hmatch i2 hi2, hb2]
-  have hf3 : full i3 = Color.c3 := by rw [hmatch i3 hi3, hb3]
-  have hadj0 : degree4Config.adj 4 i0 = true := by
-    dsimp [degree4Config, deg4Adj]; simp; omega
-  have hadj1 : degree4Config.adj 4 i1 = true := by
-    dsimp [degree4Config, deg4Adj]; simp; omega
-  have hadj2 : degree4Config.adj 4 i2 = true := by
-    dsimp [degree4Config, deg4Adj]; simp; omega
-  have hadj3 : degree4Config.adj 4 i3 = true := by
-    dsimp [degree4Config, deg4Adj]; simp; omega
-  have hv0 := hvalid 4 i0 (by decide) (by dsimp [degree4Config, Configuration.totalNodes]; omega) hadj0
-  have hv1 := hvalid 4 i1 (by decide) (by dsimp [degree4Config, Configuration.totalNodes]; omega) hadj1
-  have hv2 := hvalid 4 i2 (by decide) (by dsimp [degree4Config, Configuration.totalNodes]; omega) hadj2
-  have hv3 := hvalid 4 i3 (by decide) (by dsimp [degree4Config, Configuration.totalNodes]; omega) hadj3
-  rw [hf0] at hv0; rw [hf1] at hv1; rw [hf2] at hv2; rw [hf3] at hv3
-  cases h4 : full 4 with
-  | c0 => exact hv0 h4
-  | c1 => exact hv1 h4
-  | c2 => exact hv2 h4
-  | c3 => exact hv3 h4
+def deg4IsSurjCols (c0 c1 c2 c3 : Color) : Bool :=
+  allCols.all fun c => (c0 == c || c1 == c || c2 == c || c3 == c)
 
-theorem swapColor_eq_self_of_not_mem (col a b : Color) (h : ¬(col = a ∨ col = b)) :
-    Hypermap.swapColor col a b = col := by
+theorem distinct_of_surj (c0 c1 c2 c3 : Color) (h : deg4IsSurjCols c0 c1 c2 c3 = true) :
+    c0 ≠ c2 ∧ c0 ≠ c1 ∧ c0 ≠ c3 ∧ c2 ≠ c1 ∧ c2 ≠ c3 ∧ c1 ≠ c3 := by
   revert h
-  cases col <;> cases a <;> cases b <;> decide
+  cases c0 <;> cases c1 <;> cases c2 <;> cases c3 <;> decide
 
-def deg4AdversaryEquiv (b : BoundaryColoring degree4Config) (a b_col : Color) : Nat → Nat → Prop :=
-  fun i j => (b i = a ∨ b i = b_col) ∧ (b j = a ∨ b j = b_col)
+def findUnusedCol (c0 c1 c2 c3 : Color) : Color :=
+  if c0 != Color.c0 && c1 != Color.c0 && c2 != Color.c0 && c3 != Color.c0 then Color.c0
+  else if c0 != Color.c1 && c1 != Color.c1 && c2 != Color.c1 && c3 != Color.c1 then Color.c1
+  else if c0 != Color.c2 && c1 != Color.c2 && c2 != Color.c2 && c3 != Color.c2 then Color.c2
+  else Color.c3
 
-theorem deg4AdversaryEquiv_planar (b : BoundaryColoring degree4Config) (a b_col : Color) :
-    IsPlanarRingPartition degree4Config b a b_col (deg4AdversaryEquiv b a b_col) := by
-  refine ⟨?_, ?_, ?_, ?_, ?_, ?_⟩
-  · intro i _ h; exact ⟨h, h⟩
-  · intro i _ j _ h; exact ⟨h.2, h.1⟩
-  · intro i _ j _ l _ hij hjl; exact ⟨hij.1, hjl.2⟩
-  · intro i _ j _ h; exact h.1
-  · intro i _ j _ _ hi hj; exact ⟨hi, hj⟩
-  · intro i j l m _ _ _ _ hil hjm; exact ⟨hil.1, hjm.1⟩
+theorem unused_of_not_surj (c0 c1 c2 c3 : Color) (h : deg4IsSurjCols c0 c1 c2 c3 = false) :
+    let c := findUnusedCol c0 c1 c2 c3
+    c0 ≠ c ∧ c1 ≠ c ∧ c2 ≠ c ∧ c3 ≠ c := by
+  revert h
+  cases c0 <;> cases c1 <;> cases c2 <;> cases c3 <;> decide
 
-theorem deg4_eliminated_not_surj (b : BoundaryColoring degree4Config)
-    (hElim : Eliminated degree4Config b) :
-    deg4_surj b → False := by
-  induction hElim with
-  | ext b' hExt =>
-    intro hSurj
-    exact deg4_bad_not_extensible b' hSurj hExt
-  | kempe b' a b_col resp _ _ hValid _ ih =>
-    intro hSurj
-    let equiv := deg4AdversaryEquiv b' a b_col
-    have hPlanar := deg4AdversaryEquiv_planar b' a b_col
-    have hSwapChoice := hValid equiv hPlanar
-    have ihNext := ih equiv hPlanar
-    let S := resp equiv
-    have hCases : (∀ i < 4, S i = false) ∨ (∀ i < 4, b' i = a ∨ b' i = b_col → S i = true) := by
-      by_cases hAny : ∃ k < 4, S k = true
-      · right
-        rcases hAny with ⟨k, hk, hSk⟩
-        intro i hi hMem_i
-        have hMem_k := hSwapChoice.1 k hk hSk
-        have hEquiv_ik : equiv i k := ⟨hMem_i, hMem_k⟩
-        have hSeq : S i = S k := hSwapChoice.2 i hi k hk hEquiv_ik
-        rw [hSeq, hSk]
-      · left
+/-- The degree-4 vertex configuration is unconditionally D-reducible under Kempe semantics. -/
+theorem deg4_d_reducible : IsDReducible degree4Config := by
+  intro b hb
+  cases hSurj : deg4IsSurjCols (b 0) (b 1) (b 2) (b 3) with
+  | false =>
+    have hUnused := unused_of_not_surj (b 0) (b 1) (b 2) (b 3) hSurj
+    let c := findUnusedCol (b 0) (b 1) (b 2) (b 3)
+    have hc : ∀ i < 4, b i ≠ c := by
+      intro i hi
+      have hi4 : i < 4 := hi
+      if hi0 : i = 0 then subst hi0; exact hUnused.1
+      else if hi1 : i = 1 then subst hi1; exact hUnused.2.1
+      else if hi2 : i = 2 then subst hi2; exact hUnused.2.2.1
+      else
+        have : i = 3 := by omega
+        subst this
+        exact hUnused.2.2.2
+    exact Eliminated.ext b (deg4_extends_of_unused_color b hb c hc)
+  | true =>
+    have ⟨h02, h01, h03, h21, h23, h13⟩ := distinct_of_surj (b 0) (b 1) (b 2) (b 3) hSurj
+    let θ : ColorPairing := {
+      a := b 0
+      b := b 2
+      c := b 1
+      d := b 3
+      distinct := ⟨h02, h01, h03, h21, h23, h13⟩
+    }
+    apply Eliminated.kempe_choice degree4Config b θ hb
+    intro equiv_ab equiv_cd hPart
+    by_cases h02_rel : equiv_ab 0 2
+    · have h13_not : ¬ equiv_cd 1 3 := by
+        intro h13_rel
+        exact hPart.cross_ab_cd 0 1 2 3 (by decide) (by decide) (by decide) (by decide) h02_rel h13_rel
+      let S : Nat → Bool := fun i => i == 1
+      have hSwap : IsValidSwapChoice degree4Config b θ equiv_ab equiv_cd S := {
+        ring_only := by
+          intro i hi
+          have : i = 1 := Nat.eq_of_beq_eq_true hi
+          subst this; decide
+        respects_ab := by
+          intro i hi j hj hij
+          have h_col_i := hPart.ab_color i hi j hj hij
+          have h_col_j := hPart.ab_color j hj i hi (hPart.ab_symm i hi j hj hij)
+          dsimp [S]
+          have hi_ne1 : i ≠ 1 := by
+            intro h; subst h
+            cases h_col_i with
+            | inl h => exact h01.symm h
+            | inr h => exact h21.symm h
+          have hj_ne1 : j ≠ 1 := by
+            intro h; subst h
+            cases h_col_j with
+            | inl h => exact h01.symm h
+            | inr h => exact h21.symm h
+          rw [beq_false_of_ne hi_ne1, beq_false_of_ne hj_ne1]
+        respects_cd := by
+          intro i hi j hj hij
+          have h_col_i := hPart.cd_color i hi j hj hij
+          have h_col_j := hPart.cd_color j hj i hi (hPart.cd_symm i hi j hj hij)
+          dsimp [S]
+          have hi4 : i < 4 := hi
+          have hj4 : j < 4 := hj
+          have hi_mem : i = 1 ∨ i = 3 := by
+            if hi0 : i = 0 then
+              subst hi0; exfalso; cases h_col_i with | inl h => exact h01 h | inr h => exact h03 h
+            else if hi1 : i = 1 then exact Or.inl hi1
+            else if hi2 : i = 2 then
+              subst hi2; exfalso; cases h_col_i with | inl h => exact h21 h | inr h => exact h23 h
+            else
+              exact Or.inr (by omega)
+          have hj_mem : j = 1 ∨ j = 3 := by
+            if hj0 : j = 0 then
+              subst hj0; exfalso; cases h_col_j with | inl h => exact h01 h | inr h => exact h03 h
+            else if hj1 : j = 1 then exact Or.inl hj1
+            else if hj2 : j = 2 then
+              subst hj2; exfalso; cases h_col_j with | inl h => exact h21 h | inr h => exact h23 h
+            else
+              exact Or.inr (by omega)
+          rcases hi_mem with rfl | rfl <;> rcases hj_mem with rfl | rfl
+          · rfl
+          · exact False.elim (h13_not hij)
+          · have h31 := hPart.cd_symm 3 hi 1 hj hij
+            exact False.elim (h13_not h31)
+          · rfl
+      }
+      refine ⟨S, hSwap, ?_⟩
+      apply Eliminated.ext
+      have h_unused' : ∀ i < 4, boundaryKempeSwap degree4Config b θ S i ≠ b 1 := by
         intro i hi
-        by_cases hSi : S i = true
-        · exact False.elim (hAny ⟨i, hi, hSi⟩)
-        · cases h : S i with | true => contradiction | false => rfl
-    cases hCases with
-    | inl hAllFalse =>
-      have hSurjNext : deg4_surj (boundaryKempeSwap degree4Config b' a b_col S) := by
-        intro c
-        rcases hSurj c with ⟨i, hi, hbi⟩
-        refine ⟨i, hi, ?_⟩
-        dsimp [boundaryKempeSwap]
-        rw [hAllFalse i hi]
-        dsimp
-        exact hbi
-      exact ihNext hSurjNext
-    | inr hAllTrue =>
-      have hSurjNext : deg4_surj (boundaryKempeSwap degree4Config b' a b_col S) := by
-        intro c
-        rcases hSurj (Hypermap.swapColor c a b_col) with ⟨i, hi, hbi⟩
-        refine ⟨i, hi, ?_⟩
-        dsimp [boundaryKempeSwap]
-        by_cases hMem : b' i = a ∨ b' i = b_col
-        · rw [hAllTrue i hi hMem]
-          dsimp
-          rw [hbi, Hypermap.swapColor_inv]
-        · have hNotS : S i = false := by
-            by_cases hSi : S i = true
-            · exact False.elim (hMem (hSwapChoice.1 i hi hSi))
-            · cases h : S i with | true => contradiction | false => rfl
-          rw [hNotS]
-          dsimp
-          have hNotMem : ¬(Hypermap.swapColor c a b_col = a ∨ Hypermap.swapColor c a b_col = b_col) := by
-            rw [hbi] at hMem
-            exact hMem
-          rw [swapColor_mem_iff] at hNotMem
-          rw [hbi, swapColor_eq_self_of_not_mem c a b_col hNotMem]
-      exact ihNext hSurjNext
+        dsimp [boundaryKempeSwap, S]
+        have hi4 : i < 4 := hi
+        if hi0 : i = 0 then
+          subst hi0; dsimp; exact h01
+        else if hi1 : i = 1 then
+          subst hi1; dsimp; dsimp [θ, ColorPairing.swap]
+          rw [if_neg (Ne.symm h01), if_neg (Ne.symm h21), if_pos rfl]
+          exact h13.symm
+        else if hi2 : i = 2 then
+          subst hi2; dsimp; exact h21
+        else
+          have : i = 3 := by omega
+          subst this; dsimp; exact h13.symm
+      have hValSwapped := swap_preserves_valid degree4Config b θ equiv_ab equiv_cd S hb hPart hSwap
+      exact deg4_extends_of_unused_color (boundaryKempeSwap degree4Config b θ S) hValSwapped (b 1) h_unused'
+    · let S : Nat → Bool := fun i => i == 0
+      have hSwap : IsValidSwapChoice degree4Config b θ equiv_ab equiv_cd S := {
+        ring_only := by
+          intro i hi
+          have : i = 0 := Nat.eq_of_beq_eq_true hi
+          subst this; decide
+        respects_ab := by
+          intro i hi j hj hij
+          have h_col_i := hPart.ab_color i hi j hj hij
+          have h_col_j := hPart.ab_color j hj i hi (hPart.ab_symm i hi j hj hij)
+          dsimp [S]
+          have hi4 : i < 4 := hi
+          have hj4 : j < 4 := hj
+          have hi_mem : i = 0 ∨ i = 2 := by
+            if hi0 : i = 0 then exact Or.inl hi0
+            else if hi1 : i = 1 then
+              subst hi1; exfalso; cases h_col_i with | inl h => exact h01.symm h | inr h => exact h21.symm h
+            else if hi2 : i = 2 then exact Or.inr hi2
+            else
+              have : i = 3 := by omega
+              subst this; exfalso
+              cases h_col_i with | inl h => exact h03.symm h | inr h => exact h23.symm h
+          have hj_mem : j = 0 ∨ j = 2 := by
+            if hj0 : j = 0 then exact Or.inl hj0
+            else if hj1 : j = 1 then
+              subst hj1; exfalso; cases h_col_j with | inl h => exact h01.symm h | inr h => exact h21.symm h
+            else if hj2 : j = 2 then exact Or.inr hj2
+            else
+              have : j = 3 := by omega
+              subst this; exfalso
+              cases h_col_j with | inl h => exact h03.symm h | inr h => exact h23.symm h
+          rcases hi_mem with rfl | rfl <;> rcases hj_mem with rfl | rfl
+          · rfl
+          · exact False.elim (h02_rel hij)
+          · have h20 := hPart.ab_symm 2 hi 0 hj hij
+            exact False.elim (h02_rel h20)
+          · rfl
+        respects_cd := by
+          intro i hi j hj hij
+          have h_col_i := hPart.cd_color i hi j hj hij
+          have h_col_j := hPart.cd_color j hj i hi (hPart.cd_symm i hi j hj hij)
+          dsimp [S]
+          have hi_ne0 : i ≠ 0 := by
+            intro h; subst h
+            cases h_col_i with
+            | inl h => exact h01 h
+            | inr h => exact h03 h
+          have hj_ne0 : j ≠ 0 := by
+            intro h; subst h
+            cases h_col_j with
+            | inl h => exact h01 h
+            | inr h => exact h03 h
+          rw [beq_false_of_ne hi_ne0, beq_false_of_ne hj_ne0]
+      }
+      refine ⟨S, hSwap, ?_⟩
+      apply Eliminated.ext
+      have h_unused' : ∀ i < 4, boundaryKempeSwap degree4Config b θ S i ≠ b 0 := by
+        intro i hi
+        dsimp [boundaryKempeSwap, S]
+        have hi4 : i < 4 := hi
+        if hi0 : i = 0 then
+          subst hi0; dsimp; dsimp [θ, ColorPairing.swap]
+          rw [if_pos rfl]
+          exact h02.symm
+        else if hi1 : i = 1 then
+          subst hi1; dsimp; exact h01.symm
+        else if hi2 : i = 2 then
+          subst hi2; dsimp; exact h02.symm
+        else
+          have : i = 3 := by omega
+          subst this; dsimp; exact h03.symm
+      have hValSwapped := swap_preserves_valid degree4Config b θ equiv_ab equiv_cd S hb hPart hSwap
+      exact deg4_extends_of_unused_color (boundaryKempeSwap degree4Config b θ S) hValSwapped (b 0) h_unused'
 
-theorem deg4_not_d_reducible : ¬ IsDReducible degree4Config := by
-  intro hD
-  have hElim := hD deg4BadColoring deg4BadColoring_valid
-  exact deg4_eliminated_not_surj deg4BadColoring hElim deg4BadColoring_surj
-
-theorem deg4_not_c_reducible : ¬ IsCReducible degree4Config := by
-  intro ⟨hNonempty, _⟩
-  dsimp [degree4Config] at hNonempty
-  exact hNonempty rfl
-
-/-- The degree-4 vertex configuration is provably NOT reducible under the current
-    IsPlanarRingPartition / Eliminated definitions. -/
-theorem deg4_not_reducible : ¬ IsReducible degree4Config := by
-  intro hRed
-  cases hRed with
-  | inl hD => exact deg4_not_d_reducible hD
-  | inr hC => exact deg4_not_c_reducible hC
+/-- The degree-4 vertex configuration is unconditionally reducible. -/
+theorem deg4_reducible : IsReducible degree4Config :=
+  Or.inl deg4_d_reducible
 
 end Math

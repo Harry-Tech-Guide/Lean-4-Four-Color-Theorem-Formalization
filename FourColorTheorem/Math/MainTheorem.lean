@@ -177,13 +177,13 @@ theorem no_reducible_with_full_witness (H : Hypermap) [DecidableEq H.Dart] (dart
   exact mc.not_colorable h_glued
 
 /-- Topological Kempe Realizability:
-    In a planar hypermap, every valid swap choice over an induced planar ring partition
+    In a planar hypermap, every valid swap choice over an induced joint planar ring partition
     is realized by swapping face Kempe chain components on H_ext. -/
 def TopologicalKempeRealizable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) (w : ReductionWitness H darts c) : Prop :=
-  ∀ (col : MapColoring w.H_ext) (a b_col : Color) (equiv : Nat → Nat → Prop) (S : Nat → Bool),
-    IsPlanarRingPartition c (w.bnd_coloring col) a b_col equiv →
-    IsValidSwapChoice c (w.bnd_coloring col) a b_col equiv S →
-    ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c (w.bnd_coloring col) a b_col S
+  ∀ (col : MapColoring w.H_ext) (θ : ColorPairing) (equiv_ab equiv_cd : Nat → Nat → Prop) (S : Nat → Bool),
+    IsJointPlanarRingPartition c (w.bnd_coloring col) θ equiv_ab equiv_cd →
+    IsValidSwapChoice c (w.bnd_coloring col) θ equiv_ab equiv_cd S →
+    ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c (w.bnd_coloring col) θ S
 
 /-- Kempe Pullback Property:
     Any boundary coloring eliminated under the adversarial Kempe game
