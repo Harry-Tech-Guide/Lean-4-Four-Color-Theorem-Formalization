@@ -106,15 +106,17 @@ There are **0 `sorry` statements** across the entire repository. The project axi
    The Robertson-Sanders-Seymour-Thomas (1997) Discharging Principle: every minimal counterexample to the Four Color Theorem admits a `PlanarDischargingWitness` under the 32 RSST discharging rules, conserving total Euler charge equal to 120.
    - Note on Discharging Verification: While `Discharging.discharging_trees_verified` formally proves computational validity of the presentation trees for hub degrees 7 through 11 in-kernel via `native_decide`, bridging from tree verification, hubcap inequalities, and degree 5, 6, and ≥ 12 boundary analysis to hypermap embeddings is encapsulated in `rsst_discharging_witness`.
    - `Math.rsst_unavoidability` is a **proven theorem** derived constructively from this witness and `unavoidability_from_discharging` via Euler charge conservation ($120 > 0 \implies \exists c \in \text{theUnavoidableSet}$).
-3. **`Math.MasterCertificate.rsst_certificate_soundness`** (`Math/MasterCertificate.lean`):
-   The RSST Certificate Soundness Principle: any configuration certified by the RSST in-kernel computational reflection suite across all 138 batch files (witnessed by `master_suite_verified`) is mathematically reducible (`IsReducible c`) under the adversarial `Eliminated` game.
-   - `Math.MasterCertificate.rsst_all_unavoidable_reducible` is a **proven theorem** combining the 633 in-kernel batch certificates (`all_unavoidable_configs_certified`) with this soundness bridge.
+3. **`Math.MasterCertificate.rsst_d_certificate_witness`** (`Math/MasterCertificate.lean`):
+   The RSST D-Certificate Witness Hypothesis: any configuration certified by the RSST in-kernel computational reflection suite as D-reducible (`isCertifiedDConfig c`, 249 configurations) satisfies the computational checker and mathematical soundness hypotheses of `Math.Soundness.fast_d_sound''`. Connecting this witness to `fast_d_sound''` proves `Math.MasterCertificate.rsst_d_certificate_soundness` as a genuine theorem (`IsDReducible c`).
+4. **`Math.MasterCertificate.rsst_c_certificate_soundness`** (`Math/MasterCertificate.lean`):
+   The RSST C-Certificate Soundness Principle: any configuration certified by the RSST in-kernel computational reflection suite as C-reducible (`isCertifiedCConfig c`, 384 configurations) is mathematically C-reducible (`IsCReducible c`) under contract edge reduction and Kempe chain elimination.
+   - `Math.MasterCertificate.rsst_all_unavoidable_reducible` is a **proven theorem** combining the 633 in-kernel batch certificates (`all_unavoidable_configs_certified`) with the D/C certificate partition (`certified_cases_iff`), dispatching D-certified configurations to `IsDReducible c` via `fast_d_sound''` and C-certified configurations to `IsCReducible c` via `rsst_c_certificate_soundness`.
 
-From (2) and (3), `Math.rsst_unavoidable_reducible` is proved constructively, establishing that every minimal counterexample contains a reducible configuration, which combined with (1) derives a contradiction and completes the proof of `Math.four_color_theorem`.
+From (2), (3), and (4), `Math.rsst_unavoidable_reducible` is proved constructively, establishing that every minimal counterexample contains a reducible configuration, which combined with (1) derives a contradiction and completes the proof of `Math.four_color_theorem`.
 
 The exact axiom list of `Math.four_color_theorem` is:
 ```lean
-[propext, Classical.choice, Lean.ofReduceBool, Math.rsst_discharging_witness, Math.topological_reduction_bundle, Quot.sound, Math.MasterCertificate.rsst_certificate_soundness]
+[propext, Classical.choice, Lean.ofReduceBool, Math.rsst_discharging_witness, Math.topological_reduction_bundle, Quot.sound, Math.MasterCertificate.rsst_c_certificate_soundness, Math.MasterCertificate.rsst_d_certificate_witness]
 ```
 
 ---

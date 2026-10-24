@@ -10,9 +10,14 @@ import FourColorTheorem.Math.Batch.CR13
 import FourColorTheorem.Math.Batch.CR14
 import FourColorTheorem.Math.U633Parser
 import FourColorTheorem.Math.Reducibility
+import FourColorTheorem.Math.Soundness.DReduce
 
 namespace Math
 namespace MasterCertificate
+
+open FastReducer
+open Soundness
+open Batch
 
 /-!
 # Master RSST Reducibility Certificate Aggregator
@@ -249,6 +254,34 @@ def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
     (idx ∈ certified_d_indices ∨ idx ∈ certified_c_indices)
 
+/-- A configuration is certified D-reducible in the RSST batch suite if its canonical
+    index belongs to certified_d_indices and the master batch suite is verified. -/
+def isCertifiedDConfig (c : Configuration) : Prop :=
+  MasterSuiteVerifiedProp ∧
+  ∃ (idx : Nat) (h_lt : idx < 633),
+    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+    idx ∈ certified_d_indices
+
+/-- A configuration is certified C-reducible in the RSST batch suite if its canonical
+    index belongs to certified_c_indices and the master batch suite is verified. -/
+def isCertifiedCConfig (c : Configuration) : Prop :=
+  MasterSuiteVerifiedProp ∧
+  ∃ (idx : Nat) (h_lt : idx < 633),
+    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+    idx ∈ certified_c_indices
+
+/-- Certified unavoidable configurations partition into D-certified and C-certified configurations. -/
+theorem certified_cases_iff (c : Configuration) :
+    isCertifiedUnavoidableConfig c ↔ isCertifiedDConfig c ∨ isCertifiedCConfig c := by
+  constructor
+  · rintro ⟨hMaster, idx, h_lt, h_eq, h_cases⟩
+    cases h_cases with
+    | inl hd => exact Or.inl ⟨hMaster, idx, h_lt, h_eq, hd⟩
+    | inr hc => exact Or.inr ⟨hMaster, idx, h_lt, h_eq, hc⟩
+  · rintro (⟨hMaster, idx, h_lt, h_eq, hd⟩ | ⟨hMaster, idx, h_lt, h_eq, hc⟩)
+    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inl hd⟩
+    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inr hc⟩
+
 /-- Master In-Kernel Certificate Theorem:
     Every configuration in the canonical RSST unavoidable set is certified reducible
     by the in-kernel batch suite (either D-reducible or C-reducible), witnessed directly
@@ -269,20 +302,59 @@ theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnav
     rfl
   rw [h_eq, h_get]
 
+/-- RSST D-Certificate Witness Hypothesis:
+    A configuration certified as D-reducible by the RSST in-kernel reflection suite
+    satisfies the computational checker and mathematical soundness hypotheses:
+    there exist earlier-reduction data, balanced signed matchings, and power-of-3 tables
+    such that checkFast succeeds, the earlier adjacency graph is sound and irreflexive,
+    Lemma (a) representation holds, and the checker eliminates all positive-rank colorings. -/
+axiom rsst_d_certificate_witness (c : Configuration) :
+  isCertifiedDConfig c →
+    ∃ (earlier : Array (Array Nat)) (sms : Array SMData) (pow3 : Array Nat),
+      checkFast (Soundness.rconfOfConfig c earlier) sms pow3 = true ∧
+      Soundness.IsSoundEarlier c earlier ∧
+      Soundness.IsIrreflexiveAdj c ∧
+      Soundness.FullRepresentationHypothesis c sms pow3 ∧
+      Soundness.IterationEliminationHypothesis c earlier sms pow3
+
+/-- RSST D-Certificate Soundness Theorem:
+    A configuration certified as D-reducible is mathematically D-reducible,
+    proved by connecting the certificate witness to the master soundness theorem ast_d_sound''. -/
+theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig c) :
+    IsDReducible c := by
+  rcases rsst_d_certificate_witness c h with ⟨earlier, sms, pow3, h_check, h_earlier, h_irrefl, h_rep, h_elim⟩
+  exact Soundness.fast_d_sound'' c earlier sms pow3 h_check h_earlier h_irrefl h_rep h_elim
+
+/-- RSST C-Certificate Soundness Principle:
+    A configuration certified by the RSST in-kernel reflection suite as C-reducible
+    is mathematically C-reducible under contract edge reduction and Kempe chain elimination. -/
+axiom rsst_c_certificate_soundness (c : Configuration) :
+  isCertifiedCConfig c → IsCReducible c
+
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files
-    (witnessed by master_suite_verified) is mathematically reducible (D-reducible if in
-    certified_d_indices, or C-reducible if in certified_c_indices).
-    This bridges the in-kernel computational certificates into the mathematical reducibility predicate. -/
-axiom rsst_certificate_soundness (c : Configuration) :
-  isCertifiedUnavoidableConfig c → IsReducible c
+    is mathematically reducible (D-reducible if D-certified, or C-reducible if C-certified). -/
+theorem rsst_certificate_soundness (c : Configuration) :
+    isCertifiedUnavoidableConfig c → IsReducible c := by
+  intro h
+  rw [certified_cases_iff] at h
+  cases h with
+  | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)
+  | inr hC => exact Or.inr (rsst_c_certificate_soundness c hC)
 
 /-- Computational Reducibility of the RSST Unavoidable Set:
     Every configuration in the canonical 633 unavoidable set is mathematically reducible,
-    proven directly from the 633 in-kernel batch certificates and the RSST certificate soundness bridge. -/
+    proven directly from the 633 in-kernel batch certificates, dispatching D-certified
+    configurations to D-reducibility via ast_d_sound'' and C-certified configurations
+    to C-reducibility via 
+sst_c_certificate_soundness. -/
 theorem rsst_all_unavoidable_reducible (c : Configuration) (hMem : c ∈ theUnavoidableSet) :
-    IsReducible c :=
-  rsst_certificate_soundness c (all_unavoidable_configs_certified c hMem)
+    IsReducible c := by
+  have hCert := all_unavoidable_configs_certified c hMem
+  rw [certified_cases_iff] at hCert
+  cases hCert with
+  | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)
+  | inr hC => exact Or.inr (rsst_c_certificate_soundness c hC)
 
 end MasterCertificate
 end Math

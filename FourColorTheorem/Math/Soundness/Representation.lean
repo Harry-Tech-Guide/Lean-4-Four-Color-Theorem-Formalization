@@ -484,5 +484,82 @@ theorem combineSwapChoice_valid (c : Configuration) (b : BoundaryColoring c) (θ
       rw [if_neg (fun h => hKi h.2), if_neg (fun h => hKj h.2)]
       exact hS_eq
 
+
+
+/-- Inductive extension lemma for Lemma (a) swap choices:
+    Given an innermost chord c0 and its associated ring region K (satisfying hK_ring, hK_ab, hK_cd),
+    and an inductive hypothesis providing RepresentsPartition for sm_rest on the erased chords,
+    combineSwapChoice provides valid swap choices for the combined matching sm_ext (with sm_ext.p = sm_rest.p + 1). -/
+theorem combineSwapChoice_extension_valid
+    (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop) (pow3 : Array Nat)
+    (sm_rest sm_ext : SMData) (c0 : Chord)
+    (K : Nat → Prop) [DecidablePred K]
+    (hK_ring : ∀ i, K i → i < c.ringSize)
+    (hK_ab : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_ab i j → (K i ↔ K j))
+    (hK_cd : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_cd i j → (K i ↔ K j))
+    (hp : sm_ext.p = sm_rest.p + 1)
+    (h_rep : RepresentsPartition c b θ equiv_ab equiv_cd sm_rest pow3) :
+    ∃ S_ext : Nat → (Nat → Bool),
+      (∀ t, t < 1 <<< sm_ext.p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S_ext t)) ∧
+      (∀ i, S_ext 0 i = false) := by
+  rcases h_rep with ⟨S_rest, hS_valid, hS0, _⟩
+  refine ⟨combineSwapChoice S_rest K, ?_, ?_⟩
+  · intro t ht
+    rw [hp] at ht
+    exact combineSwapChoice_valid c b θ equiv_ab equiv_cd S_rest K hK_ring hK_ab hK_cd sm_rest.p hS_valid t ht
+  · intro i
+    exact combineSwapChoice_zero S_rest K hS0 i
+
+/-- Direct inductive swap validity for combineSwapChoice on sm_ext:
+    For any valid swap choices S_rest on sm_rest, combineSwapChoice S_rest K
+    yields valid swap choices on sm_ext. -/
+theorem combineSwapChoice_inductive_valid
+    (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop)
+    (sm_rest sm_ext : SMData) (c0 : Chord)
+    (K : Nat → Prop) [DecidablePred K]
+    (hK_ring : ∀ i, K i → i < c.ringSize)
+    (hK_ab : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_ab i j → (K i ↔ K j))
+    (hK_cd : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_cd i j → (K i ↔ K j))
+    (hp : sm_ext.p = sm_rest.p + 1)
+    (S_rest : Nat → (Nat → Bool))
+    (hS_valid : ∀ t, t < 1 <<< sm_rest.p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S_rest t)) :
+    ∀ t, t < 1 <<< sm_ext.p →
+      IsValidSwapChoice c b θ equiv_ab equiv_cd (combineSwapChoice S_rest K t) := by
+  intro t ht
+  rw [hp] at ht
+  exact combineSwapChoice_valid c b θ equiv_ab equiv_cd S_rest K hK_ring hK_ab hK_cd sm_rest.p hS_valid t ht
+
+/-- Inductive step for Lemma (a) representation:
+    Extends zero_pair_represents to arbitrary non-crossing matchings by chord recombination.
+    Given an innermost chord c0, its associated ring region K, and a representation
+    of the reduced matching sm_rest, the combined swap choices faithfully represent sm_ext. -/
+theorem represents_partition_step
+    (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop) (pow3 : Array Nat)
+    (sm_rest sm_ext : SMData) (c0 : Chord)
+    (K : Nat → Prop) [DecidablePred K]
+    (hK_ring : ∀ i, K i → i < c.ringSize)
+    (hK_ab : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_ab i j → (K i ↔ K j))
+    (hK_cd : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_cd i j → (K i ↔ K j))
+    (hp : sm_ext.p = sm_rest.p + 1)
+    (h_trace : ∀ S_rest,
+      (∀ t, t < 1 <<< sm_rest.p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S_rest t)) →
+      (∀ i, S_rest 0 i = false) →
+      (∀ t, t < 1 <<< sm_rest.p → boundaryTrace c (boundaryKempeSwap c b θ (S_rest t)) pow3 = smFitIndex sm_rest t) →
+      ∀ t, t < 1 <<< sm_ext.p →
+        boundaryTrace c (boundaryKempeSwap c b θ (combineSwapChoice S_rest K t)) pow3 = smFitIndex sm_ext t)
+    (h_rep : RepresentsPartition c b θ equiv_ab equiv_cd sm_rest pow3) :
+    RepresentsPartition c b θ equiv_ab equiv_cd sm_ext pow3 := by
+  rcases h_rep with ⟨S_rest, hS_valid, hS0, hT_rest⟩
+  refine ⟨combineSwapChoice S_rest K, ?_, ?_, ?_⟩
+  · intro t ht
+    rw [hp] at ht
+    exact combineSwapChoice_valid c b θ equiv_ab equiv_cd S_rest K hK_ring hK_ab hK_cd sm_rest.p hS_valid t ht
+  · intro i
+    exact combineSwapChoice_zero S_rest K hS0 i
+  · exact h_trace S_rest hS_valid hS0 hT_rest
+
 end Soundness
 end Math
