@@ -270,6 +270,58 @@ theorem erase_length (c : Chord) (chords : List Chord)
     (chords.erase c).length = chords.length - 1 := by
   exact List.length_erase_of_mem h_mem
 
+/-- Strong induction on chord list length for non-crossing disjoint matchings. -/
+theorem noncrossing_chord_induction
+    (P : List Chord → Prop)
+    (h_empty : P [])
+    (h_step : ∀ (chords : List Chord) (c : Chord),
+      ChordsNonCrossing chords → ChordsDisjoint chords →
+      IsInnermostChord c chords →
+      P (chords.erase c) → P chords) :
+    ∀ (n : Nat) (chords : List Chord),
+      chords.length = n →
+      ChordsNonCrossing chords →
+      ChordsDisjoint chords →
+      P chords := by
+  intro n
+  induction n with
+  | zero =>
+    intro chords h_len _ _
+    cases chords with
+    | nil => exact h_empty
+    | cons _ _ => contradiction
+  | succ k ih =>
+    intro chords h_len h_nc h_dj
+    have h_ne : chords ≠ [] := by
+      rintro rfl
+      contradiction
+    rcases exists_innermost_chord chords h_ne h_nc h_dj with ⟨c, hc_inner⟩
+    have hc_mem := hc_inner.1
+    have h_erase_len : (chords.erase c).length = k := by
+      have h1 := erase_length c chords hc_mem
+      rw [h_len] at h1
+      omega
+    have h_erase_nc := erase_noncrossing c chords h_nc
+    have h_erase_dj := erase_disjoint c chords h_dj
+    have h_rec := ih (chords.erase c) h_erase_len h_erase_nc h_erase_dj
+    exact h_step chords c h_nc h_dj hc_inner h_rec
+
+/-- Chord recombination induction principle for non-crossing disjoint matchings:
+    Any property holding for the empty matching and preserved by innermost chord recombination
+    holds for all non-crossing disjoint matchings. -/
+theorem noncrossing_matching_induction
+    (P : List Chord → Prop)
+    (h_empty : P [])
+    (h_step : ∀ (chords : List Chord) (c : Chord),
+      ChordsNonCrossing chords → ChordsDisjoint chords →
+      IsInnermostChord c chords →
+      P (chords.erase c) → P chords)
+    (chords : List Chord)
+    (h_nc : ChordsNonCrossing chords)
+    (h_dj : ChordsDisjoint chords) :
+    P chords :=
+  noncrossing_chord_induction P h_empty h_step chords.length chords rfl h_nc h_dj
+
 /-- Every pushed element is in the resulting array. -/
 theorem mem_push_self {α : Type} (a : Array α) (x : α) :
     x ∈ (a.push x).data := by
@@ -357,6 +409,80 @@ theorem combine_swap_zero (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [
     (if (0 &&& 1 == 1) ∧ K i then true else S_rest (0 >>> 1) i) = false := by
   dsimp
   exact hS0 i
+
+/-- Combined swap choice parameterization for chord recombination:
+    Bit 0 of parameter t selects whether the innermost chord's region K is swapped,
+    while higher bits `t >>> 1` select swap choices on the remaining chords. -/
+def combineSwapChoice (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
+    (t : Nat) (i : Nat) : Bool :=
+  if (t &&& 1 == 1) ∧ K i then true else S_rest (t >>> 1) i
+
+/-- At parameter t = 0, the combined swap choice is identity everywhere if S_rest is. -/
+theorem combineSwapChoice_zero (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
+    (hS0 : ∀ i, S_rest 0 i = false) (i : Nat) :
+    combineSwapChoice S_rest K 0 i = false :=
+  combine_swap_zero S_rest K hS0 i
+
+/-- Shifting parameter t right by 1 preserves bounds under bit-doubling:
+    if `t < 1 <<< (p + 1)`, then `t >>> 1 < 1 <<< p`. -/
+theorem shift_right_lt_pow (p t : Nat) (ht : t < 1 <<< (p + 1)) :
+    t >>> 1 < 1 <<< p := by
+  rw [Nat.shiftLeft_eq] at ht
+  rw [Nat.shiftLeft_eq]
+  rw [Nat.shiftRight_eq_div_pow]
+  have hpow : 2 ^ (p + 1) = 2 ^ p * 2 := Nat.pow_succ 2 p
+  rw [hpow] at ht
+  omega
+
+/-- Admissibility preservation under chord recombination:
+    If K is a ring component respecting equivalence relations equiv_ab and equiv_cd,
+    and S_rest produces admissible swap choices for remaining chords,
+    then combineSwapChoice produces admissible swap choices for the combined matching. -/
+theorem combineSwapChoice_valid (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop)
+    (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
+    (hK_ring : ∀ i, K i → i < c.ringSize)
+    (hK_ab : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_ab i j → (K i ↔ K j))
+    (hK_cd : ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_cd i j → (K i ↔ K j))
+    (p : Nat) (hS_valid : ∀ t', t' < 1 <<< p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S_rest t')) :
+    ∀ t, t < 1 <<< (p + 1) →
+      IsValidSwapChoice c b θ equiv_ab equiv_cd (combineSwapChoice S_rest K t) := by
+  intro t ht
+  have ht' := shift_right_lt_pow p t ht
+  have h_val := hS_valid (t >>> 1) ht'
+  refine ⟨?_, ?_, ?_⟩
+  · intro i hi
+    dsimp [combineSwapChoice] at hi
+    split at hi
+    · rename_i h_cond
+      exact hK_ring i h_cond.2
+    · exact h_val.ring_only i hi
+  · intro i hi j hj hab
+    dsimp [combineSwapChoice]
+    have hK_iff := hK_ab i hi j hj hab
+    have hS_eq := h_val.respects_ab i hi j hj hab
+    by_cases hKi : K i
+    · have hKj : K j := hK_iff.mp hKi
+      by_cases h_bit : t &&& 1 == 1
+      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩]
+      · rw [if_neg (fun h => h_bit h.1), if_neg (fun h => h_bit h.1)]
+        exact hS_eq
+    · have hKj : ¬ K j := fun hj => hKi (hK_iff.mpr hj)
+      rw [if_neg (fun h => hKi h.2), if_neg (fun h => hKj h.2)]
+      exact hS_eq
+  · intro i hi j hj hcd
+    dsimp [combineSwapChoice]
+    have hK_iff := hK_cd i hi j hj hcd
+    have hS_eq := h_val.respects_cd i hi j hj hcd
+    by_cases hKi : K i
+    · have hKj : K j := hK_iff.mp hKi
+      by_cases h_bit : t &&& 1 == 1
+      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩]
+      · rw [if_neg (fun h => h_bit h.1), if_neg (fun h => h_bit h.1)]
+        exact hS_eq
+    · have hKj : ¬ K j := fun hj => hKi (hK_iff.mpr hj)
+      rw [if_neg (fun h => hKi h.2), if_neg (fun h => hKj h.2)]
+      exact hS_eq
 
 end Soundness
 end Math

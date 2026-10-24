@@ -241,11 +241,13 @@ def computeEliminationRanks (rc : RConf) (sms : Array SMData) (pow3 : Array Nat)
   (runReducerLoop N (orbits0.size + 1) initSt).ranks
 
 
-/-- Canonical elimination rank of a boundary coloring, CONSTRUCTED from the checker's fixed-point. -/
+/-- Canonical elimination rank of a boundary coloring, CONSTRUCTED from the checker's fixed-point:
+    Colorings that extend directly to the interior have rank 0.
+    Colorings eliminated at iteration k of the fixed-point loop have rank k + 1. -/
 def constructedRank (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat) (b : BoundaryColoring c) : Nat :=
-  let ranks := computeEliminationRanks (rconfOfConfig c earlier) sms pow3
-  ranks.getD (boundaryTrace c b pow3) 0
+  if (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 then 0
+  else (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 + 1
 
 /-- Extension Soundness Hypothesis (Lemma (d)):
     Any boundary coloring whose rank is 0 extends directly to the interior. -/
@@ -290,6 +292,27 @@ def ConstructedRankBase (c : Configuration) (earlier : Array (Array Nat))
     constructedRank c earlier sms pow3 b = 0 →
     (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true
 
+/-- Derivation of ConstructedRankBase from checkFast:
+    Any boundary coloring with constructedRank 0 extends directly under FastReducer.extend. -/
+theorem hbase_of_checkFast (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true) :
+    ConstructedRankBase c earlier sms pow3 := by
+  intro b hb hr0
+  dsimp [constructedRank] at hr0
+  split at hr0
+  · assumption
+  · contradiction
+
+/-- Helper: boundary Kempe swap with identity swap choice everywhere is the identity coloring. -/
+theorem boundaryKempeSwap_zero (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing) (S : Nat → Bool)
+    (hS : ∀ i, S i = false) :
+    boundaryKempeSwap c b θ S = b := by
+  funext i
+  dsimp [boundaryKempeSwap]
+  rw [hS i]
+  rfl
+
 /-- Step condition for constructed rank: rank > 0 colorings admit rank-decreasing swap responses. -/
 def ConstructedRankStep (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat) : Prop :=
@@ -330,9 +353,9 @@ theorem fast_d_sound_rank0 (c : Configuration) (earlier : Array (Array Nat))
   }
   exact dreducible_of_rank_witness c W
 
-/-- Connection from Lemma (a) FullRepresentationHypothesis to ConstructedRankStep:
-    If every partition is represented by an SMData and uncovered status guarantees
-    elimination at an earlier iteration, then ConstructedRankStep holds. -/
+/-- Connection from representation hypothesis to ConstructedRankStep:
+    If every partition is represented by an SMData whose fitting traces include one with strictly
+    smaller elimination rank, then ConstructedRankStep holds. -/
 theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_step_rep : ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
@@ -342,7 +365,7 @@ theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
         ∃ sm ∈ sms.data, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
-              constructedRank c earlier sms pow3 b) :
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :
     ConstructedRankStep c earlier sms pow3 := by
   intro b hb hr_pos
   rcases h_step_rep b hb hr_pos with ⟨θ, hPart⟩
@@ -350,9 +373,80 @@ theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
   intro equiv_ab equiv_cd hP
   rcases hPart equiv_ab equiv_cd hP with ⟨sm, hsm, ⟨S, hSwap, hS0, hTrace⟩, t, ht, hr_dec⟩
   refine ⟨S t, hSwap t ht, ?_⟩
+  have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
+    cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
+    | true =>
+      dsimp [constructedRank] at hr_pos
+      rw [h] at hr_pos
+      contradiction
+    | false => rfl
+  have h_rank_b : constructedRank c earlier sms pow3 b =
+      (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 + 1 := by
+    dsimp [constructedRank]
+    rw [h_not_ext]
+    rfl
+  rw [h_rank_b]
   dsimp [constructedRank]
   rw [hTrace t ht]
-  exact hr_dec
+  split
+  · omega
+  · omega
+
+/-- Iteration elimination property of the FastReducer fixed point:
+    When all orbits are eliminated, every surviving coloring at positive rank has an uncovered pairing θ
+    where all representing signed matchings contain a parameter t eliminated at an earlier iteration. -/
+def IterationEliminationHypothesis (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat) : Prop :=
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
+    constructedRank c earlier sms pow3 b > 0 →
+    ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.data →
+      (boundaryTrace c b pow3 = smFitIndex sm 0) →
+      ∃ t, t < 1 <<< sm.p ∧
+        (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0
+
+/-- Connection from Lemma (a) FullRepresentationHypothesis and iteration elimination to ConstructedRankStep:
+    Every partition is represented by an SMData and uncovered status guarantees elimination at an
+    earlier iteration, so the swapped coloring strictly decreases the constructed rank. -/
+theorem step_of_iteration_elimination (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_rep : FullRepresentationHypothesis c sms pow3)
+    (h_elim : IterationEliminationHypothesis c earlier sms pow3) :
+    ConstructedRankStep c earlier sms pow3 := by
+  intro b hb hr_pos
+  rcases h_elim b hb hr_pos with ⟨θ, hθ⟩
+  refine ⟨θ, ?_⟩
+  intro equiv_ab equiv_cd hPart
+  rcases h_rep b θ equiv_ab equiv_cd hb hPart with ⟨sm, hsm, S, hSwap, hS0, hTrace⟩
+  have h_zero_lt : 0 < 1 <<< sm.p := by
+    rw [Nat.shiftLeft_eq, Nat.one_mul]
+    exact Nat.two_pow_pos sm.p
+  have h_swap0 : boundaryKempeSwap c b θ (S 0) = b :=
+    boundaryKempeSwap_zero c b θ (S 0) hS0
+  have h_fit0 : boundaryTrace c b pow3 = smFitIndex sm 0 := by
+    have hT0 := hTrace 0 h_zero_lt
+    rw [h_swap0] at hT0
+    exact hT0
+  rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec⟩
+  refine ⟨S t, hSwap t ht, ?_⟩
+  have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
+    cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
+    | true =>
+      dsimp [constructedRank] at hr_pos
+      rw [h] at hr_pos
+      contradiction
+    | false => rfl
+  have h_rank_b : constructedRank c earlier sms pow3 b =
+      (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 + 1 := by
+    dsimp [constructedRank]
+    rw [h_not_ext]
+    rfl
+  rw [h_rank_b]
+  dsimp [constructedRank]
+  rw [hTrace t ht]
+  split
+  · omega
+  · omega
 
 /-- Master Acceptance Theorem fast_d_sound':
     For any configuration `c`, with checker run `checkFast (rconfOfConfig c earlier) sms pow3 = true`:
@@ -371,13 +465,13 @@ theorem fast_d_sound' (c : Configuration) (earlier : Array (Array Nat))
   let W := constructedRankWitness c earlier sms pow3 h_earlier h_irrefl hbase hstep
   exact dreducible_of_rank_witness c W
 
-/-- D-reducibility deduction combining base extension with representation hypothesis (Lemma a). -/
+/-- D-reducibility deduction combining base extension with representation hypothesis (Lemma a).
+    `hbase` is eliminated via `hbase_of_checkFast`. -/
 theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
-    (hbase : ConstructedRankBase c earlier sms pow3)
     (h_step_rep : ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
       constructedRank c earlier sms pow3 b > 0 →
       ∃ θ : ColorPairing, ∀ (equiv_ab equiv_cd : Nat → Nat → Prop),
@@ -385,9 +479,29 @@ theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Arr
         ∃ sm ∈ sms.data, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
-              constructedRank c earlier sms pow3 b) :
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :
     IsDReducible c := by
+  have hbase := hbase_of_checkFast c earlier sms pow3 h_check
   have hstep := step_of_representation c earlier sms pow3 h_step_rep
+  exact fast_d_sound' c earlier sms pow3 h_check h_earlier h_irrefl hbase hstep
+
+/-- Master Soundness Theorem fast_d_sound'':
+    For any configuration `c`, with checker run `checkFast (rconfOfConfig c earlier) sms pow3 = true`:
+    Neither `hbase` nor `hstep` is assumed as a hypothesis.
+    `hbase` is derived directly via `hbase_of_checkFast`.
+    `hstep` is derived from Lemma (a) `FullRepresentationHypothesis` and the iteration elimination
+    decrease of `computeEliminationRanks`.
+    Under earlier-adjacency soundness and irreflexivity, `c` is provably D-reducible. -/
+theorem fast_d_sound'' (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (h_rep : FullRepresentationHypothesis c sms pow3)
+    (h_elim : IterationEliminationHypothesis c earlier sms pow3) :
+    IsDReducible c := by
+  have hbase := hbase_of_checkFast c earlier sms pow3 h_check
+  have hstep := step_of_iteration_elimination c earlier sms pow3 h_rep h_elim
   exact fast_d_sound' c earlier sms pow3 h_check h_earlier h_irrefl hbase hstep
 
 end Soundness
