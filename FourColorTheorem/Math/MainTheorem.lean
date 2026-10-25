@@ -215,15 +215,38 @@ pull back boundary Kempe swaps to exterior map colorings.
 This topological surgery principle is packaged directly as `FullReductionWitness`.
 -/
 
-/-- The Topological Disk Excision and Kempe Realizability Principle:
+/-- The RSST Disk Excision Principle:
+    Embedding an unavoidable configuration with positive interior into a minimal counterexample yields
+    a genuine excised planar bridgeless exterior hypermap $H_{ext}$ with restriction and gluing (`ReductionWitness`). -/
+axiom rsst_disk_excision_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
+  (hApp : appearsIn c H darts) :
+  ReductionWitness H darts c
+
+/-- The RSST Planar Kempe Chain Pullback Principle:
+    In a planar exterior hypermap, Kempe chains are non-crossing, so any boundary coloring
+    eliminated under the adversarial Kempe game on the ring pulls back to an exterior map coloring
+    that glues with an interior extension. -/
+axiom rsst_planar_kempe_pullback (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
+  (hApp : appearsIn c H darts) (rw : ReductionWitness H darts c) :
+  ∀ (col : MapColoring rw.H_ext),
+    Eliminated c (rw.bnd_coloring col) →
+    ∃ (col' : MapColoring rw.H_ext) (ext : Nat → Color),
+      (∀ i < c.ringSize, ext i = rw.bnd_coloring col' i) ∧ IsValidConfigColoring c ext
+
+/-- The Topological Disk Excision and Kempe Realizability Bundle:
     Embedding an unavoidable configuration with positive interior into a minimal counterexample yields
     a genuine planar, bridgeless exterior hypermap equipped with Kempe chain pullback,
     packaged as a FullReductionWitness.
-    This encapsulates the Jordan curve theorem disk surgery and planar Kempe chain pullback. -/
-axiom topological_reduction_bundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    Constructed directly from the RSST Disk Excision Principle and the Planar Kempe Chain Pullback Principle. -/
+noncomputable def topological_reduction_bundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
   (hApp : appearsIn c H darts) :
-  FullReductionWitness H darts c
+  FullReductionWitness H darts c :=
+  let rw := rsst_disk_excision_witness H darts mc c h_int hApp
+  { rw with
+    kempe_pullback := rsst_planar_kempe_pullback H darts mc c h_int hApp rw }
 
 /-- Planar Kempe Pullback & Topological Reduction Witness Theorem:
     Embedding an unavoidable configuration into a minimal counterexample yields a topological
@@ -238,12 +261,12 @@ noncomputable def kempe_pullback_witness (H : Hypermap) [DecidableEq H.Dart] (da
 /-- Topological Surgery Theorem:
     Embedding a configuration with positive interior size into a minimal counterexample
     yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
-    Obtained directly from the topological reduction witness. -/
+    Obtained directly from the RSST disk excision witness. -/
 noncomputable def topological_surgery_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → ReductionWitness H darts c := by
   intro hApp
-  exact (kempe_pullback_witness H darts mc c h_int hApp).toReductionWitness
+  exact rsst_disk_excision_witness H darts mc c h_int hApp
 
 /-- Topological Surgery Theorem:
     Embedding a reducible configuration into a hypermap yields a topological full reduction witness.
