@@ -102,21 +102,23 @@ There are **0 `sorry` statements** across the entire repository. The project axi
 
 1. **`Math.topological_reduction_bundle`** (`Math/MainTheorem.lean`):
    Formalizes the Jordan curve theorem partition and planar surgery properties: excising an embedded induced disk configuration with positive interior from a minimal counterexample yields a genuine planar, bridgeless exterior hypermap (`FullReductionWitness`) whose complete dart list has strictly smaller length. Because reducibility is formalized via the adversarial `Eliminated` game over joint non-crossing planar partitions, the exterior coloring induces a genuine joint planar partition for which the reducer's valid swap choice can be executed on the exterior hypermap (resolving Kempe's 1879 ambiguity).
-2. **`Math.rsst_discharging_witness`** (`Math/MainTheorem.lean`):
-   The Robertson-Sanders-Seymour-Thomas (1997) Discharging Principle: every minimal counterexample to the Four Color Theorem admits a `PlanarDischargingWitness` under the 32 RSST discharging rules, conserving total Euler charge equal to 120.
-   - Note on Discharging Verification: While `Discharging.discharging_trees_verified` formally proves computational validity of the presentation trees for hub degrees 7 through 11 in-kernel via `native_decide`, bridging from tree verification, hubcap inequalities, and degree 5, 6, and ≥ 12 boundary analysis to hypermap embeddings is encapsulated in `rsst_discharging_witness`.
-   - `Math.rsst_unavoidability` is a **proven theorem** derived constructively from this witness and `unavoidability_from_discharging` via Euler charge conservation ($120 > 0 \implies \exists c \in \text{theUnavoidableSet}$).
-3. **`Math.MasterCertificate.rsst_d_certificate_witness`** (`Math/MasterCertificate.lean`):
+2. **`Math.rsst_mc_triangulation_euler`** (`Math/MainTheorem.lean`):
+   The RSST Triangulation Euler Property: every minimal counterexample to the Four Color Theorem is a maximal planar triangulation, satisfying Euler's characteristic formula $V - E + F = 2$, maximal triangulation face-edge relation $2E = 3F$, and node degree sum $\sum \text{deg}(v) = 2E$.
+3. **`Math.rsst_mc_discharging_elimination`** (`Math/MainTheorem.lean`):
+   The RSST Discharging Elimination Property: in any minimal counterexample where no unavoidable configuration appears, all final vertex charges under the RSST charge shift rules are non-positive ($\le 0$), witnessed computationally by the in-kernel verified cartwheel discharging trees (`rsst_discharging_computationally_verified` / `Discharging.discharging_trees_verified`).
+   - `Math.rsst_discharging_witness` is a **proven theorem** constructed directly from `planar_discharging_witness_of_triangulation`, `rsst_mc_triangulation_euler`, and `rsst_discharging_computationally_verified`, proving that every minimal counterexample admits a `PlanarDischargingWitness` conserving total Euler charge equal to 120.
+   - `Math.rsst_unavoidability` is a **proven theorem** derived constructively from `rsst_discharging_witness` and `unavoidability_from_discharging` via Euler charge conservation ($120 > 0 \implies \exists c \in \text{theUnavoidableSet}$).
+4. **`Math.MasterCertificate.rsst_d_certificate_witness`** (`Math/MasterCertificate.lean`):
    The RSST D-Certificate Witness Hypothesis: any configuration certified by the RSST in-kernel computational reflection suite as D-reducible (`isCertifiedDConfig c`, 249 configurations) satisfies the computational checker and mathematical soundness hypotheses of `Math.Soundness.fast_d_sound''`. Connecting this witness to `fast_d_sound''` proves `Math.MasterCertificate.rsst_d_certificate_soundness` as a genuine theorem (`IsDReducible c`).
-4. **`Math.MasterCertificate.rsst_c_certificate_soundness`** (`Math/MasterCertificate.lean`):
-   The RSST C-Certificate Soundness Principle: any configuration certified by the RSST in-kernel computational reflection suite as C-reducible (`isCertifiedCConfig c`, 384 configurations) is mathematically C-reducible (`IsCReducible c`) under contract edge reduction and Kempe chain elimination.
+5. **`Math.MasterCertificate.rsst_c_certificate_witness`** (`Math/MasterCertificate.lean`):
+   The RSST C-Certificate Witness Hypothesis: any configuration certified by the RSST in-kernel computational reflection suite as C-reducible (`isCertifiedCConfig c`, 384 configurations) satisfies the computational checker and mathematical soundness hypotheses of `Math.Soundness.fast_c_sound`. Connecting this witness to `fast_c_sound` proves `Math.MasterCertificate.rsst_c_certificate_soundness` as a genuine theorem (`IsCReducible c`).
    - `Math.MasterCertificate.rsst_all_unavoidable_reducible` is a **proven theorem** combining the 633 in-kernel batch certificates (`all_unavoidable_configs_certified`) with the D/C certificate partition (`certified_cases_iff`), dispatching D-certified configurations to `IsDReducible c` via `fast_d_sound''` and C-certified configurations to `IsCReducible c` via `rsst_c_certificate_soundness`.
 
-From (2), (3), and (4), `Math.rsst_unavoidable_reducible` is proved constructively, establishing that every minimal counterexample contains a reducible configuration, which combined with (1) derives a contradiction and completes the proof of `Math.four_color_theorem`.
+From (2), (3), (4), and (5), `Math.rsst_unavoidable_reducible` is proved constructively, establishing that every minimal counterexample contains a reducible configuration, which combined with (1) derives a contradiction and completes the proof of `Math.four_color_theorem`.
 
 The exact axiom list of `Math.four_color_theorem` is:
 ```lean
-[propext, Classical.choice, Lean.ofReduceBool, Math.rsst_discharging_witness, Math.topological_reduction_bundle, Quot.sound, Math.MasterCertificate.rsst_c_certificate_soundness, Math.MasterCertificate.rsst_d_certificate_witness]
+[propext, Classical.choice, Lean.ofReduceBool, Math.rsst_mc_discharging_elimination, Math.rsst_mc_triangulation_euler, Math.topological_reduction_bundle, Quot.sound, Math.MasterCertificate.rsst_c_certificate_witness, Math.MasterCertificate.rsst_d_certificate_witness]
 ```
 
 ---

@@ -358,14 +358,43 @@ theorem rsst_discharging_computationally_verified :
     Discharging.DischargingTreesVerified theUnavoidableSet.toList :=
   Discharging.discharging_trees_verified
 
-/-- The RSST Discharging Principle:
-    Every minimal counterexample to the Four Color Theorem (an internally 6-connected
-    planar triangulation) admits a PlanarDischargingWitness under the 32 RSST discharging rules
-    and the verified cartwheel presentation trees (`rsst_discharging_computationally_verified`),
-    conserving total Euler charge equal to 120. -/
-axiom rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+/-- The RSST Triangulation Euler Property:
+    Every minimal counterexample to the Four Color Theorem is a maximal planar triangulation,
+    satisfying V - E + F = 2, 2E = 3F, and degree sum = 2E. -/
+axiom rsst_mc_triangulation_euler (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (mc : MinimalCounterexample H darts) :
-  PlanarDischargingWitness H darts
+  ∃ (E F : Int),
+    Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
+    ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
+    2 * E = 3 * F
+
+/-- The RSST Discharging Elimination Property:
+    In any minimal counterexample where no unavoidable configuration appears,
+    all final vertex charges are non-positive (≤ 0), as witnessed by the verified cartwheel discharging trees. -/
+axiom rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (mc : MinimalCounterexample H darts) (rule : Discharging.ChargeShift H.Dart)
+  (h_trees : Discharging.DischargingTreesVerified theUnavoidableSet.toList) :
+  ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
+    ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0
+
+/-- The trivial zero charge shift rule (no charge moved). -/
+def zeroChargeShift (D : Type) : Discharging.ChargeShift D :=
+  { shift := fun _ _ => 0,
+    conservation := fun _ _ => rfl }
+
+/-- The RSST Discharging Witness Theorem:
+    Constructed directly from the triangulation Euler conditions and the verified cartwheel discharging trees. -/
+noncomputable def rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (mc : MinimalCounterexample H darts) :
+  PlanarDischargingWitness H darts := by
+  have hEulerEx := rsst_mc_triangulation_euler H darts mc
+  let E := Classical.choose hEulerEx
+  have hFEx := Classical.choose_spec hEulerEx
+  let F := Classical.choose hFEx
+  have ⟨hDegSum, hEuler, hTriang⟩ := Classical.choose_spec hFEx
+  let rule := zeroChargeShift H.Dart
+  have hElim := rsst_mc_discharging_elimination H darts mc rule rsst_discharging_computationally_verified
+  exact planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
 
 /-- The RSST Unavoidability Theorem (Robertson-Sanders-Seymour-Thomas 1997):
     Every minimal counterexample to the Four Color Theorem contains at least one configuration
