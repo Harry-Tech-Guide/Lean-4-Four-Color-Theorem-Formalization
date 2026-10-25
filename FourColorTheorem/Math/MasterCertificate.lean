@@ -12,6 +12,7 @@ import FourColorTheorem.Math.U633Parser
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
+import FourColorTheorem.Math.Soundness.StructuralVerification
 
 namespace Math
 namespace MasterCertificate
@@ -303,54 +304,83 @@ theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnav
     rfl
   rw [h_eq, h_get]
 
+/-- Connection between indexed get on theUnavoidableSet and getElem!. -/
+theorem unavoidable_get_eq_getElem! (idx : Nat) (h_lt : idx < 633) :
+    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet[idx]! := by
+  have h_sz : idx < theUnavoidableSet.size := by
+    rw [unavoidable_size_eq]
+    exact h_lt
+  rw [getElem!_pos theUnavoidableSet idx h_sz]
+  exact (Array.get_eq_getElem theUnavoidableSet ⟨idx, h_sz⟩).symm
+
 /-- RSST D-Certificate Witness Hypothesis:
     A configuration certified as D-reducible by the RSST in-kernel reflection suite
     satisfies the computational checker and mathematical soundness hypotheses:
-    there exist earlier-reduction data, balanced signed matchings, and power-of-3 tables
-    such that checkFast succeeds, the earlier adjacency graph is sound and irreflexive,
-    Lemma (a) representation holds, and the checker eliminates all positive-rank colorings. -/
+    for its canonical index `idx`, with earlier-reduction data `sharedCfgs[idx]!.earlier`,
+    there exist balanced signed matchings and power-of-3 tables such that checkFast succeeds,
+    Lemma (a) representation holds, and the checker eliminates all positive-rank colorings.
+    (Structural earlier-soundness and irreflexivity are verified directly in-kernel by reflection.) -/
 axiom rsst_d_certificate_witness (c : Configuration) :
   isCertifiedDConfig c →
-    ∃ (earlier : Array (Array Nat)) (sms : Array SMData) (pow3 : Array Nat),
-      checkFast (Soundness.rconfOfConfig c earlier) sms pow3 = true ∧
-      Soundness.IsSoundEarlier c earlier ∧
-      Soundness.IsIrreflexiveAdj c ∧
+    ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
+      theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+      checkFast (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) sms pow3 = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧
-      Soundness.IterationEliminationHypothesis c earlier sms pow3
+      Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3
 
 /-- RSST D-Certificate Soundness Theorem:
     A configuration certified as D-reducible is mathematically D-reducible,
-    proved by connecting the certificate witness to the master soundness theorem ast_d_sound''. -/
+    proved by connecting the certificate witness and the in-kernel structural reflection
+    theorems (unavoidable_is_irreflexive and unavoidable_is_sound_earlier) to the
+    master soundness theorem fast_d_sound''. -/
 theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig c) :
     IsDReducible c := by
-  rcases rsst_d_certificate_witness c h with ⟨earlier, sms, pow3, h_check, h_earlier, h_irrefl, h_rep, h_elim⟩
-  exact Soundness.fast_d_sound'' c earlier sms pow3 h_check h_earlier h_irrefl h_rep h_elim
+  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, h_check, h_rep, h_elim⟩
+  have h_c_eq : c = theUnavoidableSet[idx]! := by
+    rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
+  have h_irrefl : Soundness.IsIrreflexiveAdj c := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_irreflexive idx h_lt
+  have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_sound_earlier idx h_lt
+  exact Soundness.fast_d_sound'' c sharedCfgs[idx]!.earlier sms pow3 h_check h_earlier h_irrefl h_rep h_elim
 
 /-- RSST C-Certificate Witness Hypothesis:
     A configuration certified as C-reducible by the RSST in-kernel reflection suite
     satisfies the computational checker and mathematical soundness hypotheses:
-    its contract edge list is non-empty, and there exist earlier-reduction data, balanced signed
-    matchings, and power-of-3 tables such that checkCFast succeeds, the earlier adjacency graph
-    is sound and irreflexive, Lemma (a) representation holds, fixed-point elimination holds,
-    and contract soundness holds. -/
+    its contract edge list is non-empty, and for its canonical index `idx`, with earlier-reduction data
+    `sharedCfgs[idx]!.earlier`, there exist balanced signed matchings and power-of-3 tables such that
+    checkCFast succeeds, Lemma (a) representation holds, fixed-point elimination holds,
+    and contract soundness holds.
+    (Structural earlier-soundness and irreflexivity are verified directly in-kernel by reflection.) -/
 axiom rsst_c_certificate_witness (c : Configuration) :
   isCertifiedCConfig c →
-    ∃ (earlier : Array (Array Nat)) (sms : Array SMData) (pow3 : Array Nat),
+    ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
+      theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
       c.contractEdges ≠ [] ∧
-      checkCFast (Soundness.rconfOfConfig c earlier) sms pow3 = true ∧
-      Soundness.IsSoundEarlier c earlier ∧
-      Soundness.IsIrreflexiveAdj c ∧
+      checkCFast (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) sms pow3 = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧
-      Soundness.IterationEliminationHypothesis c earlier sms pow3 ∧
-      Soundness.ContractSoundness c earlier sms pow3
+      Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3 ∧
+      Soundness.ContractSoundness c sharedCfgs[idx]!.earlier sms pow3
 
 /-- RSST C-Certificate Soundness Theorem:
     A configuration certified as C-reducible is mathematically C-reducible,
-    proved by connecting the certificate witness to the master soundness theorem fast_c_sound. -/
+    proved by connecting the certificate witness and the in-kernel structural reflection
+    theorems (unavoidable_is_irreflexive and unavoidable_is_sound_earlier) to the
+    master soundness theorem fast_c_sound. -/
 theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig c) :
     IsCReducible c := by
-  rcases rsst_c_certificate_witness c h with ⟨earlier, sms, pow3, h_contract, h_check, h_earlier, h_irrefl, h_rep, h_elim, h_csound⟩
-  exact Soundness.fast_c_sound c earlier sms pow3 h_contract h_check h_earlier h_irrefl h_rep h_elim h_csound
+  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, h_contract, h_check, h_rep, h_elim, h_csound⟩
+  have h_c_eq : c = theUnavoidableSet[idx]! := by
+    rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
+  have h_irrefl : Soundness.IsIrreflexiveAdj c := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_irreflexive idx h_lt
+  have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_sound_earlier idx h_lt
+  exact Soundness.fast_c_sound c sharedCfgs[idx]!.earlier sms pow3 h_contract h_check h_earlier h_irrefl h_rep h_elim h_csound
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files

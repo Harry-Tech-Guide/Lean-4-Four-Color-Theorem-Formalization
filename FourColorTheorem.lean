@@ -36,3 +36,4 @@ import FourColorTheorem.Math.Batch.CR13
 import FourColorTheorem.Math.Batch.CR14
 import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
+import FourColorTheorem.Math.Soundness.StructuralVerification
