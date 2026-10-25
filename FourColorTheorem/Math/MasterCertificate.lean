@@ -11,6 +11,7 @@ import FourColorTheorem.Math.Batch.CR14
 import FourColorTheorem.Math.U633Parser
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Soundness.DReduce
+import FourColorTheorem.Math.Soundness.CReduce
 
 namespace Math
 namespace MasterCertificate
@@ -325,11 +326,31 @@ theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig
   rcases rsst_d_certificate_witness c h with ⟨earlier, sms, pow3, h_check, h_earlier, h_irrefl, h_rep, h_elim⟩
   exact Soundness.fast_d_sound'' c earlier sms pow3 h_check h_earlier h_irrefl h_rep h_elim
 
-/-- RSST C-Certificate Soundness Principle:
-    A configuration certified by the RSST in-kernel reflection suite as C-reducible
-    is mathematically C-reducible under contract edge reduction and Kempe chain elimination. -/
-axiom rsst_c_certificate_soundness (c : Configuration) :
-  isCertifiedCConfig c → IsCReducible c
+/-- RSST C-Certificate Witness Hypothesis:
+    A configuration certified as C-reducible by the RSST in-kernel reflection suite
+    satisfies the computational checker and mathematical soundness hypotheses:
+    its contract edge list is non-empty, and there exist earlier-reduction data, balanced signed
+    matchings, and power-of-3 tables such that checkCFast succeeds, the earlier adjacency graph
+    is sound and irreflexive, Lemma (a) representation holds, fixed-point elimination holds,
+    and contract soundness holds. -/
+axiom rsst_c_certificate_witness (c : Configuration) :
+  isCertifiedCConfig c →
+    ∃ (earlier : Array (Array Nat)) (sms : Array SMData) (pow3 : Array Nat),
+      c.contractEdges ≠ [] ∧
+      checkCFast (Soundness.rconfOfConfig c earlier) sms pow3 = true ∧
+      Soundness.IsSoundEarlier c earlier ∧
+      Soundness.IsIrreflexiveAdj c ∧
+      Soundness.FullRepresentationHypothesis c sms pow3 ∧
+      Soundness.IterationEliminationHypothesis c earlier sms pow3 ∧
+      Soundness.ContractSoundness c earlier sms pow3
+
+/-- RSST C-Certificate Soundness Theorem:
+    A configuration certified as C-reducible is mathematically C-reducible,
+    proved by connecting the certificate witness to the master soundness theorem fast_c_sound. -/
+theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig c) :
+    IsCReducible c := by
+  rcases rsst_c_certificate_witness c h with ⟨earlier, sms, pow3, h_contract, h_check, h_earlier, h_irrefl, h_rep, h_elim, h_csound⟩
+  exact Soundness.fast_c_sound c earlier sms pow3 h_contract h_check h_earlier h_irrefl h_rep h_elim h_csound
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files
