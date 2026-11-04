@@ -230,6 +230,29 @@ def eraseAllDarts {D : Type} [BEq D] : List D → List D → List D
   | darts, [] => darts
   | darts, d :: ds => eraseAllDarts (darts.erase d) ds
 
+/-- Erasing a list of darts preserves the `Nodup` (duplicate-free) invariant. -/
+theorem eraseAllDarts_nodup {D : Type} [BEq D] [LawfulBEq D] (darts : List D) (excised : List D)
+    (h_nodup : darts.Nodup) :
+    (eraseAllDarts darts excised).Nodup := by
+  induction excised generalizing darts with
+  | nil => exact h_nodup
+  | cons d ds ih =>
+    dsimp [eraseAllDarts]
+    exact ih (darts.erase d) (h_nodup.erase d)
+
+/-- Any dart in `darts` that is not in `excised` remains in `eraseAllDarts darts excised`. -/
+theorem mem_eraseAllDarts_of_not_mem {D : Type} [BEq D] [LawfulBEq D] (darts : List D) (excised : List D) (x : D)
+    (hx_in : x ∈ darts) (hx_not : x ∉ excised) :
+    x ∈ eraseAllDarts darts excised := by
+  induction excised generalizing darts with
+  | nil => exact hx_in
+  | cons d ds ih =>
+    dsimp [eraseAllDarts]
+    have h_ne : x ≠ d := fun h => hx_not (by subst h; exact List.Mem.head ds)
+    have h_not_ds : x ∉ ds := fun h => hx_not (List.Mem.tail d h)
+    have hx_in_erase : x ∈ darts.erase d := (List.mem_erase_of_ne h_ne).mpr hx_in
+    exact ih (darts.erase d) hx_in_erase h_not_ds
+
 /-- Erasing darts can only decrease or preserve list length. -/
 theorem eraseAllDarts_length_le {D : Type} [BEq D] (darts : List D) (excised : List D) :
     (eraseAllDarts darts excised).length ≤ darts.length := by

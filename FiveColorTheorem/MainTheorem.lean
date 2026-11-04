@@ -89,8 +89,8 @@ theorem kempeSwap_independent {V : Type} [DecidableEq V] (G : Graph V) (c : V �
 /-- The Main Five Color Theorem Principle:
 Every combinatorially planar graph admits a valid 5-coloring.
 (Induction principle on the vertex count of combinatorially planar graphs). -/
-axiom five_color_theorem_size (n : Nat) :
-  ∀ {V : Type} [DecidableEq V] (G : Graph V),
+def FiveColorInductionPrinciple : Prop :=
+  ∀ (n : Nat) {V : Type} [DecidableEq V] (G : Graph V),
     G.vertices.length = n →
     CombinatoriallyPlanar G →
     ∃ c, ValidColoring G c
@@ -98,8 +98,8 @@ axiom five_color_theorem_size (n : Nat) :
 /-- The Five Color Theorem:
 Every combinatorially planar graph admits a valid 5-coloring. -/
 theorem five_color_theorem {V : Type} [DecidableEq V] (G : Graph V)
+    (h_ind : FiveColorInductionPrinciple)
     (hPlanar : CombinatoriallyPlanar G) : ∃ c, ValidColoring G c :=
-  five_color_theorem_size G.vertices.length G rfl hPlanar
+  h_ind G.vertices.length G rfl hPlanar
 
 end Math
-

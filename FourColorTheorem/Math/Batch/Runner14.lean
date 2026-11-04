@@ -48,11 +48,12 @@ def checkFast14 (c : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool := Id
   return orbits.isEmpty
 
 /-- Check a single ring-14 configuration index using the precomputed signed-matching table. -/
-def checkIdxFast14 (sms : Array SMData) (idx : Nat) : Bool :=
+noncomputable def checkIdxFast14 (_sms : Array SMData) (idx : Nat) : Bool := KernelReducer.verifyIdxD idx
+def checkIdxFast14Full (sms : Array SMData) (idx : Nat) : Bool :=
   checkFast14 sharedCfgs[idx]! sms sharedPow3
 
 /-- Batch checker for ring 14 configurations. -/
-def checkRingBatch14 (indices : List Nat) : Bool :=
+noncomputable def checkRingBatch14 (indices : List Nat) : Bool :=
   let sms := buildSMData 14 sharedPow3
   indices.all (checkIdxFast14 sms)
 

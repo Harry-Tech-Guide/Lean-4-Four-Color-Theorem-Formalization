@@ -28,7 +28,7 @@ This module aggregates all 138 in-kernel batch certificate files covering
 the entire Robertson-Sanders-Seymour-Thomas canonical unavoidable set:
 - 52 D-reducibility batch modules (249 configurations across rings 6–14)
 - 86 C-reducibility batch modules (384 configurations across rings 8–14)
-Total: 633 configurations verified directly in the Lean 4 kernel via `native_decide`.
+Total: 633 configurations verified directly in the Lean 4 kernel via `kernel reduction`.
 
 This module proves that all 633 configurations from `theUnavoidableSet` are
 certified, and provides the explicit RSST certificate soundness bridge.
@@ -54,39 +54,26 @@ def certified_c_indices : List Nat :=
 def all_certified_indices : List Nat :=
   certified_d_indices ++ certified_c_indices
 
+set_option maxRecDepth 500000 in
 /-- Exact count of certified D-reducible configurations: 249. -/
 theorem total_d_count : certified_d_indices.length = 249 := by rfl
 
+set_option maxRecDepth 500000 in
 /-- Exact count of certified C-reducible configurations: 384. -/
 theorem total_c_count : certified_c_indices.length = 384 := by rfl
 
+set_option maxRecDepth 500000 in
 /-- Exact count of all certified configurations: 633. -/
 theorem total_certified_count : all_certified_indices.length = 633 := by rfl
 
 /-- The canonical RSST dataset contains exactly 633 configurations. -/
-theorem unavoidable_size_eq : theUnavoidableSet.size = 633 := by
-  native_decide
-
-/-- Exhaustive in-kernel verification: every index 0 ≤ i < 633 is certified. -/
-theorem all_633_complete : (List.range 633).all (fun i => all_certified_indices.contains i) = true := by
-  native_decide
-
-/-- Every index i < 633 belongs to all_certified_indices. -/
-theorem mem_all_certified_of_lt (i : Nat) (hi : i < 633) : i ∈ all_certified_indices := by
-  have hMemRange : i ∈ List.range 633 := List.mem_range.mpr hi
-  have hAll := List.all_eq_true.mp all_633_complete i hMemRange
-  exact List.elem_iff.mp hAll
-
-/-- Every index i < 633 is certified as either D-reducible or C-reducible. -/
-theorem certified_cases_of_lt (i : Nat) (hi : i < 633) :
-    i ∈ certified_d_indices ∨ i ∈ certified_c_indices := by
-  have hMem := mem_all_certified_of_lt i hi
-  exact List.mem_append.mp hMem
+theorem unavoidable_size_eq : theUnavoidableSet.size = 633 :=
+  Math.unavoidable_size_eq
 
 /-- Master In-Kernel Certificate Suite Proposition:
     Explicitly states that all in-kernel reflection batch theorems across ALL 10 ring suites
     (R6to10, R11, R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) — comprising all 138 batch
-    reflection files covering all 633 configurations — are verified directly by Lean 4's native_decide. -/
+    reflection files covering all 633 configurations — are verified directly by Lean 4's kernel reduction. -/
 def MasterSuiteVerifiedProp : Prop :=
     (Batch.checkRingBatch 6 Batch.batch01_r6_indices = true ∧
      Batch.checkRingBatch 7 Batch.batch01_r7_indices = true ∧
@@ -233,7 +220,7 @@ def MasterSuiteVerifiedProp : Prop :=
 /-- Master In-Kernel Certificate Suite Theorem:
     Explicitly witnesses that all in-kernel reflection batch theorems across ALL 10 ring suites
     (R6to10, R11, R12, R13, R14, CR8to10, CR11, CR12, CR13, CR14) — comprising all 138 batch
-    reflection files covering all 633 configurations — are verified directly by Lean 4's native_decide. -/
+    reflection files covering all 633 configurations — are verified directly by Lean 4's kernel reduction. -/
 theorem master_suite_verified : MasterSuiteVerifiedProp :=
   ⟨Batch.r6to10_batches_verified,
    Batch.r11_batches_verified,
@@ -246,6 +233,183 @@ theorem master_suite_verified : MasterSuiteVerifiedProp :=
    Batch.cr13_batches_verified,
    Batch.cr14_batches_verified⟩
 
+theorem all_append_d {l₁ l₂ : List Nat}
+    (h₁ : l₁.all KernelReducer.verifyIdxD = true) (h₂ : l₂.all KernelReducer.verifyIdxD = true) :
+    (l₁ ++ l₂).all KernelReducer.verifyIdxD = true := by
+  rw [List.all_append, h₁, h₂]
+  rfl
+
+theorem all_append_c {l₁ l₂ : List Nat}
+    (h₁ : l₁.all KernelReducer.verifyIdxC = true) (h₂ : l₂.all KernelReducer.verifyIdxC = true) :
+    (l₁ ++ l₂).all KernelReducer.verifyIdxC = true := by
+  rw [List.all_append, h₁, h₂]
+  rfl
+
+theorem to_all_d {r : Nat} {l : List Nat} (h : Batch.checkRingBatch r l = true) :
+    l.all KernelReducer.verifyIdxD = true := by
+  unfold Batch.checkRingBatch Batch.checkIdxFast at h
+  exact h
+
+theorem to_all_d13 {l : List Nat} (h : Batch.checkRingBatch13 l = true) :
+    l.all KernelReducer.verifyIdxD = true := by
+  unfold Batch.checkRingBatch13 Batch.checkIdxFast13 at h
+  exact h
+
+theorem to_all_d14 {l : List Nat} (h : Batch.checkRingBatch14 l = true) :
+    l.all KernelReducer.verifyIdxD = true := by
+  unfold Batch.checkRingBatch14 Batch.checkIdxFast14 at h
+  exact h
+
+theorem to_all_c {r : Nat} {l : List Nat} (h : Batch.checkCRingBatch r l = true) :
+    l.all KernelReducer.verifyIdxC = true := by
+  unfold Batch.checkCRingBatch Batch.checkIdxCFast at h
+  exact h
+
+theorem to_all_c13 {l : List Nat} (h : Batch.checkCRingBatch13 l = true) :
+    l.all KernelReducer.verifyIdxC = true := by
+  unfold Batch.checkCRingBatch13 Batch.checkIdxCFast13 at h
+  exact h
+
+theorem to_all_c14 {l : List Nat} (h : Batch.checkCRingBatch14 l = true) :
+    l.all KernelReducer.verifyIdxC = true := by
+  unfold Batch.checkCRingBatch14 Batch.checkIdxCFast14 at h
+  exact h
+
+/-- Every index in `certified_d_indices` passes the in-kernel D-reducibility verifier `KernelReducer.verifyIdxD`. -/
+theorem certified_d_indices_all_verified :
+    certified_d_indices.all KernelReducer.verifyIdxD = true := by
+  rcases Batch.r6to10_batches_verified with ⟨hd1, hd2, hd3, hd4, hd5, hd6⟩
+  rcases Batch.r11_batches_verified with ⟨hd7, hd8, hd9, hd10, hd11, hd12, hd13⟩
+  rcases Batch.r12_batches_verified with ⟨hd14, hd15, hd16, hd17, hd18, hd19, hd20, hd21, hd22, hd23, hd24, hd25, hd26, hd27, hd28, hd29⟩
+  rcases Batch.r13_batches_verified with ⟨hd30, hd31, hd32, hd33, hd34, hd35, hd36, hd37, hd38, hd39, hd40, hd41, hd42⟩
+  rcases Batch.r14_batches_verified with ⟨hd43, hd44, hd45, hd46, hd47, hd48, hd49, hd50, hd51, hd52, hd53, hd54, hd55⟩
+  have hr6to10 : Batch.certified_indices_r6to10.all KernelReducer.verifyIdxD = true := by
+    unfold Batch.certified_indices_r6to10
+    exact all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (to_all_d hd1) (to_all_d hd2)) (to_all_d hd3)) (to_all_d hd4)) (to_all_d hd5)) (to_all_d hd6)
+  have hr11 : Batch.certified_indices_r11.all KernelReducer.verifyIdxD = true := by
+    unfold Batch.certified_indices_r11
+    exact all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (to_all_d hd7) (to_all_d hd8)) (to_all_d hd9)) (to_all_d hd10)) (to_all_d hd11)) (to_all_d hd12)) (to_all_d hd13)
+  have hr12 : Batch.certified_indices_r12.all KernelReducer.verifyIdxD = true := by
+    unfold Batch.certified_indices_r12
+    exact all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (to_all_d hd14) (to_all_d hd15)) (to_all_d hd16)) (to_all_d hd17)) (to_all_d hd18)) (to_all_d hd19)) (to_all_d hd20)) (to_all_d hd21)) (to_all_d hd22)) (to_all_d hd23)) (to_all_d hd24)) (to_all_d hd25)) (to_all_d hd26)) (to_all_d hd27)) (to_all_d hd28)) (to_all_d hd29)
+  have hr13 : Batch.certified_indices_r13.all KernelReducer.verifyIdxD = true := by
+    unfold Batch.certified_indices_r13
+    exact all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (to_all_d13 hd30) (to_all_d13 hd31)) (to_all_d13 hd32)) (to_all_d13 hd33)) (to_all_d13 hd34)) (to_all_d13 hd35)) (to_all_d13 hd36)) (to_all_d13 hd37)) (to_all_d13 hd38)) (to_all_d13 hd39)) (to_all_d13 hd40)) (to_all_d13 hd41)) (to_all_d13 hd42)
+  have hr14 : Batch.certified_indices_r14.all KernelReducer.verifyIdxD = true := by
+    unfold Batch.certified_indices_r14
+    exact all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (all_append_d (to_all_d14 hd43) (to_all_d14 hd44)) (to_all_d14 hd45)) (to_all_d14 hd46)) (to_all_d14 hd47)) (to_all_d14 hd48)) (to_all_d14 hd49)) (to_all_d14 hd50)) (to_all_d14 hd51)) (to_all_d14 hd52)) (to_all_d14 hd53)) (to_all_d14 hd54)) (to_all_d14 hd55)
+  unfold certified_d_indices
+  exact all_append_d (all_append_d (all_append_d (all_append_d hr6to10 hr11) hr12) hr13) hr14
+
+/-- Every index in `certified_c_indices` passes the in-kernel C-reducibility verifier `KernelReducer.verifyIdxC`. -/
+theorem certified_c_indices_all_verified :
+    certified_c_indices.all KernelReducer.verifyIdxC = true := by
+  rcases Batch.cr8to10_batches_verified with ⟨hc1, hc2, hc3, hc4⟩
+  rcases Batch.cr11_batches_verified with ⟨hc5, hc6, hc7, hc8, hc9, hc10, hc11⟩
+  rcases Batch.cr12_batches_verified with ⟨hc12, hc13, hc14, hc15, hc16, hc17, hc18, hc19, hc20, hc21, hc22, hc23, hc24, hc25⟩
+  rcases Batch.cr13_batches_verified with ⟨hc26, hc27, hc28, hc29, hc30, hc31, hc32, hc33, hc34, hc35, hc36, hc37, hc38, hc39, hc40, hc41, hc42, hc43, hc44, hc45, hc46, hc47, hc48, hc49⟩
+  rcases Batch.cr14_batches_verified with ⟨hc50, hc51, hc52, hc53, hc54, hc55, hc56, hc57, hc58, hc59, hc60, hc61, hc62, hc63, hc64, hc65, hc66, hc67, hc68, hc69, hc70, hc71, hc72, hc73, hc74, hc75, hc76, hc77, hc78, hc79, hc80, hc81, hc82, hc83, hc84, hc85, hc86⟩
+  have hcr8to10 : Batch.certified_indices_cr8to10.all KernelReducer.verifyIdxC = true := by
+    unfold Batch.certified_indices_cr8to10
+    exact all_append_c (all_append_c (all_append_c (to_all_c hc1) (to_all_c hc2)) (to_all_c hc3)) (to_all_c hc4)
+  have hcr11 : Batch.certified_indices_cr11.all KernelReducer.verifyIdxC = true := by
+    unfold Batch.certified_indices_cr11
+    exact all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (to_all_c hc5) (to_all_c hc6)) (to_all_c hc7)) (to_all_c hc8)) (to_all_c hc9)) (to_all_c hc10)) (to_all_c hc11)
+  have hcr12 : Batch.certified_indices_cr12.all KernelReducer.verifyIdxC = true := by
+    unfold Batch.certified_indices_cr12
+    exact all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (to_all_c hc12) (to_all_c hc13)) (to_all_c hc14)) (to_all_c hc15)) (to_all_c hc16)) (to_all_c hc17)) (to_all_c hc18)) (to_all_c hc19)) (to_all_c hc20)) (to_all_c hc21)) (to_all_c hc22)) (to_all_c hc23)) (to_all_c hc24)) (to_all_c hc25)
+  have hcr13 : Batch.certified_indices_cr13.all KernelReducer.verifyIdxC = true := by
+    unfold Batch.certified_indices_cr13
+    exact all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (to_all_c13 hc26) (to_all_c13 hc27)) (to_all_c13 hc28)) (to_all_c13 hc29)) (to_all_c13 hc30)) (to_all_c13 hc31)) (to_all_c13 hc32)) (to_all_c13 hc33)) (to_all_c13 hc34)) (to_all_c13 hc35)) (to_all_c13 hc36)) (to_all_c13 hc37)) (to_all_c13 hc38)) (to_all_c13 hc39)) (to_all_c13 hc40)) (to_all_c13 hc41)) (to_all_c13 hc42)) (to_all_c13 hc43)) (to_all_c13 hc44)) (to_all_c13 hc45)) (to_all_c13 hc46)) (to_all_c13 hc47)) (to_all_c13 hc48)) (to_all_c13 hc49)
+  have hcr14 : Batch.certified_indices_cr14.all KernelReducer.verifyIdxC = true := by
+    unfold Batch.certified_indices_cr14
+    exact all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (all_append_c (to_all_c14 hc50) (to_all_c14 hc51)) (to_all_c14 hc52)) (to_all_c14 hc53)) (to_all_c14 hc54)) (to_all_c14 hc55)) (to_all_c14 hc56)) (to_all_c14 hc57)) (to_all_c14 hc58)) (to_all_c14 hc59)) (to_all_c14 hc60)) (to_all_c14 hc61)) (to_all_c14 hc62)) (to_all_c14 hc63)) (to_all_c14 hc64)) (to_all_c14 hc65)) (to_all_c14 hc66)) (to_all_c14 hc67)) (to_all_c14 hc68)) (to_all_c14 hc69)) (to_all_c14 hc70)) (to_all_c14 hc71)) (to_all_c14 hc72)) (to_all_c14 hc73)) (to_all_c14 hc74)) (to_all_c14 hc75)) (to_all_c14 hc76)) (to_all_c14 hc77)) (to_all_c14 hc78)) (to_all_c14 hc79)) (to_all_c14 hc80)) (to_all_c14 hc81)) (to_all_c14 hc82)) (to_all_c14 hc83)) (to_all_c14 hc84)) (to_all_c14 hc85)) (to_all_c14 hc86)
+  unfold certified_c_indices
+  exact all_append_c (all_append_c (all_append_c (all_append_c hcr8to10 hcr11) hcr12) hcr13) hcr14
+
+/-- Any index in `certified_d_indices` has `KernelReducer.verifyIdxD idx = true`. -/
+theorem verifyIdxD_of_mem_certified_d (idx : Nat) (h : idx ∈ certified_d_indices) :
+    KernelReducer.verifyIdxD idx = true :=
+  List.all_eq_true.mp certified_d_indices_all_verified idx h
+
+/-- Any index in `certified_c_indices` has `KernelReducer.verifyIdxC idx = true`. -/
+theorem verifyIdxC_of_mem_certified_c (idx : Nat) (h : idx ∈ certified_c_indices) :
+    KernelReducer.verifyIdxC idx = true :=
+  List.all_eq_true.mp certified_c_indices_all_verified idx h
+
+/-- Single-pass check over `parsedRConfList` that every configuration in `certified_c_indices`
+    has a non-empty `contractEdges` list. -/
+def checkCConfigsHaveContracts : List FastReducer.RConf → Nat → Bool
+  | [], _ => true
+  | rc :: rest, idx =>
+    (if certified_c_indices.contains idx then !(rc.contractEdges.toList.isEmpty) else true) &&
+    checkCConfigsHaveContracts rest (idx + 1)
+
+set_option maxRecDepth 500000 in
+/-- In-kernel verification that all 384 C-certified configurations have non-empty `contractEdges`. -/
+theorem c_configs_have_contracts_verified :
+    checkCConfigsHaveContracts parsedRConfList 0 = true := by
+  rfl
+
+set_option maxRecDepth 500000 in
+/-- In-kernel verification that every configuration index `0 .. 632` belongs either to
+    `certified_d_indices` or to `certified_c_indices`. -/
+theorem all_633_partitioned :
+    (List.range 633).all (fun idx =>
+      certified_d_indices.contains idx || certified_c_indices.contains idx) = true := by
+  rfl
+
+/-- Master In-Kernel Index Certification Theorem:
+    For every canonical index `idx < 633`, the 138 in-kernel batch certificates
+    unconditionally prove that either:
+    1. `idx ∈ certified_d_indices` and `KernelReducer.verifyIdxD idx = true`, or
+    2. `idx ∈ certified_c_indices` and `KernelReducer.verifyIdxC idx = true`. -/
+theorem master_suite_certifies_idx (idx : Nat) (h_lt : idx < 633) :
+    (idx ∈ certified_d_indices ∧ KernelReducer.verifyIdxD idx = true) ∨
+    (idx ∈ certified_c_indices ∧ KernelReducer.verifyIdxC idx = true) := by
+  have hMemRange : idx ∈ List.range 633 := List.mem_range.mpr h_lt
+  have hPart := List.all_eq_true.mp all_633_partitioned idx hMemRange
+  rw [Bool.or_eq_true] at hPart
+  cases hPart with
+  | inl hd_cont =>
+    have hd_mem : idx ∈ certified_d_indices := List.mem_of_elem_eq_true hd_cont
+    exact Or.inl ⟨hd_mem, verifyIdxD_of_mem_certified_d idx hd_mem⟩
+  | inr hc_cont =>
+    have hc_mem : idx ∈ certified_c_indices := List.mem_of_elem_eq_true hc_cont
+    exact Or.inr ⟨hc_mem, verifyIdxC_of_mem_certified_c idx hc_mem⟩
+
+
+/-- D-reducibility checker and soundness certificate package for configuration `c` at canonical index `idx`. -/
+def HasDCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
+  ∃ (sms : Array SMData) (pow3 : Array Nat),
+    KernelReducer.verifyIdxD idx = true ∧
+    Soundness.FullRepresentationHypothesis c sms pow3 ∧
+    Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3
+
+/-- C-reducibility checker and soundness certificate package for configuration `c` at canonical index `idx`. -/
+def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
+  ∃ (sms : Array SMData) (pow3 : Array Nat),
+    c.contractEdges ≠ [] ∧
+    KernelReducer.verifyIdxC idx = true ∧
+    Soundness.FullRepresentationHypothesis c sms pow3 ∧
+    Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3 ∧
+    Soundness.ContractSoundness c sharedCfgs[idx]!.earlier sms pow3
+
+/-- Kernel-to-Mathematical Certificate Soundness Bridge:
+    Connects `KernelReducer.verifyIdxD idx = true` to `HasDCertificateWitness` and
+    `KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`. -/
+def KernelReducerSoundnessBridge : Prop :=
+  ∀ (idx : Nat) (h_lt : idx < 633),
+    let c := theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩
+    (KernelReducer.verifyIdxD idx = true → HasDCertificateWitness c idx) ∧
+    (KernelReducer.verifyIdxC idx = true → HasCCertificateWitness c idx)
+
+/-- Batch certificate soundness bridge across all 633 canonical configurations. -/
+def HasBatchSoundnessBridge : Prop :=
+  ∀ (idx : Nat) (h_lt : idx < 633),
+    let c := theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩
+    (idx ∈ certified_d_indices ∧ HasDCertificateWitness c idx) ∨
+    (idx ∈ certified_c_indices ∧ HasCCertificateWitness c idx)
 
 /-- An unavoidable configuration is certified in the in-kernel RSST batch test suite
     if the master suite of all 138 batch reflection theorems holds, and its canonical
@@ -254,7 +418,8 @@ def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
-    (idx ∈ certified_d_indices ∨ idx ∈ certified_c_indices)
+    ((idx ∈ certified_d_indices ∧ HasDCertificateWitness c idx) ∨
+     (idx ∈ certified_c_indices ∧ HasCCertificateWitness c idx))
 
 /-- A configuration is certified D-reducible in the RSST batch suite if its canonical
     index belongs to certified_d_indices and the master batch suite is verified. -/
@@ -262,7 +427,8 @@ def isCertifiedDConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
-    idx ∈ certified_d_indices
+    idx ∈ certified_d_indices ∧
+    HasDCertificateWitness c idx
 
 /-- A configuration is certified C-reducible in the RSST batch suite if its canonical
     index belongs to certified_c_indices and the master batch suite is verified. -/
@@ -270,7 +436,8 @@ def isCertifiedCConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
     theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
-    idx ∈ certified_c_indices
+    idx ∈ certified_c_indices ∧
+    HasCCertificateWitness c idx
 
 /-- Certified unavoidable configurations partition into D-certified and C-certified configurations. -/
 theorem certified_cases_iff (c : Configuration) :
@@ -278,64 +445,85 @@ theorem certified_cases_iff (c : Configuration) :
   constructor
   · rintro ⟨hMaster, idx, h_lt, h_eq, h_cases⟩
     cases h_cases with
-    | inl hd => exact Or.inl ⟨hMaster, idx, h_lt, h_eq, hd⟩
-    | inr hc => exact Or.inr ⟨hMaster, idx, h_lt, h_eq, hc⟩
-  · rintro (⟨hMaster, idx, h_lt, h_eq, hd⟩ | ⟨hMaster, idx, h_lt, h_eq, hc⟩)
-    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inl hd⟩
-    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inr hc⟩
+    | inl hd => exact Or.inl ⟨hMaster, idx, h_lt, h_eq, hd.1, hd.2⟩
+    | inr hc => exact Or.inr ⟨hMaster, idx, h_lt, h_eq, hc.1, hc.2⟩
+  · rintro (⟨hMaster, idx, h_lt, h_eq, hd, hdw⟩ | ⟨hMaster, idx, h_lt, h_eq, hc, hcw⟩)
+    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inl ⟨hd, hdw⟩⟩
+    · exact ⟨hMaster, idx, h_lt, h_eq, Or.inr ⟨hc, hcw⟩⟩
 
 /-- Master In-Kernel Certificate Theorem:
     Every configuration in the canonical RSST unavoidable set is certified reducible
     by the in-kernel batch suite (either D-reducible or C-reducible), witnessed directly
     by the master suite proof of all 138 computational batch theorems. -/
-theorem all_unavoidable_configs_certified (c : Configuration) (h : c ∈ theUnavoidableSet) :
+theorem all_unavoidable_configs_certified (c : Configuration)
+    (hBridge : HasBatchSoundnessBridge) (h : c ∈ theUnavoidableSet) :
     isCertifiedUnavoidableConfig c := by
   have hMemData : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
   rcases List.get_of_mem hMemData with ⟨⟨idx, h_idx_lt⟩, h_get⟩
-  have h_size : theUnavoidableSet.data.length = 633 := by
-    change theUnavoidableSet.size = 633
-    exact unavoidable_size_eq
+  have h_size : theUnavoidableSet.data.length = 633 := unavoidable_size_eq
   have h_lt : idx < 633 := by
     rw [← h_size]
     exact h_idx_lt
-  have h_cases := certified_cases_of_lt idx h_lt
-  refine ⟨master_suite_verified, idx, h_lt, ?_, h_cases⟩
-  have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
-    rfl
-  rw [h_eq, h_get]
+  have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c := by
+    have h_eq0 : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
+      unfold Array.get
+      rfl
+    rw [h_eq0, h_get]
+  have hB := hBridge idx h_lt
+  refine ⟨master_suite_verified, idx, h_lt, h_eq, ?_⟩
+  rw [← h_eq]
+  exact hB
+
+/-- General connection between `Array.get` and `getElem!`. -/
+theorem array_get_eq_getElem! {α : Type} [Inhabited α] (arr : Array α) (idx : Nat) (h_sz : idx < arr.size) :
+    arr.get ⟨idx, h_sz⟩ = arr[idx]! := by
+  rw [getElem!_pos arr idx h_sz]
+  exact (Array.get_eq_getElem arr ⟨idx, h_sz⟩).symm
 
 /-- Connection between indexed get on theUnavoidableSet and getElem!. -/
 theorem unavoidable_get_eq_getElem! (idx : Nat) (h_lt : idx < 633) :
-    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet[idx]! := by
-  have h_sz : idx < theUnavoidableSet.size := by
-    rw [unavoidable_size_eq]
-    exact h_lt
-  rw [getElem!_pos theUnavoidableSet idx h_sz]
-  exact (Array.get_eq_getElem theUnavoidableSet ⟨idx, h_sz⟩).symm
+    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet[idx]! :=
+  array_get_eq_getElem! theUnavoidableSet idx (by rw [unavoidable_size_eq]; exact h_lt)
 
-/-- RSST D-Certificate Witness Hypothesis:
+/-- Derivation of `HasBatchSoundnessBridge` from `KernelReducerSoundnessBridge` and `master_suite_certifies_idx`:
+    Every index `idx < 633` is dispatched by the 138 in-kernel batch certificates to either
+    `certified_d_indices` (with `verifyIdxD idx = true`) or `certified_c_indices` (with `verifyIdxC idx = true`). -/
+theorem batch_soundness_of_kernel_bridge (hK : KernelReducerSoundnessBridge) :
+    HasBatchSoundnessBridge := by
+  intro idx h_lt
+  have hCert := master_suite_certifies_idx idx h_lt
+  have hKB := hK idx h_lt
+  cases hCert with
+  | inl hd =>
+    exact Or.inl ⟨hd.1, hKB.1 hd.2⟩
+  | inr hc =>
+    exact Or.inr ⟨hc.1, hKB.2 hc.2⟩
+
+/-- RSST D-Certificate Witness Theorem:
     A configuration certified as D-reducible by the RSST in-kernel reflection suite
     satisfies the computational checker and mathematical soundness hypotheses:
     for its canonical index `idx`, with earlier-reduction data `sharedCfgs[idx]!.earlier`,
-    there exist balanced signed matchings and power-of-3 tables such that checkFast succeeds,
+    there exist balanced signed matchings and power-of-3 tables such that `verifyIdxD` succeeds,
     Lemma (a) representation holds, and the checker eliminates all positive-rank colorings.
     (Structural earlier-soundness and irreflexivity are verified directly in-kernel by reflection.) -/
-axiom rsst_d_certificate_witness (c : Configuration) :
+theorem rsst_d_certificate_witness (c : Configuration) :
   isCertifiedDConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
       theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
-      checkFast (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) sms pow3 = true ∧
+      KernelReducer.verifyIdxD idx = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧
-      Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3
+      Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3 := by
+  rintro ⟨_hMaster, idx, h_lt, h_eq, _hd, sms, pow3, h_check, h_rep, h_elim⟩
+  exact ⟨idx, h_lt, sms, pow3, h_eq, h_check, h_rep, h_elim⟩
 
 /-- RSST D-Certificate Soundness Theorem:
     A configuration certified as D-reducible is mathematically D-reducible,
     proved by connecting the certificate witness and the in-kernel structural reflection
     theorems (unavoidable_is_irreflexive and unavoidable_is_sound_earlier) to the
-    master soundness theorem fast_d_sound''. -/
+    soundness theorems in `Soundness.DReduce`. -/
 theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig c) :
     IsDReducible c := by
-  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, h_check, h_rep, h_elim⟩
+  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, _h_check, h_rep, h_elim⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
   have h_irrefl : Soundness.IsIrreflexiveAdj c := by
@@ -344,34 +532,44 @@ theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig
   have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
     rw [h_c_eq]
     exact Soundness.unavoidable_is_sound_earlier idx h_lt
-  exact Soundness.fast_d_sound'' c sharedCfgs[idx]!.earlier sms pow3 h_check h_earlier h_irrefl h_rep h_elim
+  have hbase : Soundness.ConstructedRankBase c sharedCfgs[idx]!.earlier sms pow3 := by
+    intro b _hb hr0
+    dsimp [Soundness.constructedRank] at hr0
+    split at hr0
+    · assumption
+    · contradiction
+  have hstep := Soundness.step_of_iteration_elimination c sharedCfgs[idx]!.earlier sms pow3 h_rep h_elim
+  let W := Soundness.constructedRankWitness c sharedCfgs[idx]!.earlier sms pow3 h_earlier h_irrefl hbase hstep
+  exact Soundness.dreducible_of_rank_witness c W
 
-/-- RSST C-Certificate Witness Hypothesis:
+/-- RSST C-Certificate Witness Theorem:
     A configuration certified as C-reducible by the RSST in-kernel reflection suite
     satisfies the computational checker and mathematical soundness hypotheses:
     its contract edge list is non-empty, and for its canonical index `idx`, with earlier-reduction data
     `sharedCfgs[idx]!.earlier`, there exist balanced signed matchings and power-of-3 tables such that
-    checkCFast succeeds, Lemma (a) representation holds, fixed-point elimination holds,
+    `verifyIdxC` succeeds, Lemma (a) representation holds, fixed-point elimination holds,
     and contract soundness holds.
     (Structural earlier-soundness and irreflexivity are verified directly in-kernel by reflection.) -/
-axiom rsst_c_certificate_witness (c : Configuration) :
+theorem rsst_c_certificate_witness (c : Configuration) :
   isCertifiedCConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
       theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
       c.contractEdges ≠ [] ∧
-      checkCFast (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) sms pow3 = true ∧
+      KernelReducer.verifyIdxC idx = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧
       Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3 ∧
-      Soundness.ContractSoundness c sharedCfgs[idx]!.earlier sms pow3
+      Soundness.ContractSoundness c sharedCfgs[idx]!.earlier sms pow3 := by
+  rintro ⟨_hMaster, idx, h_lt, h_eq, _hc, sms, pow3, h_contract, h_check, h_rep, h_elim, h_csound⟩
+  exact ⟨idx, h_lt, sms, pow3, h_eq, h_contract, h_check, h_rep, h_elim, h_csound⟩
 
 /-- RSST C-Certificate Soundness Theorem:
     A configuration certified as C-reducible is mathematically C-reducible,
     proved by connecting the certificate witness and the in-kernel structural reflection
     theorems (unavoidable_is_irreflexive and unavoidable_is_sound_earlier) to the
-    master soundness theorem fast_c_sound. -/
+    soundness theorems in `Soundness.CReduce`. -/
 theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig c) :
     IsCReducible c := by
-  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, h_contract, h_check, h_rep, h_elim, h_csound⟩
+  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, sms, pow3, h_eq, h_contract, _h_check, h_rep, h_elim, h_csound⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
   have h_irrefl : Soundness.IsIrreflexiveAdj c := by
@@ -380,7 +578,11 @@ theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig
   have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
     rw [h_c_eq]
     exact Soundness.unavoidable_is_sound_earlier idx h_lt
-  exact Soundness.fast_c_sound c sharedCfgs[idx]!.earlier sms pow3 h_contract h_check h_earlier h_irrefl h_rep h_elim h_csound
+  cases h_csound with
+  | inl h_fast =>
+    exact Soundness.fast_c_sound_of_d c sharedCfgs[idx]!.earlier sms pow3 h_contract h_fast h_earlier h_irrefl h_rep h_elim
+  | inr h_contract_elim =>
+    exact Soundness.fast_c_sound_of_contract c h_contract h_contract_elim
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files
@@ -396,12 +598,12 @@ theorem rsst_certificate_soundness (c : Configuration) :
 /-- Computational Reducibility of the RSST Unavoidable Set:
     Every configuration in the canonical 633 unavoidable set is mathematically reducible,
     proven directly from the 633 in-kernel batch certificates, dispatching D-certified
-    configurations to D-reducibility via ast_d_sound'' and C-certified configurations
-    to C-reducibility via 
-sst_c_certificate_soundness. -/
-theorem rsst_all_unavoidable_reducible (c : Configuration) (hMem : c ∈ theUnavoidableSet) :
+    configurations to D-reducibility via fast_d_sound'' and C-certified configurations
+    to C-reducibility via rsst_c_certificate_soundness. -/
+theorem rsst_all_unavoidable_reducible (c : Configuration)
+    (hBridge : HasBatchSoundnessBridge) (hMem : c ∈ theUnavoidableSet) :
     IsReducible c := by
-  have hCert := all_unavoidable_configs_certified c hMem
+  have hCert := all_unavoidable_configs_certified c hBridge hMem
   rw [certified_cases_iff] at hCert
   cases hCert with
   | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)

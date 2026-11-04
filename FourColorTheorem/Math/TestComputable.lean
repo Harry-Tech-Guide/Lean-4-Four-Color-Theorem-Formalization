@@ -4,7 +4,8 @@ namespace Math
 namespace ComputableReducer
 
 def mkAdjFromFlat (n : Nat) (data : Array Bool) : Nat -> Nat -> Bool :=
-  fun i j => if i * n + j < data.size then data[i * n + j]! else false
+  let l := data.toList
+  fun i j => l.getD (i * n + j) false
 
 /-- The Birkhoff Diamond is config 0 in the unavoidable set. -/
 def birkhoff : Configuration := {
@@ -25,10 +26,12 @@ def totalMatchings := (generateBalancedSignedMatchings birkhoff.ringSize).size
 -- Check if it is D-reducible!
 def birkhoff_is_reducible : Bool := isComputablyDReducible birkhoff
 
+set_option maxRecDepth 100000
+
 /-- Birkhoff Diamond D-Reducibility Theorem:
     Proven constructively inside the Lean 4 kernel via computational reflection! -/
 theorem birkhoff_is_d_reducible : birkhoff_is_reducible = true := by
-  native_decide
+  rfl
 
 end ComputableReducer
 end Math

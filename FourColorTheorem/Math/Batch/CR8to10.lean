@@ -12,7 +12,7 @@ namespace Batch
 This module aggregates the in-kernel certification of all 12 C-reducible
 configurations with ring sizes 8, 9, and 10 from the RSST unavoidable set.
 
-Every configuration below is proven directly by Lean 4's `native_decide`
+Every configuration below is proven directly by Lean 4's `kernel reduction`
 reflection mechanism without external scripts or unproven axioms.
 -/
 

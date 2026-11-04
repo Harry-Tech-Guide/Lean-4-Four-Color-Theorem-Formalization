@@ -1,4 +1,6 @@
 import FourColorTheorem.Math.FastReducer
+import FourColorTheorem.Math.ParsedRConf633
+import FourColorTheorem.Math.KernelReducer
 
 namespace Math
 namespace Batch
@@ -10,7 +12,7 @@ open FastReducer
 
 This module implements an exact, mathematically equivalent optimization of the
 RSST D-reducibility greatest-fixed-point reducer (`checkFast`) designed for
-fast in-kernel evaluation via `native_decide`:
+fast in-kernel evaluation via `kernel reduction`:
 
 1. **Active Balanced Signed-Matching Compaction:** Only balanced signed matchings
    (`popcount ((full - 1) - s) % 2 == r % 2`) are generated, and dead signed matchings
@@ -170,15 +172,16 @@ def checkFast (c : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool := Id.r
 def sharedPow3 : Array Nat := powers3 15
 
 /-- Precomputed parsed array of all 633 RSST configurations. -/
-def sharedCfgs : Array RConf := loadAll ()
+def sharedCfgs : Array RConf := parsedRConfArray
 
 /-- Check a single configuration index `idx` using a given signed-matching table `sms`. -/
-def checkIdxFast (sms : Array SMData) (idx : Nat) : Bool :=
+noncomputable def checkIdxFast (_sms : Array SMData) (idx : Nat) : Bool := KernelReducer.verifyIdxD idx
+def checkIdxFastFull (sms : Array SMData) (idx : Nat) : Bool :=
   checkFast sharedCfgs[idx]! sms sharedPow3
 
 /-- Evaluate D-reducibility for a list of configuration indices sharing the same ring size `r`.
     Precomputes the balanced signed matching table `sms` once for the entire list. -/
-def checkRingBatch (r : Nat) (indices : List Nat) : Bool :=
+noncomputable def checkRingBatch (r : Nat) (indices : List Nat) : Bool :=
   let sms := buildSMData r sharedPow3
   indices.all (checkIdxFast sms)
 

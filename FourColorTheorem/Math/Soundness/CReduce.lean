@@ -1,7 +1,6 @@
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Batch.Runner
-import FourColorTheorem.Math.Batch.CRunner
 import FourColorTheorem.Math.Soundness.ExtendSoundness
 import FourColorTheorem.Math.Soundness.Representation
 import FourColorTheorem.Math.Soundness.DReduce
@@ -101,21 +100,79 @@ theorem computeFinalState_ranks_eq (rc : RConf) (sms : Array SMData) (pow3 : Arr
     (computeFinalState rc sms pow3).ranks = computeEliminationRanks rc sms pow3 :=
   rfl
 
+/-- Total fuel-bounded check that NO proper coloring of the contracted configuration restricts to a trace in `live`. -/
+def checkContractExactTotal : Nat → Array (Array Nat) → Array Nat → Nat → Nat → Nat → Array Nat → Array Nat → ByteArray → Bool
+  | 0, _, _, _, r, _, col, pow3, live => Id.run do
+    let mut idx := 0
+    for i in [0:r] do
+      let nxt := if i + 1 == r then 0 else i + 1
+      let x := col[i]! ^^^ col[nxt]!
+      if x == 0 then return true
+      let d_i := x - 1
+      idx := idx + d_i * pow3[i]!
+    return !(live.get! idx == 1)
+  | fuel + 1, earlier, alias, n, r, v, col, pow3, live =>
+    if v >= n then
+      checkContractExactTotal 0 earlier alias n r v col pow3 live
+    else Id.run do
+      let root_v := alias[v]!
+      if root_v < v then
+        let c := col[root_v]!
+        for u in earlier[v]! do
+          if alias[u]! != root_v && col[u]! == c then
+            return true
+        let col' := col.set! v c
+        return checkContractExactTotal fuel earlier alias n r (v + 1) col' pow3 live
+      else
+        let mut used : Nat := 0
+        for u in earlier[v]! do
+          if alias[u]! != root_v then
+            used := used ||| (1 <<< col[u]!)
+        let mut col' := col
+        for c in [0:4] do
+          if (used >>> c) &&& 1 == 0 then
+            col' := col'.set! v c
+            if not (checkContractExactTotal fuel earlier alias n r (v + 1) col' pow3 live) then
+              return false
+        return true
+
+/-- Total fuel-bounded test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
+def runContractCheckTotal (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
+  let mut alias := mkArray c.n 0
+  for i in [0:c.n] do alias := alias.set! i i
+  for _ in [0:c.n] do
+    for (u, v) in c.contractEdges do
+      let root_u := alias[u]!
+      let root_v := alias[v]!
+      let mn := min root_u root_v
+      alias := alias.set! u mn
+      alias := alias.set! v mn
+      alias := alias.set! root_u mn
+      alias := alias.set! root_v mn
+  let col : Array Nat := mkArray c.n 0
+  return checkContractExactTotal c.n c.earlier alias c.n c.r 1 col pow3 live
+
+/-- Total fuel-bounded combined D-reduction fixed-point solver and C-reduction contract validator. -/
+def checkCFastTotal (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool :=
+  let st := computeFinalState rc sms pow3
+  if st.orbits.isEmpty then true
+  else runContractCheckTotal rc pow3 st.live
+
 /-- Contract check soundness hypothesis:
-    When `Batch.runContractCheck` returns true on the fixed-point live array, no boundary coloring
+    When `runContractCheckTotal` returns true on the fixed-point live array, no boundary coloring
     extending to the contracted configuration has trace index present in `live` (i.e. `live[idx] = 0`). -/
 def ContractCheckSoundnessHypothesis (c : Configuration) (earlier : Array (Array Nat))
     (pow3 : Array Nat) (live : ByteArray) : Prop :=
-  Batch.runContractCheck (rconfOfConfig c earlier) pow3 live = true →
+  runContractCheckTotal (rconfOfConfig c earlier) pow3 live = true →
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToContracted c b →
     live.get! (boundaryTrace c b pow3) = 0
 
-/-- Derivation: when Batch.runContractCheck succeeds and the contract check soundness holds,
+/-- Derivation: when runContractCheckTotal succeeds and the contract check soundness holds,
     any boundary coloring extending to the contracted configuration has live bit 0. -/
 theorem contract_live_zero_of_check (c : Configuration) (earlier : Array (Array Nat))
     (pow3 : Array Nat) (live : ByteArray)
     (h_sound : ContractCheckSoundnessHypothesis c earlier pow3 live)
-    (h_run : Batch.runContractCheck (rconfOfConfig c earlier) pow3 live = true)
+    (h_run : runContractCheckTotal (rconfOfConfig c earlier) pow3 live = true)
     (b : BoundaryColoring c) (hb : IsValidBoundaryColoring c b)
     (hExt : extendsToContracted c b) :
     live.get! (boundaryTrace c b pow3) = 0 :=
@@ -206,7 +263,7 @@ theorem eliminated_of_live_zero (c : Configuration) (earlier : Array (Array Nat)
 theorem contract_eliminated_of_live_zero (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_sound : ContractCheckSoundnessHypothesis c earlier pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live)
-    (h_run : Batch.runContractCheck (rconfOfConfig c earlier) pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live = true)
+    (h_run : runContractCheckTotal (rconfOfConfig c earlier) pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live = true)
     (h_elim : LiveZeroEliminationHypothesis c earlier sms pow3) :
     ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToContracted c b → Eliminated c b := by
   intro b hb hExt
@@ -219,12 +276,12 @@ theorem contract_eliminated_of_live_zero (c : Configuration) (earlier : Array (A
 -/
 
 /-- Combined Contract Soundness Principle:
-    Either all orbits are eliminated in the fixed-point loop (D-reducibility via checkFast),
+    Either all orbits are eliminated in the fixed-point loop (D-reducibility via checkFastTotal),
     or every boundary coloring extending to the contracted configuration is eliminated
     under the adversarial Kempe elimination game. -/
 def ContractSoundness (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat) : Prop :=
-  checkFast (rconfOfConfig c earlier) sms pow3 = true ∨
+  checkFastTotal (rconfOfConfig c earlier) sms pow3 = true ∨
   (∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b → extendsToContracted c b → Eliminated c b)
 
 /-- Soundness deduction for D-reducible configurations with contract edges:
@@ -232,7 +289,7 @@ def ContractSoundness (c : Configuration) (earlier : Array (Array Nat))
 theorem fast_c_sound_of_d (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_contract : c.contractEdges ≠ [])
-    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_check : checkFastTotal (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (h_rep : FullRepresentationHypothesis c sms pow3)
@@ -252,13 +309,13 @@ theorem fast_c_sound_of_contract (c : Configuration)
 
 /-- Master Acceptance Theorem `fast_c_sound`:
     For any configuration `c` with non-empty contract edge list (`c.contractEdges ≠ []`),
-    if `checkCFast` succeeds, the earlier adjacency graph is sound and irreflexive,
+    if `checkCFastTotal` succeeds, the earlier adjacency graph is sound and irreflexive,
     Lemma (a) representation holds, and fixed-point elimination holds:
     `c` is provably C-reducible under the adversarial Kempe game semantics. -/
 theorem fast_c_sound (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_contract : c.contractEdges ≠ [])
-    (h_check : checkCFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_check : checkCFastTotal (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (h_rep : FullRepresentationHypothesis c sms pow3)

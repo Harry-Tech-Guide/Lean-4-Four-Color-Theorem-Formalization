@@ -176,14 +176,34 @@ structure ReducerState where
   iter : Nat
   changed : Bool
 
+/-- Total fuel-bounded recursive tree check: are all `2^p` traces fitting `sm` currently live in `live`? -/
+def allFitLiveTotal : Nat → SMData → ByteArray → Nat → Nat → Bool
+  | 0, _, live, _, acc => live.get! acc == 1
+  | fuel + 1, sm, live, k, acc =>
+    if k >= sm.p then
+      live.get! acc == 1
+    else
+      allFitLiveTotal fuel sm live (k + 1) (acc + sm.a[k]!) &&
+      allFitLiveTotal fuel sm live (k + 1) (acc + sm.b[k]!)
+
+/-- Total fuel-bounded recursive tree mark: set `cover := 1` on all `2^p` traces fitting `sm`. -/
+def markFitCoverTotal : Nat → SMData → Nat → Nat → ByteArray → ByteArray
+  | 0, _, _, acc, cov => cov.set! acc 1
+  | fuel + 1, sm, k, acc, cov =>
+    if k >= sm.p then
+      cov.set! acc 1
+    else
+      let cov1 := markFitCoverTotal fuel sm (k + 1) (acc + sm.a[k]!) cov
+      markFitCoverTotal fuel sm (k + 1) (acc + sm.b[k]!) cov1
+
 /-- A single deterministic elimination round of the FastReducer algorithm. -/
 def reducerStep (N : Nat) (st : ReducerState) : ReducerState := Id.run do
   let iter := st.iter + 1
   let mut cover := zeros N
   let mut nextSM : Array SMData := Array.mkEmpty st.activeSM.size
   for sm in st.activeSM do
-    if allFitLive sm st.live 0 0 then
-      cover := markFitCover sm 0 0 cover
+    if allFitLiveTotal sm.p sm st.live 0 0 then
+      cover := markFitCoverTotal sm.p sm 0 0 cover
       nextSM := nextSM.push sm
   let mut nextOrbits : Array Orbit6 := Array.mkEmpty st.orbits.size
   let mut live := st.live
@@ -239,6 +259,21 @@ def computeEliminationRanks (rc : RConf) (sms : Array SMData) (pow3 : Array Nat)
     changed := true
   }
   (runReducerLoop N (orbits0.size + 1) initSt).ranks
+
+/-- Total fuel-bounded D-reducibility fixed-point checker. -/
+def checkFastTotal (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool :=
+  let r := rc.r
+  let N := pow3.getD r 1
+  let (live0, orbits0) := initialLiveFast rc pow3
+  let initSt : ReducerState := {
+    live := live0,
+    orbits := orbits0,
+    activeSM := sms,
+    ranks := mkArray N 0,
+    iter := 0,
+    changed := true
+  }
+  (runReducerLoop N (orbits0.size + 1) initSt).orbits.isEmpty
 
 
 /-- Canonical elimination rank of a boundary coloring, CONSTRUCTED from the checker's fixed-point:
@@ -296,7 +331,7 @@ def ConstructedRankBase (c : Configuration) (earlier : Array (Array Nat))
     Any boundary coloring with constructedRank 0 extends directly under FastReducer.extend. -/
 theorem hbase_of_checkFast (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
-    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true) :
+    (h_check : checkFastTotal (rconfOfConfig c earlier) sms pow3 = true) :
     ConstructedRankBase c earlier sms pow3 := by
   intro b hb hr0
   dsimp [constructedRank] at hr0
@@ -456,7 +491,7 @@ theorem step_of_iteration_elimination (c : Configuration) (earlier : Array (Arra
     the adversarial `Eliminated` game semantics. -/
 theorem fast_d_sound' (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
-    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_check : checkFastTotal (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (hbase : ConstructedRankBase c earlier sms pow3)
@@ -469,7 +504,7 @@ theorem fast_d_sound' (c : Configuration) (earlier : Array (Array Nat))
     `hbase` is eliminated via `hbase_of_checkFast`. -/
 theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
-    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_check : checkFastTotal (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (h_step_rep : ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
@@ -486,7 +521,7 @@ theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Arr
   exact fast_d_sound' c earlier sms pow3 h_check h_earlier h_irrefl hbase hstep
 
 /-- Master Soundness Theorem fast_d_sound'':
-    For any configuration `c`, with checker run `checkFast (rconfOfConfig c earlier) sms pow3 = true`:
+    For any configuration `c`, with checker run `checkFastTotal (rconfOfConfig c earlier) sms pow3 = true`:
     Neither `hbase` nor `hstep` is assumed as a hypothesis.
     `hbase` is derived directly via `hbase_of_checkFast`.
     `hstep` is derived from Lemma (a) `FullRepresentationHypothesis` and the iteration elimination
@@ -494,7 +529,7 @@ theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Arr
     Under earlier-adjacency soundness and irreflexivity, `c` is provably D-reducible. -/
 theorem fast_d_sound'' (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
-    (h_check : checkFast (rconfOfConfig c earlier) sms pow3 = true)
+    (h_check : checkFastTotal (rconfOfConfig c earlier) sms pow3 = true)
     (h_earlier : IsSoundEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (h_rep : FullRepresentationHypothesis c sms pow3)

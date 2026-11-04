@@ -1,44 +1,19 @@
-import FourColorTheorem.Math.FastReducer
+import FourColorTheorem.Math.Batch.Runner
 
 namespace Math
 namespace Batch
 
 open FastReducer
 
-/-!
-# In-Kernel D-Reducibility Batch 8: Ring 11 (Part 5)
+theorem cert_config_337_d_red : checkIdxFast (buildSMData 11 sharedPow3) 337 = true := by kernel_rfl
 
-This module certifies the D-reducibility of 5 configurations
-from the RSST unavoidable set with ring size 11:
-Configs 337, 348, 349, 354, 362.
+theorem cert_config_348_d_red : checkIdxFast (buildSMData 11 sharedPow3) 348 = true := by kernel_rfl
 
-Every theorem is verified directly inside the Lean 4 kernel via `native_decide`,
-depending solely on Lean's kernel reflection axiom `Lean.ofReduceBool`.
--/
+theorem cert_config_349_d_red : checkIdxFast (buildSMData 11 sharedPow3) 349 = true := by kernel_rfl
 
-private def pow3 := powers3 15
-private def md11 := buildMData 11 pow3
-private def cfgs := loadAll ()
+theorem cert_config_354_d_red : checkIdxFast (buildSMData 11 sharedPow3) 354 = true := by kernel_rfl
 
-/-- Config 337 (ring 11): D-reducible. -/
-theorem cert_config_337_d_red : (check cfgs[337]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 348 (ring 11): D-reducible. -/
-theorem cert_config_348_d_red : (check cfgs[348]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 349 (ring 11): D-reducible. -/
-theorem cert_config_349_d_red : (check cfgs[349]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 354 (ring 11): D-reducible. -/
-theorem cert_config_354_d_red : (check cfgs[354]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 362 (ring 11): D-reducible. -/
-theorem cert_config_362_d_red : (check cfgs[362]! md11 pow3).dReducible = true := by
-  native_decide
+theorem cert_config_362_d_red : checkIdxFast (buildSMData 11 sharedPow3) 362 = true := by kernel_rfl
 
 end Batch
 end Math

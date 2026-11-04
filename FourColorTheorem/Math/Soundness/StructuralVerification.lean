@@ -9,15 +9,13 @@ open FastReducer
 open Batch
 
 /-!
-# In-Kernel Reflection for Structural Adjacency and Earlier Properties
+# Structural Adjacency and Earlier Properties Verification
 
-This module establishes exhaustive in-kernel verification by reflection for the structural
-properties of the Robertson-Sanders-Seymour-Thomas (RSST) 633 unavoidable configurations:
+This module establishes the structural properties of the Robertson-Sanders-Seymour-Thomas (RSST)
+633 unavoidable configurations:
 1. `IsIrreflexiveAdj c`: No vertex in configuration `c` is adjacent to itself.
 2. `IsSoundEarlier c earlier`: The `earlier` neighbor table contains all earlier-indexed neighbors
    in the adjacency graph, and ring earlier-neighbors are adjacent in `c`.
-
-Both properties are verified directly in the Lean 4 kernel via `native_decide` across all 633 configurations.
 -/
 
 /-- Boolean check that no vertex in `c` is adjacent to itself. -/
@@ -82,31 +80,42 @@ theorem sound_earlier_of_check (c : Configuration) (earlier : Array (Array Nat))
       rw [hc] at h_u
       exact Or.inr h_u
 
-/-- Exhaustive in-kernel verification by reflection:
-    all 633 unavoidable configurations have irreflexive adjacency. -/
-theorem all_unavoidable_irreflexive :
-    (List.range 633).all (fun i => checkIrreflexiveAdj theUnavoidableSet[i]!) = true := by
-  native_decide
+/-- Universal theorem: every configuration constructed via `configOfRConf` has irreflexive adjacency. -/
+theorem configOfRConf_is_irreflexive (rc : RConf) :
+    IsIrreflexiveAdj (configOfRConf rc) := by
+  intro i _hi
+  dsimp [configOfRConf, symAdj]
+  have h_not_lt : ¬ (i < i) := Nat.lt_irrefl i
+  rw [if_neg h_not_lt, if_neg h_not_lt]
 
-/-- Exhaustive in-kernel verification by reflection:
-    all 633 unavoidable configurations have sound earlier adjacency structures. -/
-theorem all_unavoidable_sound_earlier :
-    (List.range 633).all (fun i => checkSoundEarlier theUnavoidableSet[i]! sharedCfgs[i]!.earlier) = true := by
-  native_decide
+/-- Universal theorem: every configuration constructed via `configOfRConf` has sound earlier adjacency. -/
+theorem configOfRConf_is_sound_earlier (rc : RConf) :
+    IsSoundEarlier (configOfRConf rc) rc.earlier := by
+  constructor
+  · intro v _hv u hu h_adj
+    dsimp [configOfRConf, symAdj] at h_adj
+    have h_not_vu : ¬ (v < u) := by omega
+    rw [if_neg h_not_vu, if_pos hu, if_pos hu] at h_adj
+    cases h_adj with
+    | inl h => exact List.elem_iff.mp h
+    | inr h => exact List.elem_iff.mp h
+  · intro i _hi u hu hu_lt
+    dsimp [configOfRConf, symAdj]
+    have h_not_iu : ¬ (i < u) := by omega
+    rw [if_neg h_not_iu, if_pos hu_lt]
+    exact Or.inl (List.elem_iff.mpr hu)
 
 /-- Pointwise theorem: any canonical RSST configuration index `idx < 633` has irreflexive adjacency. -/
 theorem unavoidable_is_irreflexive (idx : Nat) (h_lt : idx < 633) :
     IsIrreflexiveAdj theUnavoidableSet[idx]! := by
-  have hMem : idx ∈ List.range 633 := List.mem_range.mpr h_lt
-  have hCheck := List.all_eq_true.mp all_unavoidable_irreflexive idx hMem
-  exact irreflexive_of_check theUnavoidableSet[idx]! hCheck
+  rw [theUnavoidableSet_getElem! idx h_lt]
+  exact configOfRConf_is_irreflexive sharedCfgs[idx]!
 
 /-- Pointwise theorem: any canonical RSST configuration index `idx < 633` has sound earlier adjacency. -/
 theorem unavoidable_is_sound_earlier (idx : Nat) (h_lt : idx < 633) :
     IsSoundEarlier theUnavoidableSet[idx]! sharedCfgs[idx]!.earlier := by
-  have hMem : idx ∈ List.range 633 := List.mem_range.mpr h_lt
-  have hCheck := List.all_eq_true.mp all_unavoidable_sound_earlier idx hMem
-  exact sound_earlier_of_check theUnavoidableSet[idx]! sharedCfgs[idx]!.earlier hCheck
+  rw [theUnavoidableSet_getElem! idx h_lt]
+  exact configOfRConf_is_sound_earlier sharedCfgs[idx]!
 
 end Soundness
 end Math

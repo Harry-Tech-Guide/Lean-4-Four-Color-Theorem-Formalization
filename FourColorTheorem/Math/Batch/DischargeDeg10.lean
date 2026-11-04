@@ -1,9 +1,81 @@
 import FourColorTheorem.Math.TestDischarging
 import FourColorTheorem.Math.U633Parser
+import FourColorTheorem.Math.KernelRfl
+import FourColorTheorem.Math.Batch.DischargeDeg10_Defs
+import FourColorTheorem.Math.Batch.DischargeDeg10_Part1
+import FourColorTheorem.Math.Batch.DischargeDeg10_Part2
+import FourColorTheorem.Math.Batch.DischargeDeg10_Part3
+
+set_option maxHeartbeats 0
 
 namespace Math.Discharging
 
-theorem cert_deg10_verified : test10 theUnavoidableSet.toList () = true := by
-  native_decide
+theorem p_10_3 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_3 4105629843349963576032097773515384148851924615144855894615469360273363808232946903325765138368 5 3 33354 124830 [] (advanceHints 0 hs0_10) =
+      (true, 232, advanceHints 2920 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_3 4105629843349963576032097773515384148851924615144855894615469360273363808232946903325765138368 5 3 33354 124830 [] (advanceHints 0 hs0_10)
+    7 6 4105629843349963576032097773515384148851924615144855894615469360273363808232946898927718627264 4105629843349963576032097773515384148851924615144855894615469360273363808232946771384369805248 4 6 1868362 7989150 93 232 []
+    (advanceHints 1125 hs0_10) (advanceHints 2920 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_4 p_10_5
+
+theorem p_10_7 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_7 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440527424 234 2 4682 124830 [{ number := 232, nolines := 3, conds := [(10, 30), (9, 30), (8, 30)] }] (advanceHints 2920 hs0_10) =
+      (true, 561, advanceHints 7721 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_7 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440527424 234 2 4682 124830 [{ number := 232, nolines := 3, conds := [(10, 30), (9, 30), (8, 30)] }] (advanceHints 2920 hs0_10)
+    6 6 4105629843349963576032097773515384148851924615144855894615469360273363808232938740482721050688 4105629843349963576032097773515384148851924615144855894615469360273363808232938738489856225344 3 235 25162 124830 404 561 [{ number := 234, nolines := 3, conds := [(10, 30), (9, 30), (1, 30)] }, { number := 232, nolines := 3, conds := [(10, 30), (9, 30), (8, 30)] }]
+    (advanceHints 5111 hs0_10) (advanceHints 7721 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_8 p_10_9
+
+theorem p_10_6 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_6 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440529344 232 2 33354 124830 [] (advanceHints 2920 hs0_10) =
+      (true, 561, advanceHints 7721 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_6 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440529344 232 2 33354 124830 [] (advanceHints 2920 hs0_10)
+    1 6 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440529280 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440527424 3 233 4682 124830 234 561 [{ number := 232, nolines := 3, conds := [(10, 30), (9, 30), (8, 30)] }]
+    (advanceHints 2920 hs0_10) (advanceHints 7721 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_7
+
+theorem p_10_2 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_2 4105629843349963576032097773515384148851924615144855894615469360273363808232947184800741849024 4 2 586 1950 [] (advanceHints 0 hs0_10) =
+      (true, 561, advanceHints 7721 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_2 4105629843349963576032097773515384148851924615144855894615469360273363808232947184800741849024 4 2 586 1950 [] (advanceHints 0 hs0_10)
+    8 6 4105629843349963576032097773515384148851924615144855894615469360273363808232946903325765138368 4105629843349963576032097773515384148851924615144855894615469360273363808232938740551440529344 3 5 33354 124830 232 561 []
+    (advanceHints 2920 hs0_10) (advanceHints 7721 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_3 p_10_6
+
+theorem p_10_11 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_11 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966869568 563 1 74 1950 [{ number := 561, nolines := 2, conds := [(10, 30), (9, 30)] }] (advanceHints 7721 hs0_10) =
+      (true, 848, advanceHints 10785 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_11 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966869568 563 1 74 1950 [{ number := 561, nolines := 2, conds := [(10, 30), (9, 30)] }] (advanceHints 7721 hs0_10)
+    7 6 4105629843349963576032097773515384148851924615144855894615469360273363808232424762845920358464 4105629843349963576032097773515384148851924615144855894615469360273363808232424635302571536448 2 564 458 1950 637 848 [{ number := 563, nolines := 2, conds := [(10, 30), (1, 30)] }, { number := 561, nolines := 2, conds := [(10, 30), (9, 30)] }]
+    (advanceHints 8964 hs0_10) (advanceHints 10785 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_12 p_10_13
+
+theorem p_10_10 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_10 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966871488 561 1 586 1950 [] (advanceHints 7721 hs0_10) =
+      (true, 848, advanceHints 10785 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_10 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966871488 561 1 586 1950 [] (advanceHints 7721 hs0_10)
+    1 6 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966871424 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966869568 2 562 74 1950 563 848 [{ number := 561, nolines := 2, conds := [(10, 30), (9, 30)] }]
+    (advanceHints 7721 hs0_10) (advanceHints 10785 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_11
+
+theorem p_10_1 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_1 4105629843349963576032097773515384148851924615144855894615469360273363808232965199199251331008 3 1 10 30 [] (advanceHints 0 hs0_10) =
+      (true, 848, advanceHints 10785 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_1 4105629843349963576032097773515384148851924615144855894615469360273363808232965199199251331008 3 1 10 30 [] (advanceHints 0 hs0_10)
+    9 6 4105629843349963576032097773515384148851924615144855894615469360273363808232947184800741849024 4105629843349963576032097773515384148851924615144855894615469360273363808232424767243966871488 2 4 586 1950 561 848 []
+    (advanceHints 7721 hs0_10) (advanceHints 10785 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_2 p_10_10
+
+theorem p_10_0 :
+    verifyTreePureRec 10 shiftedOutsTable_10 n_10_0 4105629843349963576032097773515384148851924615144855894615469360273363808234118120703858177984 2 0 0 0 [] (advanceHints 0 hs0_10) =
+      (true, 867, advanceHints 10786 hs0_10) :=
+  verifyTreePureRec_split_pt 10 shiftedOutsTable_10 n_10_0 4105629843349963576032097773515384148851924615144855894615469360273363808234118120703858177984 2 0 0 0 [] (advanceHints 0 hs0_10)
+    10 6 4105629843349963576032097773515384148851924615144855894615469360273363808232965199199251331008 4105629843349963576032097773515384148851924615144855894615469360273363808199530475565652768704 1 3 10 30 848 867 []
+    (advanceHints 10785 hs0_10) (advanceHints 10786 hs0_10)
+    (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) (by kernel_rfl) p_10_1 (by kernel_rfl)
+
+
+theorem cert_deg10_verified : test10 theUnavoidableSet.toList () = true :=
+  verifyTree_of_pure theUnavoidableSet.toList 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) 867 (advanceHints 10786 hs0_10) p_10_0
 
 end Math.Discharging

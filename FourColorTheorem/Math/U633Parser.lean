@@ -1,5 +1,6 @@
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.U633String
+import FourColorTheorem.Math.Batch.Runner
 
 namespace Math
 
@@ -7,7 +8,7 @@ def splitString (s : String) (c : Char) : List String :=
   s.split (fun x => x == c)
 
 def parseNatList (s : String) : List Nat :=
-  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x => 
+  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x =>
     if x == "" then none else x.toNat?)
 
 def mkAdjFromFlat (n : Nat) (data : Array Bool) : Nat -> Nat -> Bool :=
@@ -18,7 +19,7 @@ def parseConfig (s : String) : Configuration :=
   if nums.length >= 2 then
     let numVertices := nums[0]!
     let ringSize := nums[1]!
-    
+
     Id.run do
       let mut flat := mkArray (numVertices * numVertices) false
       -- Header: n r X Y a, followed by the 2·a contract vertices; adjacency starts after that.
@@ -28,7 +29,7 @@ def parseConfig (s : String) : Configuration :=
         if 5 + 2 * i + 1 < nums.length then
           contracts := contracts.concat (nums[5 + 2 * i]! - 1, nums[5 + 2 * i + 1]! - 1)
       let mut idx := 5 + 2 * a
-        
+
       for _ in [0:numVertices] do
         if idx < nums.length then
           let v := nums[idx]!
@@ -45,7 +46,7 @@ def parseConfig (s : String) : Configuration :=
                 if i < numVertices && j < numVertices then
                   flat := flat.set! (i * numVertices + j) true
                   flat := flat.set! (j * numVertices + i) true
-      
+
       return {
         ringSize := ringSize,
         interiorSize := numVertices - ringSize,
@@ -65,20 +66,70 @@ def parseAllConfigs (_ : Unit) : Array Configuration :=
         arr := arr.push (parseConfig b)
     return arr
 
+/-- Canonical symmetric irreflexive adjacency relation generated from `earlier` lists. -/
+def symAdj (earlier : Array (Array Nat)) (i j : Nat) : Bool :=
+  if i < j then
+    (earlier.getD j #[]).data.contains i
+  else if j < i then
+    (earlier.getD i #[]).data.contains j
+  else
+    false
+
+/-- Canonical conversion of a parsed `RConf` from `FastReducer` into a `Configuration`. -/
+def configOfRConf (rc : FastReducer.RConf) : Configuration where
+  ringSize := rc.r
+  interiorSize := rc.n - rc.r
+  adj := symAdj rc.earlier
+  contractEdges := rc.contractEdges.toList
+
 /-- The 633 unavoidable configurations from the RSST dataset. -/
 def theUnavoidableSet : Array Configuration :=
-  parseAllConfigs ()
+  ⟨parsedRConfList.map configOfRConf⟩
 
-/-- Computational certificate: every configuration in the unavoidable set has interior size ≥ 4. -/
+/-- The pre-elaborated RSST configuration list has length 633. -/
+theorem parsedRConfList_length : parsedRConfList.length = 633 := by rfl
+
+/-- The canonical RSST unavoidable set has exactly 633 configurations. -/
+theorem unavoidable_size_eq : theUnavoidableSet.size = 633 := by
+  unfold Array.size theUnavoidableSet
+  rw [List.length_map, parsedRConfList_length]
+
+/-- Every configuration in the unavoidable set has interior size ≥ 4 (list boolean form),
+    verified directly in the Lean 4 kernel by `rfl` over all 633 configurations. -/
 theorem unavoidable_data_all_int : theUnavoidableSet.data.all (fun c => c.interiorSize >= 4) = true := by
-  native_decide
+  rfl
 
 /-- Every configuration in the RSST unavoidable set has at least 4 interior vertices. -/
 theorem unavoidable_interior_ge_4 (c : Configuration) (h : c ∈ theUnavoidableSet) :
-  c.interiorSize ≥ 4 := by
+    c.interiorSize ≥ 4 := by
   have hMem : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
-  have hTrue := List.all_eq_true.mp unavoidable_data_all_int c hMem
-  exact of_decide_eq_true hTrue
+  have hDec : decide (c.interiorSize >= 4) = true :=
+    List.all_eq_true.mp unavoidable_data_all_int c hMem
+  exact of_decide_eq_true hDec
+
+/-- General indexing lemma for an array built by mapping `f` over a list `L`. -/
+theorem array_map_getElem! (L : List FastReducer.RConf) (f : FastReducer.RConf → Configuration)
+    (idx : Nat) (h_lt : idx < L.length) :
+    (⟨L.map f⟩ : Array Configuration)[idx]! = f (⟨L⟩ : Array FastReducer.RConf)[idx]! := by
+  let arr1 : Array Configuration := ⟨L.map f⟩
+  let arr2 : Array FastReducer.RConf := ⟨L⟩
+  have h1 : idx < arr1.size := by
+    dsimp [arr1, Array.size]
+    rw [List.length_map]
+    exact h_lt
+  have h2 : idx < arr2.size := h_lt
+  rw [getElem!_pos arr1 idx h1, getElem!_pos arr2 idx h2]
+  change (L.map f)[idx]'h1 = f (L[idx]'h2)
+  exact List.getElem_map f
+
+/-- Indexing into `theUnavoidableSet` at `idx < 633` yields `configOfRConf Batch.sharedCfgs[idx]!`. -/
+theorem theUnavoidableSet_getElem! (idx : Nat) (h_lt : idx < 633) :
+    theUnavoidableSet[idx]! = configOfRConf Batch.sharedCfgs[idx]! := by
+  have h_len : idx < parsedRConfList.length := by
+    rw [parsedRConfList_length]
+    exact h_lt
+  unfold theUnavoidableSet Batch.sharedCfgs parsedRConfArray
+  exact array_map_getElem! parsedRConfList configOfRConf idx h_len
 
 /-- Every configuration in the RSST unavoidable set has strictly positive interior size. -/
 theorem unavoidable_interior_pos (c : Configuration) (h : c ∈ theUnavoidableSet) :

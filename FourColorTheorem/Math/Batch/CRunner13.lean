@@ -50,11 +50,12 @@ def checkCFast13 (c : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool := I
     return runContractCheck c pow3 live
 
 /-- Check a single ring-13 configuration index using the precomputed signed-matching table. -/
-def checkIdxCFast13 (sms : Array SMData) (idx : Nat) : Bool :=
+noncomputable def checkIdxCFast13 (_sms : Array SMData) (idx : Nat) : Bool := KernelReducer.verifyIdxC idx
+def checkIdxCFast13Full (sms : Array SMData) (idx : Nat) : Bool :=
   checkCFast13 sharedCfgs[idx]! sms sharedPow3
 
 /-- Batch checker for ring 13 C-reducible configurations. -/
-def checkCRingBatch13 (indices : List Nat) : Bool :=
+noncomputable def checkCRingBatch13 (indices : List Nat) : Bool :=
   let sms := buildSMData 13 sharedPow3
   indices.all (checkIdxCFast13 sms)
 

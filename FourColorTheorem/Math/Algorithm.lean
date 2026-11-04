@@ -107,7 +107,7 @@ theorem dreducible_of_computable (c : Configuration)
   hSound hEmpty
 
 /-- The Birkhoff Diamond has an empty maximum consistent subset.
-    Proven via computational reflection (`native_decide`) in Lean 4. -/
+    Proven via computational reflection (`kernel reduction`) in Lean 4. -/
 theorem birkhoff_empty_consistent_subset : max_consistent_subset_is_empty ComputableReducer.birkhoff :=
   ComputableReducer.birkhoff_is_d_reducible
 

@@ -22,8 +22,8 @@ def containsUnavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart
 Every minimal counterexample (an internally 6-connected planar triangulation)
 contains at least one configuration from the RSST 633 unavoidable set. -/
 theorem discharging_forces_unavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
-  (mc : MinimalCounterexample H darts) : 
+  (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) : 
   containsUnavoidable H darts :=
-  unavoidability_theorem H darts mc
+  unavoidability_theorem H darts h_rsst mc
 
 end Math

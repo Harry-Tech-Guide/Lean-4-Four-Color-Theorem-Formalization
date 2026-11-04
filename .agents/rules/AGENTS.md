@@ -12,15 +12,22 @@ Follow these rules for all theorem-proving and verification work in `c:\Four Col
   - `lean_local_search`: Search for declarations across the repository.
 - **Do NOT spawn cold `lake env lean` or `lake build` processes** to inspect proof goals or iterate on broken tactics.
 
-## 2. Targeted Module Building & Cache Protection
+## 2. Targeted Module Building, RAM/CPU Throttling & Cache Protection
 
+- **Strict RAM & CPU Limits (`-M 1536 -j 1` + `build_safe.ps1`):**
+  - `lakefile.lean` enforces `weakLeanArgs := #["-M", "1536", "-j", "1"]` (1.5 GB max memory per `lean.exe` process, 1 thread per process).
+  - **NEVER run `lake build` on an umbrella target with unbuilt heavy leaf dependencies** (which would spawn 8 parallel `lean.exe` processes and exhaust the 16 GB system RAM).
+  - **Always use `build_safe.ps1`** to build heavy modules sequentially one at a time at `BelowNormal` priority and 2-core affinity (`0x03`), leaving 6 of 8 logical processors and >7 GB RAM free for the OS UI:
+    ```powershell
+    powershell -ExecutionPolicy Bypass -File "c:\Four Color Theorem\.agents\skills\lean-mcp-proving\scripts\build_safe.ps1" <Target1> <Target2> ...
+    ```
+  - Keep individual `kernel_rfl` / `rfl` theorems bounded (`<= 18,000` `RemChecks` per theorem) so the C++ kernel's `m_whnf_core_cache` is freed after each theorem and peak `lean.exe` RAM stays under 400 MB.
 - **Never run concurrent `lake build` commands.** Overlapping builds corrupt the `.lake` build cache.
-- **Never run full `lake build FourColorTheorem`** (all 204 targets including 138 `native_decide` batch certificates) during iterative proof development.
+- **Never run full `lake build FourColorTheorem`** in a single unthrottled invocation.
 - For fast verification of soundness, discharging, and topology modules (< 3 seconds), run:
   ```powershell
   powershell -ExecutionPolicy Bypass -File "c:\Four Color Theorem\.agents\skills\lean-mcp-proving\scripts\verify_fast.ps1"
   ```
-- Only run full `lake build FourColorTheorem` when `Batch/` files or `FastReducer.lean` execution behavior is modified.
 
 ## 3. Subagent Configuration & Token Economy
 

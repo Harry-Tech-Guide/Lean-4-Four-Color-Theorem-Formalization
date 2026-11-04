@@ -13,88 +13,119 @@ abbrev ColorList := Array Nat
 def isValidRing (ringSize : Nat) (colors : ColorList) : Bool :=
   if colors.size != ringSize then false
   else if ringSize == 0 then true
-  else Id.run do
-    let mut valid := true
-    for i in [0:ringSize] do
-      let c1 := colors[i]!
-      let c2 := colors[(i + 1) % ringSize]!
-      if c1 == c2 then
-        valid := false
-        break
-    return valid
+  else
+    (List.range ringSize).all fun i =>
+      colors.toList.get! i != colors.toList.get! ((i + 1) % ringSize)
 
-/-- Generate all valid ring colorings of size N using colors 0, 1, 2, 3. -/
+/-- Generate all canonical valid ring colorings of size N using colors 0, 1, 2, 3 (up to S_4 color symmetry). -/
+def genRingLists : Nat → Nat → Nat → List (List Nat)
+  | 0, _, _ => [[]]
+  | fuel + 1, prev, maxCol =>
+    let limit := if Nat.blt maxCol 3 then maxCol + 1 else 3
+    match fuel with
+    | 0 =>
+      (if prev != 1 && Nat.ble 1 limit then [[1]] else []) ++
+      (if prev != 2 && Nat.ble 2 limit then [[2]] else []) ++
+      (if prev != 3 && Nat.ble 3 limit then [[3]] else [])
+    | _ =>
+      (if prev != 0 then (genRingLists fuel 0 maxCol).map (0 :: ·) else []) ++
+      (if prev != 1 && Nat.ble 1 limit then (genRingLists fuel 1 (if Nat.blt maxCol 1 then 1 else maxCol)).map (1 :: ·) else []) ++
+      (if prev != 2 && Nat.ble 2 limit then (genRingLists fuel 2 (if Nat.blt maxCol 2 then 2 else maxCol)).map (2 :: ·) else []) ++
+      (if prev != 3 && Nat.ble 3 limit then (genRingLists fuel 3 3).map (3 :: ·) else [])
+
 def generateRingColorings (ringSize : Nat) : Array ColorList :=
-  let rec build (current : ColorList) (acc : Array ColorList) : Array ColorList :=
-    if h : current.size < ringSize then
-      Id.run do
-        let mut newAcc := acc
-        for c in [0, 1, 2, 3] do
-          if current.size > 0 && current[current.size - 1]! == c then
-            continue
-          newAcc := build (current.push c) newAcc
-        return newAcc
-    else
-      if isValidRing ringSize current then acc.push current else acc
-  termination_by ringSize - current.size
-  
-  if ringSize == 0 then #[]
-  else build #[0] #[]
+  match ringSize with
+  | 0 => #[]
+  | 1 => #[#[0]]
+  | r + 1 => Array.mk ((genRingLists r 0 0).map (fun tail => Array.mk (0 :: tail)))
+
+def colorAt : List Nat → Nat → Nat
+  | [], _ => 99
+  | x :: xs, n =>
+    match n with
+    | 0 => x
+    | m + 1 => colorAt xs m
+
+def strictNat (n : Nat) (k : Nat → α) : α :=
+  match n with
+  | 0 => k 0
+  | m + 1 => k (m + 1)
+
+def forceBoolListRev : List Bool → List Bool → List Bool
+  | [], acc => acc
+  | b :: xs, acc =>
+    match b with
+    | true => forceBoolListRev xs (true :: acc)
+    | false => forceBoolListRev xs (false :: acc)
+
+def strictBoolList (l : List Bool) (k : List Bool → α) : α :=
+  match forceBoolListRev (forceBoolListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def forceNatListRev : List Nat → List Nat → List Nat
+  | [], acc => acc
+  | x :: xs, acc =>
+    strictNat x fun x' => forceNatListRev xs (x' :: acc)
+
+def strictNatList (l : List Nat) (k : List Nat → α) : α :=
+  match forceNatListRev (forceNatListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def forceListOfNatListRev : List (List Nat) → List (List Nat) → List (List Nat)
+  | [], acc => acc
+  | x :: xs, acc =>
+    strictNatList x fun x' => forceListOfNatListRev xs (x' :: acc)
+
+def strictListOfNatList (l : List (List Nat)) (k : List (List Nat) → α) : α :=
+  match forceListOfNatListRev (forceListOfNatListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def interiorNeighborOffsets (c : Configuration) : List (List Nat) :=
+  (List.range c.interiorSize).map fun k =>
+    let idx := c.ringSize + k
+    ((List.range idx).filter fun nb => c.adj idx nb).map fun nb => idx - 1 - nb
+
+def extendsRev : List (List Nat) → List Nat → Bool
+  | [], _ => true
+  | offsets :: rest, revColors =>
+    (offsets.all (fun off => colorAt revColors off != 0) && extendsRev rest (0 :: revColors)) ||
+    (offsets.all (fun off => colorAt revColors off != 1) && extendsRev rest (1 :: revColors)) ||
+    (offsets.all (fun off => colorAt revColors off != 2) && extendsRev rest (2 :: revColors)) ||
+    (offsets.all (fun off => colorAt revColors off != 3) && extendsRev rest (3 :: revColors))
 
 /-- Backtracking solver to check if a valid boundary coloring can be extended
 to a full valid coloring of the configuration's interior nodes. -/
 def extendsToInterior (c : Configuration) (boundary : ColorList) : Bool :=
-  let total := c.totalNodes
-  let rec solve (idx : Nat) (colors : Array Nat) : Bool × Array Nat :=
-    if h : idx < total then
-      Id.run do
-        let mut currentColors := colors
-        let mut found := false
-        for color in [0, 1, 2, 3] do
-          let mut valid := true
-          for neighbor in [0:idx] do
-            if c.adj idx neighbor && currentColors[neighbor]! == color then
-              valid := false
-              break
-          if valid then
-            currentColors := currentColors.set! idx color
-            let (res, nextColors) := solve (idx + 1) currentColors
-            currentColors := nextColors
-            if res then
-              found := true
-              break
-        return (found, currentColors)
-    else 
-      (true, colors)
-  termination_by total - idx
-  
-  -- The boundary is already colored, pad it to use set! in-place
-  let padded := Id.run do
-    let mut p := boundary
-    for _ in [boundary.size : total] do
-      p := p.push 0
-    return p
-    
-  (solve c.ringSize padded).1
+  strictListOfNatList (interiorNeighborOffsets c) fun offsetLists =>
+    extendsRev offsetLists (forceNatListRev boundary.toList [])
 
 /-- Get all boundary colorings that DO NOT extend. These are the "live" colorings
 that we must reduce via Kempe swaps. -/
 def getNonExtendingColorings (c : Configuration) : Array ColorList :=
   let allColorings := generateRingColorings c.ringSize
-  allColorings.filter (fun b => not (extendsToInterior c b))
+  strictListOfNatList (interiorNeighborOffsets c) fun offsetLists =>
+    Array.mk (allColorings.toList.filter (fun b => not (extendsRev offsetLists (forceNatListRev b.toList []))))
 
--- The new namespace continues down to the end of the file.
+def xor4 (a b : Nat) : Nat :=
+  match a, b with
+  | 0, x => x
+  | x, 0 => x
+  | 1, 1 | 2, 2 | 3, 3 => 0
+  | 1, 2 | 2, 1 => 3
+  | 1, 3 | 3, 1 => 2
+  | 2, 3 | 3, 2 => 1
+  | _, _ => 0
+
 /-- Map a 4-coloring of the boundary vertices to a 3-coloring of the boundary edges using the Klein four-group.
 In the Klein 4-group, elements are 0 (00), 1 (01), 2 (10), 3 (11).
 The edge color is the bitwise XOR of the two adjacent vertex colors. -/
 def vertexToEdgeColoring (ringSize : Nat) (col : ColorList) : Array Nat :=
-  Id.run do
-    let mut edgeCol := #[]
-    for i in [0:ringSize] do
-      let c1 := col[i]!
-      let c2 := col[(i + 1) % ringSize]!
-      edgeCol := edgeCol.push (c1.xor c2)
-    return edgeCol
+  let l := col.toList
+  Array.mk ((List.range ringSize).map fun i =>
+    xor4 (l.get! i) (l.get! ((i + 1) % ringSize)))
 
 /-- A computable representation of a signed matching on the boundary ring edges. -/
 structure SignedMatching where
@@ -113,180 +144,201 @@ An edge coloring `ecol` theta-fits a matching `m` for color `theta` (1, 2, or 3)
 3. Every edge that is NOT matched MUST have color `theta`.
 -/
 def checkThetaFit (ringSize : Nat) (ecol : Array Nat) (theta : Nat) (m : SignedMatching) : Bool :=
-  Id.run do
-    let mut matchedEdges := mkArray ringSize false
-    let mut fits := true
-    
-    for i in [0:m.numPairs] do
-      let e1 := m.pairs[2 * i]!
-      let e2 := m.pairs[2 * i + 1]!
-      
-      matchedEdges := matchedEdges.set! e1 true
-      matchedEdges := matchedEdges.set! e2 true
-      
-      let c1 := ecol[e1]!
-      let c2 := ecol[e2]!
-      
-      if c1 == theta || c2 == theta then
-        fits := false
-        break
-        
-      let sign := m.signs[i]!
-      let colorsEqual := (c1 == c2)
-      if colorsEqual != sign then
-        fits := false
-        break
-        
-    if not fits then return false
-    
-    for i in [0:ringSize] do
-      if not matchedEdges[i]! then
-        if ecol[i]! != theta then
-          fits := false
-          break
-          
-    return fits
+  let el := ecol.toList
+  let pl := m.pairs.toList
+  let sl := m.signs.toList
+  let pairsOk := (List.range m.numPairs).all fun i =>
+    let e1 := pl.get! (2 * i)
+    let e2 := pl.get! (2 * i + 1)
+    let c1 := el.get! e1
+    let c2 := el.get! e2
+    let sign := sl.get! i
+    c1 != theta && c2 != theta && ((c1 == c2) == sign)
+  if !pairsOk then false
+  else
+    (List.range ringSize).all fun i =>
+      if pl.contains i then true
+      else el.get! i == theta
 
-/-- Generate all perfect matchings of a given array of elements. -/
-partial def getMatchings (elements : Array Nat) : Array (Array (Nat × Nat)) :=
-  if elements.size == 0 then #[ #[] ]
-  else Id.run do
-    let first := elements[0]!
-    let rest := elements.extract 1 elements.size
-    let mut res := #[]
-    for i in [0:rest.size] do
-      let pair := (first, rest[i]!)
-      let remaining := (rest.extract 0 i) ++ (rest.extract (i+1) rest.size)
-      for m in getMatchings remaining do
-        res := res.push (m.push pair)
-    return res
+/-- Generate all perfect matchings of a given list of elements. -/
+def getMatchingsList : Nat → List Nat → List (List (Nat × Nat))
+  | 0, _ => [[]]
+  | fuel + 1, elems =>
+    match elems with
+    | [] => [[]]
+    | first :: rest =>
+      (List.range rest.length).bind fun i =>
+        let partner := rest.get! i
+        let remaining := rest.take i ++ rest.drop (i + 1)
+        (getMatchingsList fuel remaining).map fun m => (first, partner) :: m
+
+def getMatchings (elements : Array Nat) : Array (Array (Nat × Nat)) :=
+  let l := elements.toList
+  Array.mk ((getMatchingsList l.length l).map Array.mk)
 
 /-- Check if a matching is non-crossing. -/
+def isNonCrossingList (m : List (Nat × Nat)) : Bool :=
+  m.all fun (a0, b0) =>
+    m.all fun (c0, d0) =>
+      let (a, b) := if Nat.blt a0 b0 then (a0, b0) else (b0, a0)
+      let (c, d) := if Nat.blt c0 d0 then (c0, d0) else (d0, c0)
+      !((Nat.blt a c && Nat.blt c b && Nat.blt b d) || (Nat.blt c a && Nat.blt a d && Nat.blt d b))
+
 def isNonCrossing (m : Array (Nat × Nat)) : Bool :=
-  Id.run do
-    for i in [0:m.size] do
-      for j in [0:m.size] do
-        let (a, b) := m[i]!
-        let (c, d) := m[j]!
-        let (a, b) := if a < b then (a, b) else (b, a)
-        let (c, d) := if c < d then (c, d) else (d, c)
-        
-        if (a < c && c < b && b < d) || (c < a && a < d && d < b) then
-          return false
-    return true
+  isNonCrossingList m.toList
 
 /-- Generate all sign assignments (+1=true, -1=false) for a given number of pairs. -/
-partial def getSignAssignments (numPairs : Nat) : Array (Array Bool) :=
-  if numPairs == 0 then #[ #[] ]
-  else Id.run do
-    let mut res := #[]
-    for s in getSignAssignments (numPairs - 1) do
-      res := res.push (s.push true)
-      res := res.push (s.push false)
-    return res
+def getSignAssignmentsList : Nat → List (List Bool)
+  | 0 => [[]]
+  | numPairs + 1 =>
+    (getSignAssignmentsList numPairs).bind fun s => [true :: s, false :: s]
+
+def getSignAssignments (numPairs : Nat) : Array (Array Bool) :=
+  Array.mk ((getSignAssignmentsList numPairs).map Array.mk)
+
+def allSubsets : List Nat → List (List Nat)
+  | [] => [[]]
+  | y :: ys =>
+    let s := allSubsets ys
+    s ++ s.map (y :: ·)
+
+def subsetsOfEvenSize (l : List Nat) : List (List Nat) :=
+  (allSubsets l).filter (fun s => s.length % 2 == 0)
 
 /-- Generate balanced signed matchings for a given ring size. -/
-partial def generateBalancedSignedMatchings (ringSize : Nat) : Array SignedMatching :=
-  Id.run do
-    let mut results := #[]
-    let numSubsets := 1 <<< ringSize
-    for subsetMask in [0:numSubsets] do
-      let mut k := subsetMask
-      let mut bitCount := 0
-      while k > 0 do
-        if k % 2 == 1 then bitCount := bitCount + 1
-        k := k / 2
-        
-      if bitCount % 2 == 0 then
-        let mut subset := #[]
-        for i in [0:ringSize] do
-          if (subsetMask >>> i) % 2 == 1 then
-            subset := subset.push i
-            
-        for m in getMatchings subset do
-          if isNonCrossing m then
-            let numPairs := m.size
-            for signs in getSignAssignments numPairs do
-              let mut negCount := 0
-              for s in signs do
-                if not s then negCount := negCount + 1
-              if negCount % 2 == ringSize % 2 then
-                let mut flatPairs := #[]
-                for (a,b) in m do
-                  flatPairs := flatPairs.push a
-                  flatPairs := flatPairs.push b
-                results := results.push { numPairs := numPairs, pairs := flatPairs, signs := signs }
-    return results
+def generateBalancedSignedMatchings (ringSize : Nat) : Array SignedMatching :=
+  let subsets := subsetsOfEvenSize (List.range ringSize)
+  let listRes := subsets.bind fun subset =>
+    let matchings := (getMatchingsList subset.length subset).filter isNonCrossingList
+    matchings.bind fun m =>
+      let numPairs := m.length
+      let signAssigns := (getSignAssignmentsList numPairs).filter fun signs =>
+        (signs.filter (!·)).length % 2 == ringSize % 2
+      signAssigns.map fun signs =>
+        let flatPairs := m.bind (fun (a, b) => [a, b])
+        { numPairs := numPairs, pairs := Array.mk flatPairs, signs := Array.mk signs }
+  Array.mk listRes
 
 /-- The computable implementation of `computeMaxConsistentSubset`.
 It computes the greatest fixed point of the reduction operator over the live colorings.
 Returns the final array of live colorings. If empty, the configuration is D-reducible! -/
 def getNonExtendingMask (c : Configuration) (allColorings : Array ColorList) : Array Bool :=
-  allColorings.map (fun b => not (extendsToInterior c b))
+  strictListOfNatList (interiorNeighborOffsets c) fun offsetLists =>
+    Array.mk (allColorings.toList.map (fun b => not (extendsRev offsetLists (forceNatListRev b.toList []))))
+
+structure FastMatching where
+  pairs : List (Nat × Nat × Bool)
+  unmatched : List Nat
+
+def forcePairListRev : List (Nat × Nat × Bool) → List (Nat × Nat × Bool) → List (Nat × Nat × Bool)
+  | [], acc => acc
+  | p :: xs, acc =>
+    match p with
+    | (e1, e2, sign) =>
+      strictNat e1 fun e1' =>
+        strictNat e2 fun e2' =>
+          match sign with
+          | true => forcePairListRev xs ((e1', e2', true) :: acc)
+          | false => forcePairListRev xs ((e1', e2', false) :: acc)
+
+def strictPairList (l : List (Nat × Nat × Bool)) (k : List (Nat × Nat × Bool) → α) : α :=
+  match forcePairListRev (forcePairListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def forceFastMatchingListRev : List FastMatching → List FastMatching → List FastMatching
+  | [], acc => acc
+  | m :: ms, acc =>
+    strictPairList m.pairs fun ps =>
+      strictNatList m.unmatched fun us =>
+        forceFastMatchingListRev ms ({ pairs := ps, unmatched := us } :: acc)
+
+def strictFastMatchingList (l : List FastMatching) (k : List FastMatching → α) : α :=
+  match forceFastMatchingListRev (forceFastMatchingListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def toFastMatching (ringSize : Nat) (m : SignedMatching) : FastMatching :=
+  let pl := m.pairs.toList
+  let sl := m.signs.toList
+  let pairs := (List.range m.numPairs).map fun i =>
+    (colorAt pl (2 * i), colorAt pl (2 * i + 1), sl.getD i false)
+  let unmatched := (List.range ringSize).filter fun i => !pl.contains i
+  { pairs := pairs, unmatched := unmatched }
+
+def checkThetaFitFast (ecol : List Nat) (theta : Nat) (m : FastMatching) : Bool :=
+  m.unmatched.all (fun u => colorAt ecol u == theta) &&
+  m.pairs.all fun (e1, e2, sign) =>
+    let c1 := colorAt ecol e1
+    let c2 := colorAt ecol e2
+    c1 != theta && c2 != theta && ((c1 == c2) == sign)
+
+def checkEcolFitsM (ecol : List Nat) (m : FastMatching) : Bool :=
+  checkThetaFitFast ecol 1 m || checkThetaFitFast ecol 2 m || checkThetaFitFast ecol 3 m
+
+def isMatchingAlive : List (List Nat) → List Bool → FastMatching → Bool
+  | [], _, _ => true
+  | ecol :: ecols, ls, m =>
+    match ls with
+    | [] => true
+    | true :: rest => isMatchingAlive ecols rest m
+    | false :: rest =>
+      if checkEcolFitsM ecol m then false else isMatchingAlive ecols rest m
+
+def coloringSurvives (ecol : List Nat) (mLive : List FastMatching) : Bool :=
+  (mLive.any (checkThetaFitFast ecol 1)) &&
+  (mLive.any (checkThetaFitFast ecol 2)) &&
+  (mLive.any (checkThetaFitFast ecol 3))
+
+def nextMaskLoop : List (List Nat) → List Bool → List FastMatching → List Bool
+  | [], _, _ => []
+  | ecol :: ecols, ls, mLive =>
+    match ls with
+    | [] => []
+    | true :: rest => coloringSurvives ecol mLive :: nextMaskLoop ecols rest mLive
+    | false :: rest => false :: nextMaskLoop ecols rest mLive
+
+def forceListRev : List α → List α → List α
+  | [], acc => acc
+  | x :: xs, acc => forceListRev xs (x :: acc)
+
+def strictList (l : List α) (k : List α → β) : β :=
+  match forceListRev (forceListRev l []) [] with
+  | [] => k []
+  | x :: xs => k (x :: xs)
+
+def fixpoint (allEcols : List (List Nat)) : List FastMatching → Nat → List Bool → Nat → List Bool
+  | _, 0, liveMask, _ => liveMask
+  | matchings, fuel + 1, liveMask, liveCount =>
+    strictList (matchings.filter (isMatchingAlive allEcols liveMask)) fun mLive =>
+    strictBoolList (nextMaskLoop allEcols liveMask mLive) fun nextLiveMask =>
+    strictNat (nextLiveMask.filter (· == true)).length fun nextLiveCount =>
+      if Nat.blt nextLiveCount liveCount then
+        fixpoint allEcols mLive fuel nextLiveMask nextLiveCount
+      else
+        liveMask
+
+def collectFinal : List (List Nat) → List Bool → List ColorList
+  | [], _ => []
+  | col :: cols, ls =>
+    match ls with
+    | [] => []
+    | true :: rest => Array.mk col :: collectFinal cols rest
+    | false :: rest => collectFinal cols rest
 
 /-- The computable implementation of `computeMaxConsistentSubset`.
 It computes the greatest fixed point of the reduction operator over the live colorings.
 Returns the final array of live colorings. If empty, the configuration is D-reducible! -/
 def computeMaxConsistentSubset (c : Configuration) : Array ColorList :=
   let ringSize := c.ringSize
-  let matchings := generateBalancedSignedMatchings ringSize
-  let allRingColorings := generateRingColorings ringSize
-  let initialLiveMask := getNonExtendingMask c allRingColorings
-  let allRingWithEdges := allRingColorings.mapIdx (fun i col => (i.val, col, vertexToEdgeColoring ringSize col))
-  
-  set_option linter.unusedVariables false in
-  let rec fixpoint (liveMask : Array Bool) (liveCount : Nat) : Array Bool × Nat :=
-    let M_live := matchings.filter (fun m => Id.run do
-      let mut isAlive := true
-      for (i, col, ecol) in allRingWithEdges do
-        let mut fitsAny := false
-        for x in [1, 2, 3] do
-          if checkThetaFit ringSize ecol x m then
-            fitsAny := true
-            if not liveMask[i]! then
-              isAlive := false
-            break
-        if not isAlive then break
-      return isAlive
-    )
-    
-    let (nextLiveMask, nextLiveCount) := Id.run do
-      let mut mask := liveMask
-      let mut count := 0
-      for (i, col, ecol) in allRingWithEdges do
-        if liveMask[i]! then
-          let mut survives := true
-          for x in [1, 2, 3] do
-            let mut fitsAny := false
-            for m in M_live do
-              if checkThetaFit ringSize ecol x m then
-                fitsAny := true
-                break
-            if not fitsAny then
-              survives := false
-              break
-          if survives then
-            count := count + 1
-          else
-            mask := mask.set! i false
-      return (mask, count)
-          
-    if h : nextLiveCount < liveCount then 
-      fixpoint nextLiveMask nextLiveCount
-    else 
-      (liveMask, liveCount)
-  termination_by liveCount
-  decreasing_by exact h
-  
-  let initialLiveCount := initialLiveMask.foldl (fun acc b => if b then acc + 1 else acc) 0
-  let (finalMask, _) := fixpoint initialLiveMask initialLiveCount
-  
-  Id.run do
-    let mut finalLive := #[]
-    for i in [0:allRingColorings.size] do
-      if finalMask[i]! then
-        finalLive := finalLive.push allRingColorings[i]!
-    return finalLive
+  strictListOfNatList (interiorNeighborOffsets c) fun offsetLists =>
+  strictFastMatchingList ((generateBalancedSignedMatchings ringSize).toList.map (toFastMatching ringSize)) fun matchings =>
+  strictListOfNatList ((generateRingColorings ringSize).toList.map Array.toList) fun allCols =>
+  strictBoolList (allCols.map (fun b => not (extendsRev offsetLists (forceNatListRev b [])))) fun initialLiveMask =>
+  strictListOfNatList (allCols.map (fun b => (vertexToEdgeColoring ringSize (Array.mk b)).toList)) fun allEcols =>
+    strictNat (initialLiveMask.filter (· == true)).length fun initialLiveCount =>
+      let finalMask := fixpoint allEcols matchings initialLiveCount initialLiveMask initialLiveCount
+      Array.mk (collectFinal allCols finalMask)
 
 /-- The final computable D-reducibility check! -/
 def isComputablyDReducible (c : Configuration) : Bool :=

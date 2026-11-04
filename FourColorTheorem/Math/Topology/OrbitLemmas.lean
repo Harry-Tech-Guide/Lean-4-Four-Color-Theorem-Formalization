@@ -74,22 +74,16 @@ theorem bypass_fixed_point (p : Perm D) (d : D) :
 theorem bypass_bypass (p : Perm D) (d : D) : bypass (bypass p d) d = bypass p d :=
   bypass_fixed_point (bypass p d) d (bypass_self p d)
 
-theorem countOrbits_nil (p : Perm D) (fuel : Nat) : countOrbits p fuel [] = 0 := by
-  rw [countOrbits]
+theorem countOrbits_nil (p : Perm D) (fuel : Nat) : countOrbits p fuel [] = 0 := rfl
 
 theorem countComponents_nil (H : Hypermap) [BEq H.Dart] (fuel : Nat) :
-    countComponents H fuel [] = 0 := by
-  rw [countComponents]
+    countComponents H fuel [] = 0 := rfl
 
 theorem countOrbits_singleton (p : Perm D) (fuel : Nat) (d : D) :
-    countOrbits p fuel [d] = 1 := by
-  rw [countOrbits]
-  simp [countOrbits_nil]
+    countOrbits p fuel [d] = 1 := rfl
 
 theorem countComponents_singleton (H : Hypermap) [BEq H.Dart] (fuel : Nat) (d : H.Dart) :
-    countComponents H fuel [d] = 1 := by
-  rw [countComponents]
-  simp [countComponents_nil]
+    countComponents H fuel [d] = 1 := rfl
 
 theorem getOrbit_fixed_point (p : Perm D) (d : D) (fuel : Nat) (h : IsFixedPoint p d) :
     getOrbit p (fuel + 1) d = [d] := by

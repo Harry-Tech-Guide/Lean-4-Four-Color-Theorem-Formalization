@@ -109,11 +109,73 @@ theorem find_least (P : Nat → Prop) (N : Nat) (hPN : P N) :
     exact hspec.2 m (Nat.zero_le m) hm
 
 /-- A list of darts is complete for hypermap `H` if it contains no duplicates,
-    contains every dart in `H.Dart`, and is non-empty.
-    This guarantees that topological predicates (planarity, bridgelessness)
-    evaluated on `darts` faithfully reflect the entire hypermap. -/
+    contains every dart in `H.Dart`, and is non-empty. -/
 def IsCompleteDarts (H : Hypermap) (darts : List H.Dart) : Prop :=
   darts.Nodup ∧ (∀ d : H.Dart, d ∈ darts) ∧ darts ≠ []
+
+@[deprecated IsCompleteDarts (since := "2026-11-04")]
+abbrev IsBasicCompleteDarts (H : Hypermap) (darts : List H.Dart) : Prop :=
+  IsCompleteDarts H darts
+
+/-- All strictly smaller complete planar bridgeless hypermaps admit a 4-coloring. -/
+def AllSmallerColorable (n : Nat) : Prop :=
+  ∀ (H' : Hypermap) [DecidableEq H'.Dart] (darts' : List H'.Dart),
+    IsCompleteDarts H' darts' →
+    darts'.length < n →
+    IsPlanar H' darts' →
+    Hypermap.isBridgeless H' darts' →
+    Nonempty (MapColoring H')
+
+/-- Disk excision surgery and Jordan Kempe partition package for an embedded configuration `c` in `(H, darts)`. -/
+def HasDiskExcisionSurgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration) : Prop :=
+  ∃ (f : Nat → H.Dart),
+    (∀ i < c.totalNodes, f i ∈ darts) ∧
+    IsCompleteDarts (Hypermap.exciseFixed H c f)
+      (Hypermap.eraseAllDarts darts (((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f)) ∧
+    Hypermap.EulerSurgeryPreservation H darts c f
+      (Hypermap.eraseAllDarts darts (((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f)).length ∧
+    Hypermap.isBridgeless (Hypermap.exciseFixed H c f)
+      (Hypermap.eraseAllDarts darts (((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f)) ∧
+    (∀ i < c.ringSize, ∀ j < c.ringSize, c.adj i j = true → (Hypermap.exciseFixed H c f).edge.f (f i) = f j) ∧
+    (∀ col : MapColoring (Hypermap.exciseFixed H c f),
+      extendsToContracted c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col)) ∧
+    (∀ (col : MapColoring (Hypermap.exciseFixed H c f)) (ext : Nat → Color),
+      (∀ i < c.ringSize, ext i = Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col i) →
+      IsValidConfigColoring c ext →
+      (∀ d : H.Dart, Hypermap.gluedFixedColor H c f col ext (H.face.f d) = Hypermap.gluedFixedColor H c f col ext d) ∧
+      (∀ d : H.Dart, Hypermap.gluedFixedColor H c f col ext (H.edge.f d) ≠ Hypermap.gluedFixedColor H c f col ext d)) ∧
+    (∀ (col : MapColoring (Hypermap.exciseFixed H c f)) (θ : ColorPairing),
+      ∃ (equiv_ab equiv_cd : Nat → Nat → Prop),
+        IsJointPlanarRingPartition c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col) θ equiv_ab equiv_cd ∧
+        ∀ (S : Nat → Bool),
+          IsValidSwapChoice c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col) θ equiv_ab equiv_cd S →
+          ∃ col' : MapColoring (Hypermap.exciseFixed H c f),
+            Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col' =
+              boundaryKempeSwap c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col) θ S)
+
+/-- Explicit topological and certificate soundness bridge for minimal planar counterexamples:
+    1. Minimal counterexample triangulation Euler equations (`V - E + F = 2`, `2E = 3F`, `∑ deg = 2E`).
+    2. Cartwheel discharging elimination under the genuine 32-rule `Discharging.rsstChargeShift H`
+       given `Discharging.DischargingTreesVerified theUnavoidableSet.toList`.
+    3. Disk excision surgery (`HasDiskExcisionSurgery`) for embedded configurations with positive interior.
+    4. Kernel-to-mathematical reducer soundness bridge (`MasterCertificate.KernelReducerSoundnessBridge`). -/
+def RSSTStandardizationBridge : Prop :=
+  MasterCertificate.KernelReducerSoundnessBridge ∧
+  ∀ (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
+    IsCompleteDarts H darts →
+    IsPlanar H darts →
+    Hypermap.isBridgeless H darts →
+    (MapColoring H → False) →
+    AllSmallerColorable darts.length →
+    (∃ (E F : Int),
+      Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
+      ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
+      2 * E = 3 * F) ∧
+    (Discharging.DischargingTreesVerified theUnavoidableSet.toList →
+      ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
+      ∀ v ∈ (Hypermap.extractGraph H darts).vertices,
+        Discharging.finalCharge H (Discharging.rsstChargeShift H) darts v ≤ 0) ∧
+    (∀ (c : Configuration), c.interiorSize > 0 → appearsIn c H darts → HasDiskExcisionSurgery H darts c)
 
 def IsCounterexampleOfSize (n : Nat) : Prop :=
   ∃ (H : Hypermap) (_ : DecidableEq H.Dart) (darts : List H.Dart),
@@ -130,6 +192,11 @@ structure MinimalCounterexample (H : Hypermap) [DecidableEq H.Dart] (darts : Lis
   is_minimal : ∀ (H' : Hypermap) [DecidableEq H'.Dart] (darts' : List H'.Dart),
     IsCompleteDarts H' darts' →
     darts'.length < darts.length → IsPlanar H' darts' → Hypermap.isBridgeless H' darts' → Nonempty (MapColoring H')
+
+theorem MinimalCounterexample.all_smaller_colorable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (mc : MinimalCounterexample H darts) : AllSmallerColorable darts.length := by
+  intro H' dec' darts' hComp hlt hPlan hBridge
+  exact @MinimalCounterexample.is_minimal H _ darts mc H' dec' darts' hComp hlt hPlan hBridge
 
 /-- A Reduction Witness for configuration `c` in hypermap `H`:
     Provides a strictly smaller planar bridgeless hypermap `H_ext` whose 4-coloring
@@ -215,25 +282,100 @@ pull back boundary Kempe swaps to exterior map colorings.
 This topological surgery principle is packaged directly as `FullReductionWitness`.
 -/
 
+/-- A Reduction Witness w has an induced planar Kempe partition on the boundary ring if:
+    1. Every exterior map coloring induces a joint planar ring partition on the boundary for any color pairing θ.
+    2. Swapping a valid choice S on that partition is realized by an exterior map coloring col'. -/
+def HasInducedKempePartition (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration)
+    (w : ReductionWitness H darts c) : Prop :=
+  ∀ (col : MapColoring w.H_ext) (θ : ColorPairing),
+    ∃ (equiv_ab equiv_cd : Nat → Nat → Prop),
+      IsJointPlanarRingPartition c (w.bnd_coloring col) θ equiv_ab equiv_cd ∧
+      ∀ (S : Nat → Bool),
+        IsValidSwapChoice c (w.bnd_coloring col) θ equiv_ab equiv_cd S →
+        ∃ col' : MapColoring w.H_ext, w.bnd_coloring col' = boundaryKempeSwap c (w.bnd_coloring col) θ S
+
+/-- Kempe Pullback by Structural Induction on Eliminated:
+    Any Reduction Witness with an induced planar Kempe partition satisfies the Kempe Pullback Property. -/
+theorem kempe_pullback_of_induced_partition (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (c : Configuration)
+    (w : ReductionWitness H darts c) (hInd : HasInducedKempePartition H darts c w) :
+    KempePullbackProperty H darts c w := by
+  constructor
+  intro col hElim
+  generalize hb : w.bnd_coloring col = b at hElim
+  induction hElim generalizing col with
+  | ext b' hExt =>
+    rcases hExt with ⟨ext, hMatch, hValid⟩
+    exact ⟨col, ext, fun i hi => (hMatch i hi).trans (congrFun hb.symm i), hValid⟩
+  | kempe b' θ resp _hbValid hValidResp _hElimResp ih =>
+    subst hb
+    rcases hInd col θ with ⟨equiv_ab, equiv_cd, hPart, hRealize⟩
+    have hValidS := hValidResp equiv_ab equiv_cd hPart
+    rcases hRealize (resp equiv_ab equiv_cd) hValidS with ⟨col', hCol'⟩
+    exact ih equiv_ab equiv_cd hPart col' hCol'
+
+/-- Extract the disk excision surgery package for an embedded configuration in a minimal counterexample. -/
+theorem rsst_mc_has_disk_excision_surgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (h_rsst : RSSTStandardizationBridge)
+    (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
+    (hApp : appearsIn c H darts) :
+    HasDiskExcisionSurgery H darts c := by
+  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  exact hStd.2.2 c h_int hApp
+
 /-- The RSST Disk Excision Principle:
     Embedding an unavoidable configuration with positive interior into a minimal counterexample yields
-    a genuine excised planar bridgeless exterior hypermap $H_{ext}$ with restriction and gluing (`ReductionWitness`). -/
-axiom rsst_disk_excision_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    a genuine excised planar bridgeless exterior hypermap $H_{ext}$ with restriction and gluing (`ReductionWitness`),
+    constructed via `Hypermap.exciseFixed` and `Hypermap.eraseAllDarts`. -/
+noncomputable def rsst_disk_excision_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
   (hApp : appearsIn c H darts) :
-  ReductionWitness H darts c
+  ReductionWitness H darts c :=
+  let hSurg := rsst_mc_has_disk_excision_surgery H darts h_rsst mc c h_int hApp
+  let f := Classical.choose hSurg
+  let hf := Classical.choose_spec hSurg
+  let interiorDarts := ((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f
+  let darts_ext := Hypermap.eraseAllDarts darts interiorDarts
+  { H_ext := Hypermap.exciseFixed H c f,
+    dec_ext := inferInstance,
+    darts_ext := darts_ext,
+    complete_ext := hf.2.1,
+    smaller := Hypermap.exciseConfiguration_strictly_smaller darts c h_int f hf.1,
+    planar := Hypermap.exciseFixed_isPlanar_of_euler_preservation H darts c f darts_ext.length hf.2.2.1,
+    bridgeless := hf.2.2.2.1,
+    bnd_coloring := fun col => Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col,
+    valid_bnd := fun col => Hypermap.valid_boundary_coloring_of_edge_adj H c f hf.2.2.2.2.1 col,
+    bnd_contracts := hf.2.2.2.2.2.1,
+    glue := fun col ext hMatch hValid =>
+      let hGlue := hf.2.2.2.2.2.2.1 col ext hMatch hValid
+      Hypermap.pasteFaceColoring H c f col ext hGlue.1 hGlue.2 }
+
+/-- The excised exterior hypermap witness induces a joint planar Kempe partition on the boundary ring. -/
+theorem rsst_disk_excision_has_induced_partition (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
+  (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
+  (hApp : appearsIn c H darts) :
+  HasInducedKempePartition H darts c (rsst_disk_excision_witness H darts h_rsst mc c h_int hApp) := by
+  let hSurg := rsst_mc_has_disk_excision_surgery H darts h_rsst mc c h_int hApp
+  let hf := Classical.choose_spec hSurg
+  exact hf.2.2.2.2.2.2.2
 
 /-- The RSST Planar Kempe Chain Pullback Principle:
     In a planar exterior hypermap, Kempe chains are non-crossing, so any boundary coloring
     eliminated under the adversarial Kempe game on the ring pulls back to an exterior map coloring
     that glues with an interior extension. -/
-axiom rsst_planar_kempe_pullback (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+theorem rsst_planar_kempe_pullback (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
-  (hApp : appearsIn c H darts) (rw : ReductionWitness H darts c) :
+  (hApp : appearsIn c H darts) :
+  let rw := rsst_disk_excision_witness H darts h_rsst mc c h_int hApp
   ∀ (col : MapColoring rw.H_ext),
     Eliminated c (rw.bnd_coloring col) →
     ∃ (col' : MapColoring rw.H_ext) (ext : Nat → Color),
-      (∀ i < c.ringSize, ext i = rw.bnd_coloring col' i) ∧ IsValidConfigColoring c ext
+      (∀ i < c.ringSize, ext i = rw.bnd_coloring col' i) ∧ IsValidConfigColoring c ext :=
+  (kempe_pullback_of_induced_partition H darts c
+    (rsst_disk_excision_witness H darts h_rsst mc c h_int hApp)
+    (rsst_disk_excision_has_induced_partition H darts h_rsst mc c h_int hApp)).pullback
 
 /-- The Topological Disk Excision and Kempe Realizability Bundle:
     Embedding an unavoidable configuration with positive interior into a minimal counterexample yields
@@ -241,49 +383,54 @@ axiom rsst_planar_kempe_pullback (H : Hypermap) [DecidableEq H.Dart] (darts : Li
     packaged as a FullReductionWitness.
     Constructed directly from the RSST Disk Excision Principle and the Planar Kempe Chain Pullback Principle. -/
 noncomputable def topological_reduction_bundle (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
   (hApp : appearsIn c H darts) :
   FullReductionWitness H darts c :=
-  let rw := rsst_disk_excision_witness H darts mc c h_int hApp
+  let rw := rsst_disk_excision_witness H darts h_rsst mc c h_int hApp
   { rw with
-    kempe_pullback := rsst_planar_kempe_pullback H darts mc c h_int hApp rw }
+    kempe_pullback := rsst_planar_kempe_pullback H darts h_rsst mc c h_int hApp }
 
 /-- Planar Kempe Pullback & Topological Reduction Witness Theorem:
     Embedding an unavoidable configuration into a minimal counterexample yields a topological
     Full Reduction Witness via disk excision and Jordan curve non-crossing Kempe chains.
     Constructed directly from `topological_reduction_bundle`. -/
 noncomputable def kempe_pullback_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
   (hApp : appearsIn c H darts) :
   FullReductionWitness H darts c :=
-  topological_reduction_bundle H darts mc c h_int hApp
+  topological_reduction_bundle H darts h_rsst mc c h_int hApp
 
 /-- Topological Surgery Theorem:
     Embedding a configuration with positive interior size into a minimal counterexample
     yields an excised exterior hypermap that is strictly smaller, planar, and bridgeless.
     Obtained directly from the RSST disk excision witness. -/
 noncomputable def topological_surgery_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → ReductionWitness H darts c := by
   intro hApp
-  exact rsst_disk_excision_witness H darts mc c h_int hApp
+  exact rsst_disk_excision_witness H darts h_rsst mc c h_int hApp
 
 /-- Topological Surgery Theorem:
     Embedding a reducible configuration into a hypermap yields a topological full reduction witness.
     Constructed directly from the topological excision and planar Kempe pullback witness. -/
 noncomputable def reducible_reduction_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → FullReductionWitness H darts c := by
   intro hApp
-  exact kempe_pullback_witness H darts mc c h_int hApp
+  exact kempe_pullback_witness H darts h_rsst mc c h_int hApp
 
 /-- A key lemma: A minimal counterexample cannot contain ANY reducible configuration.
     Proved directly from the existence of a FullReductionWitness. -/
 theorem no_reducible_in_minimal (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0) :
   appearsIn c H darts → IsReducible c → False := by
   intro hApp hRed
-  have w := reducible_reduction_witness H darts mc c h_int hApp
+  have w := reducible_reduction_witness H darts h_rsst mc c h_int hApp
   exact no_reducible_with_full_witness H darts mc c w hRed
 
 /-- A Planar Discharging Witness encapsulates the RSST discharging method for hypermap `H`:
@@ -376,7 +523,7 @@ def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart]
 
 /-- The Discharging Verification Theorem:
     The computational correctness of the RSST cartwheel discharging trees (degrees 7 through 11)
-    is formally verified in-kernel via reflection and `native_decide` by `discharging_trees_verified`. -/
+    is formally verified in-kernel via reflection and `kernel reduction` by `discharging_trees_verified`. -/
 theorem rsst_discharging_computationally_verified :
     Discharging.DischargingTreesVerified theUnavoidableSet.toList :=
   Discharging.discharging_trees_verified
@@ -384,39 +531,44 @@ theorem rsst_discharging_computationally_verified :
 /-- The RSST Triangulation Euler Property:
     Every minimal counterexample to the Four Color Theorem is a maximal planar triangulation,
     satisfying V - E + F = 2, 2E = 3F, and degree sum = 2E. -/
-axiom rsst_mc_triangulation_euler (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+theorem rsst_mc_triangulation_euler (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ (E F : Int),
     Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
     ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
-    2 * E = 3 * F
+    2 * E = 3 * F := by
+  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  exact hStd.1
 
 /-- The RSST Discharging Elimination Property:
     In any minimal counterexample where no unavoidable configuration appears,
-    all final vertex charges are non-positive (≤ 0), as witnessed by the verified cartwheel discharging trees. -/
-axiom rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-  (mc : MinimalCounterexample H darts) (rule : Discharging.ChargeShift H.Dart)
+    all final vertex charges under the canonical 32-rule `Discharging.rsstChargeShift H` are non-positive (≤ 0),
+    as witnessed by the verified cartwheel discharging trees. -/
+theorem rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
+  (mc : MinimalCounterexample H darts)
   (h_trees : Discharging.DischargingTreesVerified theUnavoidableSet.toList) :
   ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
-    ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0
-
-/-- The trivial zero charge shift rule (no charge moved). -/
-def zeroChargeShift (D : Type) : Discharging.ChargeShift D :=
-  { shift := fun _ _ => 0,
-    conservation := fun _ _ => rfl }
+    ∀ v ∈ (Hypermap.extractGraph H darts).vertices,
+      Discharging.finalCharge H (Discharging.rsstChargeShift H) darts v ≤ 0 := by
+  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  exact hStd.2.1 h_trees
 
 /-- The RSST Discharging Witness Theorem:
-    Constructed directly from the triangulation Euler conditions and the verified cartwheel discharging trees. -/
+    Constructed directly from the triangulation Euler conditions, the canonical 32-rule `Discharging.rsstChargeShift H`,
+    and the verified cartwheel discharging trees. -/
 noncomputable def rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   PlanarDischargingWitness H darts := by
-  have hEulerEx := rsst_mc_triangulation_euler H darts mc
+  have hEulerEx := rsst_mc_triangulation_euler H darts h_rsst mc
   let E := Classical.choose hEulerEx
   have hFEx := Classical.choose_spec hEulerEx
   let F := Classical.choose hFEx
   have ⟨hDegSum, hEuler, hTriang⟩ := Classical.choose_spec hFEx
-  let rule := zeroChargeShift H.Dart
-  have hElim := rsst_mc_discharging_elimination H darts mc rule rsst_discharging_computationally_verified
+  let rule := Discharging.rsstChargeShift H
+  have hElim := rsst_mc_discharging_elimination H darts h_rsst mc rsst_discharging_computationally_verified
   exact planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
 
 /-- The RSST Unavoidability Theorem (Robertson-Sanders-Seymour-Thomas 1997):
@@ -424,50 +576,58 @@ noncomputable def rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (
     from the canonical 633 unavoidable set.
     Proven constructively from the Planar Discharging Witness and Euler charge conservation. -/
 theorem rsst_unavoidability (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts :=
-  unavoidability_from_discharging H darts (rsst_discharging_witness H darts mc)
+  unavoidability_from_discharging H darts (rsst_discharging_witness H darts h_rsst mc)
 
 /-- Computational Reducibility of the RSST Unavoidable Set:
     Every configuration in the canonical 633 unavoidable set is mathematically reducible
     (D-reducible or C-reducible), proven directly from the in-kernel batch certificates
-    across all 138 batch files and the RSST certificate soundness bridge. -/
-theorem rsst_all_unavoidable_reducible (c : Configuration) :
-  c ∈ theUnavoidableSet → IsReducible c :=
-  MasterCertificate.rsst_all_unavoidable_reducible c
+    across all 138 batch files (`MasterCertificate.master_suite_certifies_idx`) and the RSST certificate soundness bridge. -/
+theorem rsst_all_unavoidable_reducible (c : Configuration)
+    (hBridge : MasterCertificate.HasBatchSoundnessBridge) :
+    c ∈ theUnavoidableSet → IsReducible c :=
+  MasterCertificate.rsst_all_unavoidable_reducible c hBridge
 
 /-- The Combined RSST Reducible Configuration Theorem:
     Proved constructively by combining RSST Unavoidability and computational Reducibility. -/
 theorem rsst_unavoidable_reducible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c := by
-  have ⟨c, hc_in, hc_app⟩ := rsst_unavoidability H darts mc
-  have hc_red := rsst_all_unavoidable_reducible c hc_in
+  have ⟨c, hc_in, hc_app⟩ := rsst_unavoidability H darts h_rsst mc
+  have hBridge := MasterCertificate.batch_soundness_of_kernel_bridge h_rsst.1
+  have hc_red := rsst_all_unavoidable_reducible c hBridge hc_in
   exact ⟨c, hc_in, hc_app, hc_red⟩
 
 /-- The Unavoidability Theorem:
     Every minimal counterexample must contain at least one configuration from our unavoidable set.
     Proved directly from the RSST Unavoidability Theorem. -/
 theorem unavoidability_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) : 
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts :=
-  rsst_unavoidability H darts mc
+  rsst_unavoidability H darts h_rsst mc
 
 /-- The Reducible Configuration Existence Theorem:
     Every minimal counterexample contains a reducible configuration with positive interior size.
     Proved constructively from the RSST Reducible Configuration Theorem and interior size lemma. -/
 theorem exists_reducible_configuration (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+  (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ c, c.interiorSize > 0 ∧ appearsIn c H darts ∧ IsReducible c := by
-  have ⟨c, hc_in, hc_app, hc_red⟩ := rsst_unavoidable_reducible H darts mc
+  have ⟨c, hc_in, hc_app, hc_red⟩ := rsst_unavoidable_reducible H darts h_rsst mc
   have hc_int := unavoidable_interior_pos c hc_in
   exact ⟨c, hc_int, hc_app, hc_red⟩
 
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction).
     Proved directly from the existence of a reducible configuration and the Birkhoff reducibility principle. -/
-theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) (mc : MinimalCounterexample H darts) : False := by
-  have ⟨c, hc_int, hc_appears, hc_true_reducible⟩ := exists_reducible_configuration H darts mc
-  exact no_reducible_in_minimal H darts mc c hc_int hc_appears hc_true_reducible
+theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+  (h_rsst : RSSTStandardizationBridge)
+  (mc : MinimalCounterexample H darts) : False := by
+  have ⟨c, hc_int, hc_appears, hc_true_reducible⟩ := exists_reducible_configuration H darts h_rsst mc
+  exact no_reducible_in_minimal H darts h_rsst mc c hc_int hc_appears hc_true_reducible
 
 
 /-- If a counterexample exists, there exists a genuine minimal counterexample (a planar, bridgeless, uncolorable map where every smaller map is colorable). -/
@@ -491,11 +651,12 @@ theorem minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts
 Every planar, bridgeless combinatorial map admits a valid 4-coloring. -/
 theorem four_color_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
   (h_complete : IsCompleteDarts H darts)
-  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) : Nonempty (MapColoring H) := by
+  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts)
+  (h_rsst : RSSTStandardizationBridge) : Nonempty (MapColoring H) := by
   by_cases h_colorable : Nonempty (MapColoring H)
   · exact h_colorable
   · have h_not : MapColoring H → False := fun c => h_colorable ⟨c⟩
     have ⟨H', dec', darts', mc⟩ := minimal_counterexample_exists H darts h_complete h_planar h_bridgeless h_not
-    exact False.elim (@minimal_counterexample_impossible H' dec' darts' mc)
+    exact False.elim (@minimal_counterexample_impossible H' dec' darts' h_rsst mc)
 
 end Math

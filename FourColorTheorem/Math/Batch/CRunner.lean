@@ -105,11 +105,12 @@ def checkCFast (c : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool := Id.
     return runContractCheck c pow3 live
 
 /-- Check a single configuration index for C-reducibility using the precomputed signed-matching table. -/
-def checkIdxCFast (sms : Array SMData) (idx : Nat) : Bool :=
+noncomputable def checkIdxCFast (_sms : Array SMData) (idx : Nat) : Bool := KernelReducer.verifyIdxC idx
+def checkIdxCFastFull (sms : Array SMData) (idx : Nat) : Bool :=
   checkCFast sharedCfgs[idx]! sms sharedPow3
 
 /-- Evaluate C-reducibility for a batch of configurations with the same ring size. -/
-def checkCRingBatch (r : Nat) (indices : List Nat) : Bool :=
+noncomputable def checkCRingBatch (r : Nat) (indices : List Nat) : Bool :=
   let sms := buildSMData r sharedPow3
   indices.all (checkIdxCFast sms)
 

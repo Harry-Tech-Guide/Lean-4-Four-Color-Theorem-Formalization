@@ -5,41 +5,31 @@ namespace Batch
 
 open FastReducer
 
-/-!
-# In-Kernel C-Reducibility Batch 26: Ring 13 (Part 1)
-
-This module certifies the C-reducibility of 6 C-reducible configurations
-from the RSST unavoidable set with ring size 13:
-Configs 22, 82, 94, 95, 100, 101.
--/
-
-/-- The 6 ring-13 configuration indices certified in CBatch 26. -/
 def cbatch26_indices : List Nat :=
   [22, 82, 94, 95, 100, 101]
 
-/-- Unified in-kernel certification for CBatch 26 (Ring 13, Part 1). -/
-theorem cert_cbatch26_r13 : checkCRingBatch13 cbatch26_indices = true := by
-  native_decide
-
--- Individual configuration certificates extracted deductively from the batch theorem:
-
 theorem cert_config_22_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 22 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 22 (by decide)
+  KernelReducer.verifyIdxC_of_D 22 (by kernel_rfl)
 
 theorem cert_config_82_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 82 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 82 (by decide)
+  KernelReducer.verifyIdxC_of_D 82 (by kernel_rfl)
 
 theorem cert_config_94_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 94 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 94 (by decide)
+  KernelReducer.verifyIdxC_of_D 94 (by kernel_rfl)
 
 theorem cert_config_95_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 95 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 95 (by decide)
+  KernelReducer.verifyIdxC_of_D 95 (by kernel_rfl)
 
 theorem cert_config_100_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 100 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 100 (by decide)
+  KernelReducer.verifyIdxC_of_D 100 (by kernel_rfl)
 
 theorem cert_config_101_c_red : checkIdxCFast13 (buildSMData 13 sharedPow3) 101 = true :=
-  certified_of_cbatch13 cbatch26_indices cert_cbatch26_r13 101 (by decide)
+  KernelReducer.verifyIdxC_of_D 101 (by kernel_rfl)
+
+theorem cert_cbatch26_r13 : checkCRingBatch13 cbatch26_indices = true := by
+  dsimp only [cbatch26_indices, checkCRingBatch13, List.all]
+  rw [cert_config_22_c_red, cert_config_82_c_red, cert_config_94_c_red, cert_config_95_c_red, cert_config_100_c_red, cert_config_101_c_red]
+  rfl
 
 end Batch
 end Math

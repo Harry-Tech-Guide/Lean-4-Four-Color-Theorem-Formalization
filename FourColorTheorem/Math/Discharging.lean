@@ -1,5 +1,6 @@
 import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Topology.Euler
+import FourColorTheorem.Math.Rules
 
 namespace Math
 
@@ -54,6 +55,70 @@ structure ChargeShift (D : Type) where
 theorem shift_self_zero {D : Type} (rule : ChargeShift D) (x : D) : rule.shift x x = 0 := by
   have h := rule.conservation x x
   omega
+
+/-- Step from a pair of reference darts `(du, dv)` in a triangulation to the third triangle vertex dart,
+    oriented by `inv = false` (counterclockwise `node.f`) or `inv = true` (clockwise `node.inv`). -/
+def triStepDart (H : Hypermap) (inv : Bool) (du dv : H.Dart) : H.Dart :=
+  if inv then H.edge.f (H.node.inv (H.edge.f du))
+  else H.edge.f (H.node.f dv)
+
+/-- Map each RSST rule coordinate `k ∈ {0..16}` around a directed dart `d` to its vertex dart in `H`
+    using the canonical RSST coordinate tables `U` and `V` from `Rules.lean`. -/
+def ruleVertexDart (H : Hypermap) (inv : Bool) (d : H.Dart) : Nat → H.Dart
+  | 0 => d
+  | 1 => H.edge.f d
+  | k + 2 =>
+    let z := k + 2
+    let u_idx := if inv then V.getD z 0 else U.getD z 0
+    let v_idx := if inv then U.getD z 0 else V.getD z 0
+    let du := ruleVertexDart H inv d (min u_idx (k + 1))
+    let dv := ruleVertexDart H inv d (min v_idx (k + 1))
+    triStepDart H inv du dv
+
+/-- Check whether a vertex degree `deg` satisfies an RSST rule degree bound `(low, upp)`.
+    In RSST rule notation (`Rules.lean`), `upp = 12` denotes no upper bound (`∞`),
+    and `low = 0` denotes exact degree `upp`. -/
+def degMatchesBound (deg : Nat) (bnd : Nat × Nat) : Bool :=
+  let upp := if bnd.2 == 9 then 12 else bnd.2
+  let low := if bnd.1 == 0 then upp else bnd.1
+  decide (low ≤ deg) && (decide (upp == 12) || decide (deg ≤ upp))
+
+/-- Check whether an RSST `RawRule` matches directed dart `d` with reflection orientation `inv`. -/
+def matchesRawRule (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (inv : Bool) (d : H.Dart) (r : RawRule) : Bool :=
+  degMatchesBound (Hypermap.nodeDegree H (ruleVertexDart H inv d 0) fuel) r.b0 &&
+  degMatchesBound (Hypermap.nodeDegree H (ruleVertexDart H inv d 1) fuel) r.b1 &&
+  r.triples.all (fun p => degMatchesBound (Hypermap.nodeDegree H (ruleVertexDart H inv d p.1) fuel) p.2)
+
+/-- Charge sent by a single RSST `RawRule` (including its reflection if `r.invert = true`) along dart `d`. -/
+def rawRuleOutflow (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart) (r : RawRule) : Int :=
+  (if matchesRawRule H fuel false d r then 1 else 0) +
+  (if r.invert && matchesRawRule H fuel true d r then 1 else 0)
+
+/-- Total charge outflow along directed dart `d` across all 32 RSST rules in `theRules`. -/
+def dartRuleOutflow (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart) : Int :=
+  theRules.foldl (fun acc r => acc + rawRuleOutflow H fuel d r) 0
+
+/-- Total charge sent from vertex `u` to vertex `v` across all directed darts from `u` to `v`. -/
+def vertexRuleOutflow (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (u v : H.Dart) : Int :=
+  if Hypermap.sameVertex H u v fuel then 0
+  else
+    ((getOrbit H.node fuel u).filter (fun d => Hypermap.sameVertex H (H.edge.f d) v fuel)).foldl
+      (fun acc d => acc + dartRuleOutflow H fuel d) 0
+
+/-- Net RSST charge shift received by `u` from `v`: inflow from `v` to `u` minus outflow from `u` to `v`. -/
+def rsstShift (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat := 1000) (u v : H.Dart) : Int :=
+  vertexRuleOutflow H fuel v u - vertexRuleOutflow H fuel u v
+
+/-- Skew-symmetry (charge conservation) of the RSST 32-rule charge shift. -/
+theorem rsstShift_conservation (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (u v : H.Dart) :
+    rsstShift H fuel u v = - (rsstShift H fuel v u) := by
+  dsimp [rsstShift]
+  omega
+
+/-- The canonical RSST 32-rule discharging `ChargeShift` constructed from `theRules` (`Rules.lean`). -/
+def rsstChargeShift (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat := 1000) : ChargeShift H.Dart where
+  shift := rsstShift H fuel
+  conservation := rsstShift_conservation H fuel
 
 def sumShiftsTo {D : Type} (rule : ChargeShift D) (v : D) : List D → Int
   | [] => 0

@@ -7,6 +7,16 @@ namespace Math
 
 open Hypermap
 
+def colorBeq : Color → Color → Bool
+  | .c0, .c0 | .c1, .c1 | .c2, .c2 | .c3, .c3 => true
+  | _, _ => false
+
+local instance (priority := high) : BEq Color := ⟨colorBeq⟩
+
+local instance (priority := high) : LawfulBEq Color where
+  eq_of_beq {a b} h := by cases a <;> cases b <;> revert h <;> decide
+  rfl {a} := by cases a <;> rfl
+
 /-!
 # Sanity Verification: Degree-5 Vertex Configuration is Provably NOT Reducible
 
@@ -19,7 +29,7 @@ This module formally verifies that Kempe's 1879 degree-5 fallacy does NOT hold i
    has a valid joint planar ring partition (π_ab, π_cd) such that EVERY response swap choice S keeps
    the boundary coloring surjective onto all 4 colors.
 4. The existence of this winning adversary partition is verified across all 120 surjective colorings
-   and all 24 color pairings via computational reflection (`native_decide`) in `checkDeg5Adversary_true`.
+   and all 24 color pairings via computational reflection (`kernel reduction`) in `checkDeg5Adversary_true`.
 5. Hence, no Kempe chain transformation can eliminate a surjective boundary coloring: `¬ IsDReducible degree5Config`.
 6. Therefore, `¬ IsReducible degree5Config`.
 -/
@@ -192,27 +202,49 @@ theorem surj_of_isSurj5 (b : Nat → Color)
 def deg5BadList : List (List Color) :=
   allBoundaryColorings5.filter (fun l => isValid5 l && isSurj5 l)
 
-def allPairings24 : List ColorPairing :=
+theorem beq_to_eq {a b : Color} (h : (a == b) = true) : a = b :=
+  LawfulBEq.eq_of_beq h
+
+theorem bne_of_ne {x y : Color} (h : x ≠ y) : (x != y) = true := by
+  cases x <;> cases y <;> revert h <;> decide
+
+def rawPairings24 : List (Color × Color × Color × Color) :=
   allColors.bind fun a =>
     allColors.bind fun b =>
       allColors.bind fun c =>
         allColors.filterMap fun d =>
-          if h : a ≠ b ∧ a ≠ c ∧ a ≠ d ∧ b ≠ c ∧ b ≠ d ∧ c ≠ d then
-            some ⟨a, b, c, d, h⟩
+          if a != b && a != c && a != d && b != c && b != d && c != d then
+            some (a, b, c, d)
           else none
 
-theorem mem_allPairings24 (θ : ColorPairing) : θ ∈ allPairings24 := by
-  dsimp [allPairings24]
+def rawSwap (a b c d col : Color) : Color :=
+  if col == a then b
+  else if col == b then a
+  else if col == c then d
+  else if col == d then c
+  else col
+
+theorem rawSwap_eq_swap (θ : ColorPairing) (col : Color) :
+    rawSwap θ.a θ.b θ.c θ.d col = θ.swap col := by
+  dsimp [rawSwap, ColorPairing.swap]
+  have h_beq (x y : Color) : (x == y) = decide (x = y) := by cases x <;> cases y <;> rfl
+  rw [h_beq col θ.a, h_beq col θ.b, h_beq col θ.c, h_beq col θ.d]
+  by_cases ha : col = θ.a <;> by_cases hb : col = θ.b <;> by_cases hc : col = θ.c <;> by_cases hd : col = θ.d <;>
+  simp [ha, hb, hc, hd]
+
+theorem mem_rawPairings24 (θ : ColorPairing) : (θ.a, θ.b, θ.c, θ.d) ∈ rawPairings24 := by
+  rcases θ with ⟨a, b, c, d, hab, hac, had, hbc, hbd, hcd⟩
+  dsimp [rawPairings24]
   rw [List.mem_bind]
-  refine ⟨θ.a, mem_allColors θ.a, ?_⟩
+  refine ⟨a, mem_allColors a, ?_⟩
   rw [List.mem_bind]
-  refine ⟨θ.b, mem_allColors θ.b, ?_⟩
+  refine ⟨b, mem_allColors b, ?_⟩
   rw [List.mem_bind]
-  refine ⟨θ.c, mem_allColors θ.c, ?_⟩
+  refine ⟨c, mem_allColors c, ?_⟩
   rw [List.mem_filterMap]
-  refine ⟨θ.d, mem_allColors θ.d, ?_⟩
-  dsimp
-  rw [dif_pos θ.distinct]
+  refine ⟨d, mem_allColors d, ?_⟩
+  rw [bne_of_ne hab, bne_of_ne hac, bne_of_ne had, bne_of_ne hbc, bne_of_ne hbd, bne_of_ne hcd]
+  rfl
 
 def isRingAdj (i j : Nat) : Bool :=
   j == (i + 1) % 5 || i == (j + 1) % 5
@@ -234,75 +266,92 @@ theorem deg5Adj_eq (i j : Nat) (hi : i < 5) (hj : j < 5) :
   rcases hi_cases with rfl | rfl | rfl | rfl | rfl <;>
   rcases hj_cases with rfl | rfl | rfl | rfl | rfl <;> rfl
 
-theorem beq_to_eq {a b : Color} (h : (a == b) = true) : a = b := by
-  cases a <;> cases b <;> revert h <;> decide
-
 theorem get_five (b : Nat → Color) (i : Nat) (hi : i < 5) :
     [b 0, b 1, b 2, b 3, b 4].get! i = b i := by
   have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by omega
   rcases this with rfl | rfl | rfl | rfl | rfl <;> rfl
 
+def fiveEdges : List (Nat × Nat) :=
+  [(0, 1), (1, 2), (2, 3), (3, 4), (4, 0)]
+
+theorem mem_fiveEdges (i j : Nat) (hi : i < 5) (hj : j < 5) (hadj : degree5Config.adj i j = true) :
+    (i, j) ∈ fiveEdges ∨ (j, i) ∈ fiveEdges := by
+  have hi_c : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by omega
+  have hj_c : j = 0 ∨ j = 1 ∨ j = 2 ∨ j = 3 ∨ j = 4 := by omega
+  rcases hi_c with rfl | rfl | rfl | rfl | rfl <;>
+  rcases hj_c with rfl | rfl | rfl | rfl | rfl <;>
+  revert hadj <;> decide
+
+def inPair (col : List Color) (x y : Color) (i : Nat) : Bool :=
+  col.get! i == x || col.get! i == y
+
+def kernelRel (in_set side : Nat → Bool) (i j : Nat) : Bool :=
+  in_set i && in_set j && (side i == side j)
+
+theorem kernelRel_refl (in_set side : Nat → Bool) (i : Nat) (h : in_set i = true) :
+    kernelRel in_set side i i = true := by
+  dsimp [kernelRel]; rw [h]; simp
+
+theorem kernelRel_symm (in_set side : Nat → Bool) (i j : Nat) (h : kernelRel in_set side i j = true) :
+    kernelRel in_set side j i = true := by
+  dsimp [kernelRel] at h ⊢
+  revert h
+  cases in_set i <;> cases in_set j <;> cases side i <;> cases side j <;> decide
+
+theorem kernelRel_trans (in_set side : Nat → Bool) (i j l : Nat)
+    (h1 : kernelRel in_set side i j = true) (h2 : kernelRel in_set side j l = true) :
+    kernelRel in_set side i l = true := by
+  dsimp [kernelRel] at h1 h2 ⊢
+  revert h1 h2
+  cases in_set i <;> cases in_set j <;> cases in_set l <;>
+  cases side i <;> cases side j <;> cases side l <;> decide
+
+theorem kernelRel_color (in_set side : Nat → Bool) (i j : Nat) (h : kernelRel in_set side i j = true) :
+    in_set i = true := by
+  dsimp [kernelRel] at h
+  rw [Bool.and_eq_true, Bool.and_eq_true] at h
+  exact h.1.1
+
+def fiveTuples4 : List (Nat × Nat × Nat × Nat) :=
+  [(0, 1, 2, 3), (0, 1, 2, 4), (0, 1, 3, 4), (0, 2, 3, 4), (1, 2, 3, 4)]
+
+theorem mem_fiveTuples4 (i j l m : Nat) (hij : i < j) (hjl : j < l) (hlm : l < m) (hm : m < 5) :
+    (i, j, l, m) ∈ fiveTuples4 := by
+  have : (i = 0 ∧ j = 1 ∧ l = 2 ∧ m = 3) ∨
+         (i = 0 ∧ j = 1 ∧ l = 2 ∧ m = 4) ∨
+         (i = 0 ∧ j = 1 ∧ l = 3 ∧ m = 4) ∨
+         (i = 0 ∧ j = 2 ∧ l = 3 ∧ m = 4) ∨
+         (i = 1 ∧ j = 2 ∧ l = 3 ∧ m = 4) := by omega
+  rcases this with ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ | ⟨rfl, rfl, rfl, rfl⟩ <;> decide
+
 structure JointPlanarChecks (col : List Color) (θ : ColorPairing)
-    (rel_ab rel_cd : Nat → Nat → Bool) : Prop where
-  ab_refl : (List.range 5).all (fun i => if col.get! i == θ.a || col.get! i == θ.b then rel_ab i i else true) = true
-  ab_symm : (List.range 5).all (fun i => (List.range 5).all (fun j => if rel_ab i j then rel_ab j i else true)) = true
-  ab_trans : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => if rel_ab i j && rel_ab j l then rel_ab i l else true))) = true
-  ab_color : (List.range 5).all (fun i => (List.range 5).all (fun j => if rel_ab i j then (col.get! i == θ.a || col.get! i == θ.b) else true)) = true
-  cd_refl : (List.range 5).all (fun i => if col.get! i == θ.c || col.get! i == θ.d then rel_cd i i else true) = true
-  cd_symm : (List.range 5).all (fun i => (List.range 5).all (fun j => if rel_cd i j then rel_cd j i else true)) = true
-  cd_trans : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => if rel_cd i j && rel_cd j l then rel_cd i l else true))) = true
-  cd_color : (List.range 5).all (fun i => (List.range 5).all (fun j => if rel_cd i j then (col.get! i == θ.c || col.get! i == θ.d) else true)) = true
-  ab_adj : (List.range 5).all (fun i => (List.range 5).all (fun j => if isRingAdj i j && (col.get! i == θ.a || col.get! i == θ.b) && (col.get! j == θ.a || col.get! j == θ.b) then rel_ab i j else true)) = true
-  cd_adj : (List.range 5).all (fun i => (List.range 5).all (fun j => if isRingAdj i j && (col.get! i == θ.c || col.get! i == θ.d) && (col.get! j == θ.c || col.get! j == θ.d) then rel_cd i j else true)) = true
-  ab_noncross : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => (List.range 5).all (fun m =>
-    if i < j && j < l && l < m && rel_ab i l && rel_ab j m then rel_ab i j else true)))) = true
-  cd_noncross : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => (List.range 5).all (fun m =>
-    if i < j && j < l && l < m && rel_cd i l && rel_cd j m then rel_cd i j else true)))) = true
-  cross_ab_cd : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => (List.range 5).all (fun m =>
-    if i < j && j < l && l < m then !(rel_ab i l && rel_cd j m) else true)))) = true
-  cross_cd_ab : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => (List.range 5).all (fun m =>
-    if i < j && j < l && l < m then !(rel_cd i l && rel_ab j m) else true)))) = true
-
-theorem all_range5 {P : Nat → Bool} (h : (List.range 5).all P = true) (i : Nat) (hi : i < 5) :
-    P i = true := by
-  have hMem : i ∈ List.range 5 := List.mem_range.mpr hi
-  exact List.all_eq_true.mp h i hMem
-
-theorem all_range5_2 {P : Nat → Nat → Bool} (h : (List.range 5).all (fun i => (List.range 5).all (fun j => P i j)) = true)
-    (i : Nat) (hi : i < 5) (j : Nat) (hj : j < 5) :
-    P i j = true := by
-  have hi_mem : i ∈ List.range 5 := List.mem_range.mpr hi
-  have hj_mem : j ∈ List.range 5 := List.mem_range.mpr hj
-  have h_i := List.all_eq_true.mp h i hi_mem
-  exact List.all_eq_true.mp h_i j hj_mem
-
-theorem all_range5_3 {P : Nat → Nat → Nat → Bool}
-    (h : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => P i j l))) = true)
-    (i : Nat) (hi : i < 5) (j : Nat) (hj : j < 5) (l : Nat) (hl : l < 5) :
-    P i j l = true := by
-  have hi_mem : i ∈ List.range 5 := List.mem_range.mpr hi
-  have hj_mem : j ∈ List.range 5 := List.mem_range.mpr hj
-  have hl_mem : l ∈ List.range 5 := List.mem_range.mpr hl
-  have h_i := List.all_eq_true.mp h i hi_mem
-  have h_j := List.all_eq_true.mp h_i j hj_mem
-  exact List.all_eq_true.mp h_j l hl_mem
-
-theorem all_range5_4 {P : Nat → Nat → Nat → Nat → Bool}
-    (h : (List.range 5).all (fun i => (List.range 5).all (fun j => (List.range 5).all (fun l => (List.range 5).all (fun m => P i j l m)))) = true)
-    (i : Nat) (hi : i < 5) (j : Nat) (hj : j < 5) (l : Nat) (hl : l < 5) (m : Nat) (hm : m < 5) :
-    P i j l m = true := by
-  have hi_mem : i ∈ List.range 5 := List.mem_range.mpr hi
-  have hj_mem : j ∈ List.range 5 := List.mem_range.mpr hj
-  have hl_mem : l ∈ List.range 5 := List.mem_range.mpr hl
-  have hm_mem : m ∈ List.range 5 := List.mem_range.mpr hm
-  have h_i := List.all_eq_true.mp h i hi_mem
-  have h_j := List.all_eq_true.mp h_i j hj_mem
-  have h_l := List.all_eq_true.mp h_j l hl_mem
-  exact List.all_eq_true.mp h_l m hm_mem
+    (side_ab side_cd : Nat → Bool) : Prop where
+  ab_adj : fiveEdges.all (fun (i, j) =>
+    let rel_ab := kernelRel (inPair col θ.a θ.b) side_ab
+    if inPair col θ.a θ.b i && inPair col θ.a θ.b j then rel_ab i j else true) = true
+  cd_adj : fiveEdges.all (fun (i, j) =>
+    let rel_cd := kernelRel (inPair col θ.c θ.d) side_cd
+    if inPair col θ.c θ.d i && inPair col θ.c θ.d j then rel_cd i j else true) = true
+  ab_noncross : fiveTuples4.all (fun (i, j, l, m) =>
+    let rel_ab := kernelRel (inPair col θ.a θ.b) side_ab
+    if rel_ab i l && rel_ab j m then rel_ab i j else true) = true
+  cd_noncross : fiveTuples4.all (fun (i, j, l, m) =>
+    let rel_cd := kernelRel (inPair col θ.c θ.d) side_cd
+    if rel_cd i l && rel_cd j m then rel_cd i j else true) = true
+  cross_ab_cd : fiveTuples4.all (fun (i, j, l, m) =>
+    let rel_ab := kernelRel (inPair col θ.a θ.b) side_ab
+    let rel_cd := kernelRel (inPair col θ.c θ.d) side_cd
+    !(rel_ab i l && rel_cd j m)) = true
+  cross_cd_ab : fiveTuples4.all (fun (i, j, l, m) =>
+    let rel_ab := kernelRel (inPair col θ.a θ.b) side_ab
+    let rel_cd := kernelRel (inPair col θ.c θ.d) side_cd
+    !(rel_cd i l && rel_ab j m)) = true
 
 theorem isJointPlanar_of_checks (col : List Color) (θ : ColorPairing)
-    (rel_ab rel_cd : Nat → Nat → Bool) (hc : JointPlanarChecks col θ rel_ab rel_cd)
+    (side_ab side_cd : Nat → Bool) (hc : JointPlanarChecks col θ side_ab side_cd)
     (b : BoundaryColoring degree5Config) (hb : ∀ i < 5, b i = col.get! i) :
+    let rel_ab := kernelRel (inPair col θ.a θ.b) side_ab
+    let rel_cd := kernelRel (inPair col θ.c θ.d) side_cd
     IsJointPlanarRingPartition degree5Config b θ
       (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
       (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true) := by
@@ -313,218 +362,154 @@ theorem isJointPlanar_of_checks (col : List Color) (θ : ColorPairing)
     cross_ab_cd := ?_, cross_cd_ab := ?_
   }
   · intro i hi hcol
-    have h_i := all_range5 hc.ab_refl i hi
     rw [hb i hi] at hcol
-    have h_or : (col.get! i == θ.a || col.get! i == θ.b) = true := by
+    have h_or : inPair col θ.a θ.b i = true := by
+      dsimp [inPair]
       cases hcol with
       | inl h => simp only [h, beq_self_eq_true, Bool.true_or]
       | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    rw [h_or] at h_i
-    exact ⟨hi, hi, h_i⟩
+    exact ⟨hi, hi, kernelRel_refl _ _ i h_or⟩
   · intro i hi j hj ⟨_, _, hrel⟩
-    have h_ij := all_range5_2 hc.ab_symm i hi j hj
-    rw [hrel] at h_ij
-    exact ⟨hj, hi, h_ij⟩
-  · intro i hi j hj l hl ⟨_, _, h1⟩ ⟨_, _, h2⟩
-    have h_ijl := all_range5_3 hc.ab_trans i hi j hj l hl
-    rw [h1, h2] at h_ijl
-    exact ⟨hi, hl, h_ijl⟩
-  · intro i hi j hj ⟨_, _, hrel⟩
-    have h_ij := all_range5_2 hc.ab_color i hi j hj
-    rw [hrel] at h_ij
+    exact ⟨hj, hi, kernelRel_symm _ _ i j hrel⟩
+  · intro i hi j _ l hl ⟨_, _, h1⟩ ⟨_, _, h2⟩
+    exact ⟨hi, hl, kernelRel_trans _ _ i j l h1 h2⟩
+  · intro i hi _ _ ⟨_, _, hrel⟩
+    have h_in := kernelRel_color _ _ i _ hrel
+    dsimp [inPair] at h_in
     rw [hb i hi]
     cases h_or : (col.get! i == θ.a)
-    · rw [h_or, Bool.false_or] at h_ij
-      exact Or.inr (beq_to_eq h_ij)
+    · rw [h_or, Bool.false_or] at h_in
+      exact Or.inr (beq_to_eq h_in)
     · exact Or.inl (beq_to_eq h_or)
   · intro i hi hcol
-    have h_i := all_range5 hc.cd_refl i hi
     rw [hb i hi] at hcol
-    have h_or : (col.get! i == θ.c || col.get! i == θ.d) = true := by
+    have h_or : inPair col θ.c θ.d i = true := by
+      dsimp [inPair]
       cases hcol with
       | inl h => simp only [h, beq_self_eq_true, Bool.true_or]
       | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    rw [h_or] at h_i
-    exact ⟨hi, hi, h_i⟩
+    exact ⟨hi, hi, kernelRel_refl _ _ i h_or⟩
   · intro i hi j hj ⟨_, _, hrel⟩
-    have h_ij := all_range5_2 hc.cd_symm i hi j hj
-    rw [hrel] at h_ij
-    exact ⟨hj, hi, h_ij⟩
-  · intro i hi j hj l hl ⟨_, _, h1⟩ ⟨_, _, h2⟩
-    have h_ijl := all_range5_3 hc.cd_trans i hi j hj l hl
-    rw [h1, h2] at h_ijl
-    exact ⟨hi, hl, h_ijl⟩
-  · intro i hi j hj ⟨_, _, hrel⟩
-    have h_ij := all_range5_2 hc.cd_color i hi j hj
-    rw [hrel] at h_ij
+    exact ⟨hj, hi, kernelRel_symm _ _ i j hrel⟩
+  · intro i hi j _ l hl ⟨_, _, h1⟩ ⟨_, _, h2⟩
+    exact ⟨hi, hl, kernelRel_trans _ _ i j l h1 h2⟩
+  · intro i hi _ _ ⟨_, _, hrel⟩
+    have h_in := kernelRel_color _ _ i _ hrel
+    dsimp [inPair] at h_in
     rw [hb i hi]
     cases h_or : (col.get! i == θ.c)
-    · rw [h_or, Bool.false_or] at h_ij
-      exact Or.inr (beq_to_eq h_ij)
+    · rw [h_or, Bool.false_or] at h_in
+      exact Or.inr (beq_to_eq h_in)
     · exact Or.inl (beq_to_eq h_or)
   · intro i hi j hj hadj hcol_i hcol_j
-    have h_ij := all_range5_2 hc.ab_adj i hi j hj
-    rw [deg5Adj_eq i j hi hj] at hadj
     rw [hb i hi] at hcol_i
     rw [hb j hj] at hcol_j
-    have h_or_i : (col.get! i == θ.a || col.get! i == θ.b) = true := by
-      cases hcol_i with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    have h_or_j : (col.get! j == θ.a || col.get! j == θ.b) = true := by
-      cases hcol_j with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    rw [hadj, h_or_i, h_or_j] at h_ij
-    dsimp at h_ij
-    exact ⟨hi, hj, h_ij⟩
+    have h_or_i : inPair col θ.a θ.b i = true := by
+      dsimp [inPair]; cases hcol_i with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
+    have h_or_j : inPair col θ.a θ.b j = true := by
+      dsimp [inPair]; cases hcol_j with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
+    rcases mem_fiveEdges i j hi hj hadj with h_edge | h_edge
+    · have h_ij := List.all_eq_true.mp hc.ab_adj (i, j) h_edge
+      dsimp at h_ij; rw [h_or_i, h_or_j] at h_ij; dsimp at h_ij
+      exact ⟨hi, hj, h_ij⟩
+    · have h_ji := List.all_eq_true.mp hc.ab_adj (j, i) h_edge
+      dsimp at h_ji; rw [h_or_j, h_or_i] at h_ji; dsimp at h_ji
+      exact ⟨hi, hj, kernelRel_symm _ _ j i h_ji⟩
   · intro i hi j hj hadj hcol_i hcol_j
-    have h_ij := all_range5_2 hc.cd_adj i hi j hj
-    rw [deg5Adj_eq i j hi hj] at hadj
     rw [hb i hi] at hcol_i
     rw [hb j hj] at hcol_j
-    have h_or_i : (col.get! i == θ.c || col.get! i == θ.d) = true := by
-      cases hcol_i with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    have h_or_j : (col.get! j == θ.c || col.get! j == θ.d) = true := by
-      cases hcol_j with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
-    rw [hadj, h_or_i, h_or_j] at h_ij
-    dsimp at h_ij
-    exact ⟨hi, hj, h_ij⟩
-  · intro i j l m hij hjl hlm hm ⟨hi, hl, h1⟩ ⟨hj, _, h2⟩
-    have h_ijlm := all_range5_4 hc.ab_noncross i hi j hj l hl m hm
-    have h_lt : (i < j && j < l && l < m) = true := by
-      simp [hij, hjl, hlm]
-    rw [h_lt, h1, h2] at h_ijlm
-    dsimp at h_ijlm
+    have h_or_i : inPair col θ.c θ.d i = true := by
+      dsimp [inPair]; cases hcol_i with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
+    have h_or_j : inPair col θ.c θ.d j = true := by
+      dsimp [inPair]; cases hcol_j with | inl h => simp only [h, beq_self_eq_true, Bool.true_or] | inr h => simp only [h, beq_self_eq_true, Bool.or_true]
+    rcases mem_fiveEdges i j hi hj hadj with h_edge | h_edge
+    · have h_ij := List.all_eq_true.mp hc.cd_adj (i, j) h_edge
+      dsimp at h_ij; rw [h_or_i, h_or_j] at h_ij; dsimp at h_ij
+      exact ⟨hi, hj, h_ij⟩
+    · have h_ji := List.all_eq_true.mp hc.cd_adj (j, i) h_edge
+      dsimp at h_ji; rw [h_or_j, h_or_i] at h_ji; dsimp at h_ji
+      exact ⟨hi, hj, kernelRel_symm _ _ j i h_ji⟩
+  · intro i j l m hij hjl hlm hm ⟨hi, _, h1⟩ ⟨hj, _, h2⟩
+    have h_ijlm := List.all_eq_true.mp hc.ab_noncross (i, j, l, m) (mem_fiveTuples4 i j l m hij hjl hlm hm)
+    dsimp at h_ijlm; rw [h1, h2] at h_ijlm; dsimp at h_ijlm
     exact ⟨hi, hj, h_ijlm⟩
-  · intro i j l m hij hjl hlm hm ⟨hi, hl, h1⟩ ⟨hj, _, h2⟩
-    have h_ijlm := all_range5_4 hc.cd_noncross i hi j hj l hl m hm
-    have h_lt : (i < j && j < l && l < m) = true := by
-      simp [hij, hjl, hlm]
-    rw [h_lt, h1, h2] at h_ijlm
-    dsimp at h_ijlm
+  · intro i j l m hij hjl hlm hm ⟨hi, _, h1⟩ ⟨hj, _, h2⟩
+    have h_ijlm := List.all_eq_true.mp hc.cd_noncross (i, j, l, m) (mem_fiveTuples4 i j l m hij hjl hlm hm)
+    dsimp at h_ijlm; rw [h1, h2] at h_ijlm; dsimp at h_ijlm
     exact ⟨hi, hj, h_ijlm⟩
-  · intro i j l m hij hjl hlm hm ⟨hi, hl, h1⟩ ⟨hj, _, h2⟩
-    have h_ijlm := all_range5_4 hc.cross_ab_cd i hi j hj l hl m hm
-    have h_lt : (i < j && j < l && l < m) = true := by
-      simp [hij, hjl, hlm]
-    rw [h_lt] at h_ijlm
-    dsimp at h_ijlm
-    rw [h1, h2] at h_ijlm
-    contradiction
-  · intro i j l m hij hjl hlm hm ⟨hi, hl, h1⟩ ⟨hj, _, h2⟩
-    have h_ijlm := all_range5_4 hc.cross_cd_ab i hi j hj l hl m hm
-    have h_lt : (i < j && j < l && l < m) = true := by
-      simp [hij, hjl, hlm]
-    rw [h_lt] at h_ijlm
-    dsimp at h_ijlm
-    rw [h1, h2] at h_ijlm
-    contradiction
+  · intro i j l m hij hjl hlm hm ⟨_, _, h1⟩ ⟨_, _, h2⟩
+    have h_ijlm := List.all_eq_true.mp hc.cross_ab_cd (i, j, l, m) (mem_fiveTuples4 i j l m hij hjl hlm hm)
+    dsimp at h_ijlm; rw [h1, h2] at h_ijlm; contradiction
+  · intro i j l m hij hjl hlm hm ⟨_, _, h1⟩ ⟨_, _, h2⟩
+    have h_ijlm := List.all_eq_true.mp hc.cross_cd_ab (i, j, l, m) (mem_fiveTuples4 i j l m hij hjl hlm hm)
+    dsimp at h_ijlm; rw [h1, h2] at h_ijlm; contradiction
 
-def isJointPlanarBool (col : List Color) (θ : ColorPairing)
-    (rel_ab rel_cd : Nat → Nat → Bool) : Bool :=
-  let R := List.range 5
-  R.all (fun i => if col.get! i == θ.a || col.get! i == θ.b then rel_ab i i else true) &&
-  R.all (fun i => R.all (fun j => if rel_ab i j then rel_ab j i else true)) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => if rel_ab i j && rel_ab j l then rel_ab i l else true))) &&
-  R.all (fun i => R.all (fun j => if rel_ab i j then (col.get! i == θ.a || col.get! i == θ.b) else true)) &&
-  R.all (fun i => if col.get! i == θ.c || col.get! i == θ.d then rel_cd i i else true) &&
-  R.all (fun i => R.all (fun j => if rel_cd i j then rel_cd j i else true)) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => if rel_cd i j && rel_cd j l then rel_cd i l else true))) &&
-  R.all (fun i => R.all (fun j => if rel_cd i j then (col.get! i == θ.c || col.get! i == θ.d) else true)) &&
-  R.all (fun i => R.all (fun j => if isRingAdj i j && (col.get! i == θ.a || col.get! i == θ.b) && (col.get! j == θ.a || col.get! j == θ.b) then rel_ab i j else true)) &&
-  R.all (fun i => R.all (fun j => if isRingAdj i j && (col.get! i == θ.c || col.get! i == θ.d) && (col.get! j == θ.c || col.get! j == θ.d) then rel_cd i j else true)) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => R.all (fun m =>
-    if i < j && j < l && l < m && rel_ab i l && rel_ab j m then rel_ab i j else true)))) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => R.all (fun m =>
-    if i < j && j < l && l < m && rel_cd i l && rel_cd j m then rel_cd i j else true)))) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => R.all (fun m =>
-    if i < j && j < l && l < m then !(rel_ab i l && rel_cd j m) else true)))) &&
-  R.all (fun i => R.all (fun j => R.all (fun l => R.all (fun m =>
-    if i < j && j < l && l < m then !(rel_cd i l && rel_ab j m) else true))))
+def isJointPlanarBoolRaw (col : List Color) (a b c d : Color)
+    (side_ab side_cd : Nat → Bool) : Bool :=
+  let rel_ab := kernelRel (inPair col a b) side_ab
+  let rel_cd := kernelRel (inPair col c d) side_cd
+  fiveEdges.all (fun (i, j) => if inPair col a b i && inPair col a b j then rel_ab i j else true) &&
+  fiveEdges.all (fun (i, j) => if inPair col c d i && inPair col c d j then rel_cd i j else true) &&
+  fiveTuples4.all (fun (i, j, l, m) => if rel_ab i l && rel_ab j m then rel_ab i j else true) &&
+  fiveTuples4.all (fun (i, j, l, m) => if rel_cd i l && rel_cd j m then rel_cd i j else true) &&
+  fiveTuples4.all (fun (i, j, l, m) => !(rel_ab i l && rel_cd j m)) &&
+  fiveTuples4.all (fun (i, j, l, m) => !(rel_cd i l && rel_ab j m))
 
-theorem checks_of_isJointPlanarBool (col : List Color) (θ : ColorPairing) (rel_ab rel_cd : Nat → Nat → Bool)
-    (h : isJointPlanarBool col θ rel_ab rel_cd = true) : JointPlanarChecks col θ rel_ab rel_cd := by
-  dsimp [isJointPlanarBool] at h
+theorem checks_of_isJointPlanarBoolRaw (col : List Color) (θ : ColorPairing) (side_ab side_cd : Nat → Bool)
+    (h : isJointPlanarBoolRaw col θ.a θ.b θ.c θ.d side_ab side_cd = true) : JointPlanarChecks col θ side_ab side_cd := by
+  dsimp [isJointPlanarBoolRaw] at h
   repeat rw [Bool.and_eq_true] at h
-  rcases h with ⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩, h7⟩, h8⟩, h9⟩, h10⟩, h11⟩, h12⟩, h13⟩, h14⟩
-  exact ⟨h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12, h13, h14⟩
+  rcases h with ⟨⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩, h6⟩
+  exact ⟨h1, h2, h3, h4, h5, h6⟩
 
-def allPartitionsOf (verts : List Nat) : List (Nat → Nat → Bool) :=
-  match verts with
-  | [] => [fun _ _ => false]
-  | [x] => [fun i j => i == x && j == x]
-  | [x, y] =>
-    [ fun i j => (i == x && j == x) || (i == y && j == y),
-      fun i j => (i == x || i == y) && (j == x || j == y) ]
-  | [x, y, z] =>
-    [ fun i j => (i == x && j == x) || (i == y && j == y) || (i == z && j == z),
-      fun i j => ((i == x || i == y) && (j == x || j == y)) || (i == z && j == z),
-      fun i j => ((i == x || i == z) && (j == x || j == z)) || (i == y && j == y),
-      fun i j => ((i == y || i == z) && (j == y || j == z)) || (i == x && j == x),
-      fun i j => (i == x || i == y || i == z) && (j == x || j == y || j == z) ]
-  | _ => []
+def hasConnectedPair (col : List Color) (x y : Color) (rel : Nat → Nat → Bool) : Bool :=
+  (List.range 5).any fun u =>
+    col.get! u == x && (List.range 5).any fun v =>
+      col.get! v == y && rel u v
 
-def allValidSwaps (rel_ab rel_cd : Nat → Nat → Bool) : List (Nat → Bool) :=
-  let allSubsets : List (Nat → Bool) :=
-    (List.range 32).map fun mask =>
-      fun i => (mask >>> i) &&& 1 == 1
-  allSubsets.filter fun S =>
-    (List.range 5).all (fun i => (List.range 5).all (fun j =>
-      (if rel_ab i j then S i == S j else true) &&
-      (if rel_cd i j then S i == S j else true)))
+theorem toNat_inj {x y : Color} (h : x.toNat = y.toNat) : x = y := by
+  cases x <;> cases y <;> cases h <;> rfl
 
-def maskOfS (S : Nat → Bool) : Nat :=
-  (if S 0 then 1 else 0) +
-  (if S 1 then 2 else 0) +
-  (if S 2 then 4 else 0) +
-  (if S 3 then 8 else 0) +
-  (if S 4 then 16 else 0)
+theorem toNat_lt_4 (x : Color) : x.toNat < 4 := by
+  cases x <;> decide
 
-theorem maskOfS_spec (S : Nat → Bool) (i : Nat) (hi : i < 5) :
-    ((maskOfS S >>> i) &&& 1 == 1) = S i := by
-  have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by omega
-  cases h0 : S 0 <;> cases h1 : S 1 <;> cases h2 : S 2 <;> cases h3 : S 3 <;> cases h4 : S 4 <;>
-  rcases this with rfl | rfl | rfl | rfl | rfl <;>
-  dsimp [maskOfS] <;> rw [h0, h1, h2, h3, h4] <;> decide
+theorem color_mem_pairing (θ : ColorPairing) (x : Color) :
+    x = θ.a ∨ x = θ.b ∨ x = θ.c ∨ x = θ.d := by
+  rcases θ with ⟨a, b, c, d, hab, hac, had, hbc, hbd, hcd⟩
+  have ha := toNat_lt_4 a; have hb := toNat_lt_4 b; have hc := toNat_lt_4 c; have hd := toNat_lt_4 d; have hx := toNat_lt_4 x
+  have hab' : a.toNat ≠ b.toNat := fun h => hab (toNat_inj h)
+  have hac' : a.toNat ≠ c.toNat := fun h => hac (toNat_inj h)
+  have had' : a.toNat ≠ d.toNat := fun h => had (toNat_inj h)
+  have hbc' : b.toNat ≠ c.toNat := fun h => hbc (toNat_inj h)
+  have hbd' : b.toNat ≠ d.toNat := fun h => hbd (toNat_inj h)
+  have hcd' : c.toNat ≠ d.toNat := fun h => hcd (toNat_inj h)
+  have h_nat : x.toNat = a.toNat ∨ x.toNat = b.toNat ∨ x.toNat = c.toNat ∨ x.toNat = d.toNat := by omega
+  rcases h_nat with h | h | h | h
+  · exact Or.inl (toNat_inj h)
+  · exact Or.inr (Or.inl (toNat_inj h))
+  · exact Or.inr (Or.inr (Or.inl (toNat_inj h)))
+  · exact Or.inr (Or.inr (Or.inr (toNat_inj h)))
 
-theorem maskOfS_lt32 (S : Nat → Bool) : maskOfS S < 32 := by
-  cases h0 : S 0 <;> cases h1 : S 1 <;> cases h2 : S 2 <;> cases h3 : S 3 <;> cases h4 : S 4 <;>
-  dsimp [maskOfS] <;> rw [h0, h1, h2, h3, h4] <;> decide
+theorem swap_eq_b (θ : ColorPairing) : θ.swap θ.a = θ.b := by
+  dsimp [ColorPairing.swap]
+  rw [if_pos rfl]
 
-theorem swap_in_allValidSwaps (rel_ab rel_cd : Nat → Nat → Bool)
-    (S : Nat → Bool)
-    (h_ab : ∀ i < 5, ∀ j < 5, rel_ab i j = true → S i = S j)
-    (h_cd : ∀ i < 5, ∀ j < 5, rel_cd i j = true → S i = S j) :
-    ∃ S_cand ∈ allValidSwaps rel_ab rel_cd, ∀ i < 5, S_cand i = S i := by
-  let S_cand := fun i => (maskOfS S >>> i) &&& 1 == 1
-  have hspec : ∀ i < 5, S_cand i = S i := maskOfS_spec S
-  refine ⟨S_cand, ?_, hspec⟩
-  dsimp [allValidSwaps]
-  rw [List.mem_filter]
-  refine ⟨?_, ?_⟩
-  · rw [List.mem_map]
-    refine ⟨maskOfS S, ?_, rfl⟩
-    exact List.mem_range.mpr (maskOfS_lt32 S)
-  · rw [List.all_eq_true]
-    intro i hi_mem
-    rw [List.all_eq_true]
-    intro j hj_mem
-    have hi : i < 5 := List.mem_range.mp hi_mem
-    have hj : j < 5 := List.mem_range.mp hj_mem
-    rw [hspec i hi, hspec j hj]
-    cases h_ab_ij : rel_ab i j <;> cases h_cd_ij : rel_cd i j
-    · rfl
-    · dsimp
-      have heq := h_cd i hi j hj h_cd_ij
-      simp [beq_iff_eq, heq]
-    · dsimp
-      have heq := h_ab i hi j hj h_ab_ij
-      simp [beq_iff_eq, heq]
-    · dsimp
-      have heq := h_ab i hi j hj h_ab_ij
-      simp [beq_iff_eq, heq]
+theorem swap_eq_a (θ : ColorPairing) : θ.swap θ.b = θ.a := by
+  dsimp [ColorPairing.swap]
+  rw [if_neg (Ne.symm θ.distinct.1), if_pos rfl]
+
+theorem swap_eq_d (θ : ColorPairing) : θ.swap θ.c = θ.d := by
+  dsimp [ColorPairing.swap]
+  rw [if_neg (Ne.symm θ.distinct.2.1), if_neg (Ne.symm θ.distinct.2.2.2.1), if_pos rfl]
+
+theorem swap_eq_c (θ : ColorPairing) : θ.swap θ.d = θ.c := by
+  dsimp [ColorPairing.swap]
+  rw [if_neg (Ne.symm θ.distinct.2.2.1), if_neg (Ne.symm θ.distinct.2.2.2.2.1),
+      if_neg (Ne.symm θ.distinct.2.2.2.2.2), if_pos rfl]
 
 theorem swap_preserves_surj_step (col : List Color) (θ : ColorPairing)
     (rel_ab rel_cd : Nat → Nat → Bool)
-    (h_win : (allValidSwaps rel_ab rel_cd).all (fun S =>
-      isSurj5 ((List.range 5).map fun i => if S i then θ.swap (col.get! i) else col.get! i)) = true)
+    (h_win : (hasConnectedPair col θ.a θ.b rel_ab && hasConnectedPair col θ.c θ.d rel_cd) = true)
     (b : BoundaryColoring degree5Config)
     (hb_col : ∀ i < 5, b i = col.get! i)
     (S : Nat → Bool)
@@ -532,68 +517,81 @@ theorem swap_preserves_surj_step (col : List Color) (θ : ColorPairing)
       (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
       (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true) S) :
     deg5_surj (boundaryKempeSwap degree5Config b θ S) := by
-  have h_ab : ∀ i < 5, ∀ j < 5, rel_ab i j = true → S i = S j := by
-    intro i hi j hj hrel
-    exact hSwap.respects_ab i hi j hj ⟨hi, hj, hrel⟩
-  have h_cd : ∀ i < 5, ∀ j < 5, rel_cd i j = true → S i = S j := by
-    intro i hi j hj hrel
-    exact hSwap.respects_cd i hi j hj ⟨hi, hj, hrel⟩
-  have ⟨S_cand, h_mem, h_spec⟩ := swap_in_allValidSwaps rel_ab rel_cd S h_ab h_cd
-  have h_all := List.all_eq_true.mp h_win S_cand h_mem
-  apply surj_of_isSurj5
-  have h_eq_list : ((List.range 5).map (boundaryKempeSwap degree5Config b θ S)) =
-      ((List.range 5).map fun i => if S_cand i then θ.swap (col.get! i) else col.get! i) := by
-    apply List.ext_get
-    · simp
-    · intro k h1 h2
-      simp only [List.length_map, List.length_range] at h1
-      have hk : k < 5 := h1
-      have h1' : ((List.range 5).map (boundaryKempeSwap degree5Config b θ S)).get ⟨k, h1⟩ =
-          boundaryKempeSwap degree5Config b θ S k := by
-        simp [List.getElem_map]
-      have h2' : ((List.range 5).map fun i => if S_cand i then θ.swap (col.get! i) else col.get! i).get ⟨k, h2⟩ =
-          (if S_cand k then θ.swap (col.get! k) else col.get! k) := by
-        simp [List.getElem_map]
-      rw [h1', h2']
-      dsimp [boundaryKempeSwap]
-      rw [h_spec k hk, hb_col k hk]
-  rw [h_eq_list]
-  exact h_all
+  rw [Bool.and_eq_true] at h_win
+  rcases h_win with ⟨h_ab_pair, h_cd_pair⟩
+  dsimp [hasConnectedPair] at h_ab_pair h_cd_pair
+  rw [List.any_eq_true] at h_ab_pair h_cd_pair
+  rcases h_ab_pair with ⟨u, hu_mem, hu_rest⟩
+  rw [Bool.and_eq_true, List.any_eq_true] at hu_rest
+  rcases hu_rest with ⟨hu_col, v, hv_mem, hv_rest⟩
+  rw [Bool.and_eq_true] at hv_rest
+  rcases hv_rest with ⟨hv_col, huv_rel⟩
+  rcases h_cd_pair with ⟨x, hx_mem, hx_rest⟩
+  rw [Bool.and_eq_true, List.any_eq_true] at hx_rest
+  rcases hx_rest with ⟨hx_col, y, hy_mem, hy_rest⟩
+  rw [Bool.and_eq_true] at hy_rest
+  rcases hy_rest with ⟨hy_col, hxy_rel⟩
+  have hu : u < 5 := List.mem_range.mp hu_mem
+  have hv : v < 5 := List.mem_range.mp hv_mem
+  have hx : x < 5 := List.mem_range.mp hx_mem
+  have hy : y < 5 := List.mem_range.mp hy_mem
+  have hbu : b u = θ.a := by rw [hb_col u hu]; exact beq_to_eq hu_col
+  have hbv : b v = θ.b := by rw [hb_col v hv]; exact beq_to_eq hv_col
+  have hbx : b x = θ.c := by rw [hb_col x hx]; exact beq_to_eq hx_col
+  have hby : b y = θ.d := by rw [hb_col y hy]; exact beq_to_eq hy_col
+  have hSuv : S u = S v := hSwap.respects_ab u hu v hv ⟨hu, hv, huv_rel⟩
+  have hSxy : S x = S y := hSwap.respects_cd x hx y hy ⟨hx, hy, hxy_rel⟩
+  intro c
+  rcases color_mem_pairing θ c with rfl | rfl | rfl | rfl
+  · cases hSu : S u
+    · refine ⟨u, hu, ?_⟩
+      dsimp [boundaryKempeSwap]; rw [hSu, if_neg Bool.false_ne_true, hbu]
+    · refine ⟨v, hv, ?_⟩
+      have hSv : S v = true := by rw [← hSuv, hSu]
+      dsimp [boundaryKempeSwap]; rw [hSv, if_pos rfl, hbv, swap_eq_a]
+  · cases hSu : S u
+    · refine ⟨v, hv, ?_⟩
+      have hSv : S v = false := by rw [← hSuv, hSu]
+      dsimp [boundaryKempeSwap]; rw [hSv, if_neg Bool.false_ne_true, hbv]
+    · refine ⟨u, hu, ?_⟩
+      dsimp [boundaryKempeSwap]; rw [hSu, if_pos rfl, hbu, swap_eq_b]
+  · cases hSx : S x
+    · refine ⟨x, hx, ?_⟩
+      dsimp [boundaryKempeSwap]; rw [hSx, if_neg Bool.false_ne_true, hbx]
+    · refine ⟨y, hy, ?_⟩
+      have hSy : S y = true := by rw [← hSxy, hSx]
+      dsimp [boundaryKempeSwap]; rw [hSy, if_pos rfl, hby, swap_eq_c]
+  · cases hSx : S x
+    · refine ⟨y, hy, ?_⟩
+      have hSy : S y = false := by rw [← hSxy, hSx]
+      dsimp [boundaryKempeSwap]; rw [hSy, if_neg Bool.false_ne_true, hby]
+    · refine ⟨x, hx, ?_⟩
+      dsimp [boundaryKempeSwap]; rw [hSx, if_pos rfl, hbx, swap_eq_d]
 
-def findWinningPartition (col : List Color) (θ : ColorPairing) :
-    Option ((Nat → Nat → Bool) × (Nat → Nat → Bool)) :=
-  let verts_ab := (List.range 5).filter fun i => col.get! i == θ.a || col.get! i == θ.b
-  let verts_cd := (List.range 5).filter fun i => col.get! i == θ.c || col.get! i == θ.d
-  let parts_ab := allPartitionsOf verts_ab
-  let parts_cd := allPartitionsOf verts_cd
-  parts_ab.findSome? fun rel_ab =>
-    parts_cd.findSome? fun rel_cd =>
-      if isJointPlanarBool col θ rel_ab rel_cd &&
-         let swaps := allValidSwaps rel_ab rel_cd
-         swaps.all fun S =>
-           let col' := (List.range 5).map fun i =>
-             if S i then θ.swap (col.get! i) else col.get! i
-           isSurj5 col'
-      then some (rel_ab, rel_cd)
-      else none
+def winningSides (col : List Color) (a b c d : Color) :
+    (Nat → Bool) × (Nat → Bool) :=
+  let verts_ab := (List.range 5).filter (inPair col a b)
+  let verts_cd := (List.range 5).filter (inPair col c d)
+  match verts_ab with
+  | [u, v] => (fun _ => true, fun i => Nat.blt u i && Nat.blt i v)
+  | _ =>
+    match verts_cd with
+    | [u, v] => (fun i => Nat.blt u i && Nat.blt i v, fun _ => true)
+    | _ => (fun _ => false, fun _ => false)
 
 def checkDeg5Adversary : Bool :=
   deg5BadList.all fun col =>
-    allPairings24.all fun θ =>
-      match findWinningPartition col θ with
-      | some (rel_ab, rel_cd) =>
-          isJointPlanarBool col θ rel_ab rel_cd &&
-          let swaps := allValidSwaps rel_ab rel_cd
-          swaps.all fun S =>
-            let col' := (List.range 5).map fun i =>
-              if S i then θ.swap (col.get! i) else col.get! i
-            isSurj5 col'
-      | none => false
+    rawPairings24.all fun (a, b, c, d) =>
+      let (side_ab, side_cd) := winningSides col a b c d
+      let rel_ab := kernelRel (inPair col a b) side_ab
+      let rel_cd := kernelRel (inPair col c d) side_cd
+      isJointPlanarBoolRaw col a b c d side_ab side_cd &&
+      (hasConnectedPair col a b rel_ab && hasConnectedPair col c d rel_cd)
 
 /-- In-kernel reflection theorem verifying the degree-5 adversary winning strategy across all
-    120 bad ring colorings and all 24 color pairings using `native_decide`. -/
+    120 bad ring colorings and all 24 color pairings using kernel reduction (`rfl`). -/
 theorem checkDeg5Adversary_true : checkDeg5Adversary = true := by
-  native_decide
+  rfl
 
 theorem checkDeg5Valid_of_valid (b : BoundaryColoring degree5Config)
     (hb : IsValidBoundaryColoring degree5Config b) :
@@ -648,34 +646,33 @@ theorem deg5_eliminated_not_surj (b : BoundaryColoring degree5Config)
     intro _ hSurj
     let col := [b' 0, b' 1, b' 2, b' 3, b' 4]
     have h_col_mem : col ∈ deg5BadList := col_mem_deg5BadList b' hb' hSurj
-    have h_θ_mem : θ ∈ allPairings24 := mem_allPairings24 θ
+    have h_θ_mem : (θ.a, θ.b, θ.c, θ.d) ∈ rawPairings24 := mem_rawPairings24 θ
     have h_all_cols := List.all_eq_true.mp checkDeg5Adversary_true col h_col_mem
-    have h_all_θ := List.all_eq_true.mp h_all_cols θ h_θ_mem
-    cases h_opt : findWinningPartition col θ with
-    | none =>
-      rw [h_opt] at h_all_θ
-      contradiction
-    | some pair =>
-      let (rel_ab, rel_cd) := pair
-      rw [h_opt, Bool.and_eq_true] at h_all_θ
-      rcases h_all_θ with ⟨h_jp, h_win⟩
-      have hc := checks_of_isJointPlanarBool col θ rel_ab rel_cd h_jp
-      have hb_spec : ∀ i < 5, b' i = col.get! i := by
-        intro i hi
-        have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by omega
-        rcases this with rfl | rfl | rfl | rfl | rfl <;> rfl
-      have hPart := isJointPlanar_of_checks col θ rel_ab rel_cd hc b' hb_spec
-      let S := resp (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
-                    (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true)
-      have hSwap := hValid (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
-                           (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true) hPart
-      have hb_swapped := swap_preserves_valid degree5Config b' θ
-        (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
-        (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true) S hb' hPart hSwap
-      have hSurj_swapped := swap_preserves_surj_step col θ rel_ab rel_cd h_win b' hb_spec S hSwap
-      exact ih (fun i j => i < 5 ∧ j < 5 ∧ rel_ab i j = true)
-               (fun i j => i < 5 ∧ j < 5 ∧ rel_cd i j = true)
-               hPart hb_swapped hSurj_swapped
+    have h_all_θ := List.all_eq_true.mp h_all_cols (θ.a, θ.b, θ.c, θ.d) h_θ_mem
+    dsimp at h_all_θ
+    rw [Bool.and_eq_true] at h_all_θ
+    rcases h_all_θ with ⟨h_jp, h_win⟩
+    have hc := checks_of_isJointPlanarBoolRaw col θ
+      (winningSides col θ.a θ.b θ.c θ.d).1 (winningSides col θ.a θ.b θ.c θ.d).2 h_jp
+    have hb_spec : ∀ i < 5, b' i = col.get! i := by
+      intro i hi
+      have : i = 0 ∨ i = 1 ∨ i = 2 ∨ i = 3 ∨ i = 4 := by omega
+      rcases this with rfl | rfl | rfl | rfl | rfl <;> rfl
+    have hPart := isJointPlanar_of_checks col θ
+      (winningSides col θ.a θ.b θ.c θ.d).1 (winningSides col θ.a θ.b θ.c θ.d).2 hc b' hb_spec
+    let S := resp (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.a θ.b) (winningSides col θ.a θ.b θ.c θ.d).1 i j = true)
+                  (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.c θ.d) (winningSides col θ.a θ.b θ.c θ.d).2 i j = true)
+    have hSwap := hValid (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.a θ.b) (winningSides col θ.a θ.b θ.c θ.d).1 i j = true)
+                         (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.c θ.d) (winningSides col θ.a θ.b θ.c θ.d).2 i j = true) hPart
+    have hb_swapped := swap_preserves_valid degree5Config b' θ
+      (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.a θ.b) (winningSides col θ.a θ.b θ.c θ.d).1 i j = true)
+      (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.c θ.d) (winningSides col θ.a θ.b θ.c θ.d).2 i j = true) S hb' hPart hSwap
+    have hSurj_swapped := swap_preserves_surj_step col θ
+      (kernelRel (inPair col θ.a θ.b) (winningSides col θ.a θ.b θ.c θ.d).1)
+      (kernelRel (inPair col θ.c θ.d) (winningSides col θ.a θ.b θ.c θ.d).2) h_win b' hb_spec S hSwap
+    exact ih (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.a θ.b) (winningSides col θ.a θ.b θ.c θ.d).1 i j = true)
+             (fun i j => i < 5 ∧ j < 5 ∧ kernelRel (inPair col θ.c θ.d) (winningSides col θ.a θ.b θ.c θ.d).2 i j = true)
+             hPart hb_swapped hSurj_swapped
 
 theorem deg5_not_d_reducible : ¬ IsDReducible degree5Config := by
   intro hD
@@ -689,7 +686,7 @@ theorem deg5_not_c_reducible : ¬ IsCReducible degree5Config := by
 
 /-- The degree-5 vertex configuration is NOT reducible under the RSST / Kempe game semantics.
     The proof relies on `checkDeg5Adversary_true`, which is formally verified via Lean 4
-    computational reflection using `native_decide` (introducing the `Lean.ofReduceBool` axiom). -/
+    kernel reduction (`rfl`) with zero external axioms. -/
 theorem deg5_not_reducible : ¬ IsReducible degree5Config := by
   intro hRed
   cases hRed with

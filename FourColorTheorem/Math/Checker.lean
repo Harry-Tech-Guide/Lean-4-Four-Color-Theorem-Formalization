@@ -19,20 +19,23 @@ def isValidColorAssignment (c : Configuration) (idx : Nat) (color : Color) (assi
 
 /-- Backtracking search to color nodes starting from `nodeIdx` up to `c.totalNodes`.
 Returns true if a valid extension exists. -/
-partial def canExtendInterior (c : Configuration) (nodeIdx : Nat) (assignments : Array (Option Color)) : Bool :=
-  if nodeIdx >= c.totalNodes then
-    true -- We successfully colored all interior nodes
-  else
-    let tryColor (col : Color) : Bool :=
-      if isValidColorAssignment c nodeIdx col assignments then
-        canExtendInterior c (nodeIdx + 1) (assignments.set! nodeIdx (some col))
-      else false
-    
-    tryColor Color.c0 || tryColor Color.c1 || tryColor Color.c2 || tryColor Color.c3
+def canExtendInteriorAux : Nat → Configuration → Nat → Array (Option Color) → Bool
+  | 0, _, _, _ => true
+  | fuel + 1, c, nodeIdx, assignments =>
+    if nodeIdx >= c.totalNodes then
+      true
+    else
+      let tryColor (col : Color) : Bool :=
+        if isValidColorAssignment c nodeIdx col assignments then
+          canExtendInteriorAux fuel c (nodeIdx + 1) (assignments.set! nodeIdx (some col))
+        else false
+      tryColor Color.c0 || tryColor Color.c1 || tryColor Color.c2 || tryColor Color.c3
+
+def canExtendInterior (c : Configuration) (nodeIdx : Nat) (assignments : Array (Option Color)) : Bool :=
+  canExtendInteriorAux (c.totalNodes - nodeIdx) c nodeIdx assignments
 
 /-- Given a boundary coloring array, verify it's a valid boundary and if so, check if it extends. -/
 def checkBoundaryAndExtend (c : Configuration) (boundary : Array Color) : Bool :=
-  -- First, check if boundary is valid internally
   let rec checkValid (i : Nat) (j : Nat) : Bool :=
     if i < c.ringSize then
       if j < c.ringSize then
@@ -42,29 +45,32 @@ def checkBoundaryAndExtend (c : Configuration) (boundary : Array Color) : Bool :
     else true
     
   if !checkValid 0 0 then
-    true -- Vacuously true: if boundary is invalid, we don't need to extend it.
+    true
   else Id.run (α := Bool) do
-    -- Initialize the assignments array with boundary colors
     let mut assignments : Array (Option Color) := #[]
     for i in [0:c.ringSize] do
       assignments := assignments.push (some boundary[i]!)
     for _ in [c.ringSize:c.totalNodes] do
       assignments := assignments.push none
-      
     return canExtendInterior c c.ringSize assignments
 
 /-- Generates all 4^ringSize boundary colorings and checks if ALL valid ones can be extended. -/
-partial def checkAllBoundaries (c : Configuration) (nodeIdx : Nat) (currentBoundary : Array Color) : Bool :=
-  if nodeIdx >= c.ringSize then
-    checkBoundaryAndExtend c currentBoundary
-  else
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c0) &&
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c1) &&
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c2) &&
-    checkAllBoundaries c (nodeIdx + 1) (currentBoundary.push Color.c3)
+def checkAllBoundariesAux : Nat → Configuration → Nat → Array Color → Bool
+  | 0, c, _, currentBoundary => checkBoundaryAndExtend c currentBoundary
+  | fuel + 1, c, nodeIdx, currentBoundary =>
+    if nodeIdx >= c.ringSize then
+      checkBoundaryAndExtend c currentBoundary
+    else
+      checkAllBoundariesAux fuel c (nodeIdx + 1) (currentBoundary.push Color.c0) &&
+      checkAllBoundariesAux fuel c (nodeIdx + 1) (currentBoundary.push Color.c1) &&
+      checkAllBoundariesAux fuel c (nodeIdx + 1) (currentBoundary.push Color.c2) &&
+      checkAllBoundariesAux fuel c (nodeIdx + 1) (currentBoundary.push Color.c3)
+
+def checkAllBoundaries (c : Configuration) (nodeIdx : Nat) (currentBoundary : Array Color) : Bool :=
+  checkAllBoundariesAux (c.ringSize - nodeIdx) c nodeIdx currentBoundary
 
 /-- The executable function to check if a configuration is D-Reducible! -/
-partial def checkDReducible (c : Configuration) : Bool :=
+def checkDReducible (c : Configuration) : Bool :=
   checkAllBoundaries c 0 #[]
 
 end Math

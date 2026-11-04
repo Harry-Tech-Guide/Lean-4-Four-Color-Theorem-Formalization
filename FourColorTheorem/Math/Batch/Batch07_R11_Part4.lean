@@ -1,48 +1,21 @@
-import FourColorTheorem.Math.FastReducer
+import FourColorTheorem.Math.Batch.Runner
 
 namespace Math
 namespace Batch
 
 open FastReducer
 
-/-!
-# In-Kernel D-Reducibility Batch 7: Ring 11 (Part 4)
+theorem cert_config_133_d_red : checkIdxFast (buildSMData 11 sharedPow3) 133 = true := by kernel_rfl
 
-This module certifies the D-reducibility of 6 configurations
-from the RSST unavoidable set with ring size 11:
-Configs 133, 201, 330, 332, 334, 336.
+theorem cert_config_201_d_red : checkIdxFast (buildSMData 11 sharedPow3) 201 = true := by kernel_rfl
 
-Every theorem is verified directly inside the Lean 4 kernel via `native_decide`,
-depending solely on Lean's kernel reflection axiom `Lean.ofReduceBool`.
--/
+theorem cert_config_330_d_red : checkIdxFast (buildSMData 11 sharedPow3) 330 = true := by kernel_rfl
 
-private def pow3 := powers3 15
-private def md11 := buildMData 11 pow3
-private def cfgs := loadAll ()
+theorem cert_config_332_d_red : checkIdxFast (buildSMData 11 sharedPow3) 332 = true := by kernel_rfl
 
-/-- Config 133 (ring 11): D-reducible. -/
-theorem cert_config_133_d_red : (check cfgs[133]! md11 pow3).dReducible = true := by
-  native_decide
+theorem cert_config_334_d_red : checkIdxFast (buildSMData 11 sharedPow3) 334 = true := by kernel_rfl
 
-/-- Config 201 (ring 11): D-reducible. -/
-theorem cert_config_201_d_red : (check cfgs[201]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 330 (ring 11): D-reducible. -/
-theorem cert_config_330_d_red : (check cfgs[330]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 332 (ring 11): D-reducible. -/
-theorem cert_config_332_d_red : (check cfgs[332]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 334 (ring 11): D-reducible. -/
-theorem cert_config_334_d_red : (check cfgs[334]! md11 pow3).dReducible = true := by
-  native_decide
-
-/-- Config 336 (ring 11): D-reducible. -/
-theorem cert_config_336_d_red : (check cfgs[336]! md11 pow3).dReducible = true := by
-  native_decide
+theorem cert_config_336_d_red : checkIdxFast (buildSMData 11 sharedPow3) 336 = true := by kernel_rfl
 
 end Batch
 end Math
