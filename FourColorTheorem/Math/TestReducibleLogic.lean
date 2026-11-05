@@ -73,13 +73,13 @@ def verifyReduceAux : Nat → Array Nat → Array Nat → Bool
     let mut matched_c : Configuration := default
     for c in theUnavoidableSet do
       let totalNodes := c.ringSize + c.interiorSize
-      let degrees := mkArray totalNodes 0 |>.mapIdx fun i _ => getDegree c i
+      let degrees := Array.replicate totalNodes 0 |>.mapIdx fun i _ => getDegree c i
       let st : IsoState := {
         c := c,
         adjmat := adjmat,
         upp := A_upp,
-        mapping := mkArray totalNodes CARTVERT,
-        used := mkArray CARTVERT false,
+        mapping := Array.replicate totalNodes CARTVERT,
+        used := Array.replicate CARTVERT false,
         degrees := degrees
       }
       match findIso st 0 with

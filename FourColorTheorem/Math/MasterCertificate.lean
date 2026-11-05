@@ -14,6 +14,9 @@ import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
 import FourColorTheorem.Math.Soundness.StructuralVerification
 
+set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
+
 namespace Math
 namespace MasterCertificate
 
@@ -345,13 +348,11 @@ def checkCConfigsHaveContracts : List FastReducer.RConf → Nat → Bool
     (if certified_c_indices.contains idx then !(rc.contractEdges.toList.isEmpty) else true) &&
     checkCConfigsHaveContracts rest (idx + 1)
 
-set_option maxRecDepth 500000 in
 /-- In-kernel verification that all 384 C-certified configurations have non-empty `contractEdges`. -/
 theorem c_configs_have_contracts_verified :
     checkCConfigsHaveContracts parsedRConfList 0 = true := by
   rfl
 
-set_option maxRecDepth 500000 in
 /-- In-kernel verification that every configuration index `0 .. 632` belongs either to
     `certified_d_indices` or to `certified_c_indices`. -/
 theorem all_633_partitioned :
@@ -400,14 +401,14 @@ def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
     `KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`. -/
 def KernelReducerSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
-    let c := theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩
+    let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
     (KernelReducer.verifyIdxD idx = true → HasDCertificateWitness c idx) ∧
     (KernelReducer.verifyIdxC idx = true → HasCCertificateWitness c idx)
 
 /-- Batch certificate soundness bridge across all 633 canonical configurations. -/
 def HasBatchSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
-    let c := theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩
+    let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
     (idx ∈ certified_d_indices ∧ HasDCertificateWitness c idx) ∨
     (idx ∈ certified_c_indices ∧ HasCCertificateWitness c idx)
 
@@ -417,7 +418,7 @@ def HasBatchSoundnessBridge : Prop :=
 def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
-    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+    theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
     ((idx ∈ certified_d_indices ∧ HasDCertificateWitness c idx) ∨
      (idx ∈ certified_c_indices ∧ HasCCertificateWitness c idx))
 
@@ -426,7 +427,7 @@ def isCertifiedUnavoidableConfig (c : Configuration) : Prop :=
 def isCertifiedDConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
-    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+    theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
     idx ∈ certified_d_indices ∧
     HasDCertificateWitness c idx
 
@@ -435,7 +436,7 @@ def isCertifiedDConfig (c : Configuration) : Prop :=
 def isCertifiedCConfig (c : Configuration) : Prop :=
   MasterSuiteVerifiedProp ∧
   ∃ (idx : Nat) (h_lt : idx < 633),
-    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+    theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
     idx ∈ certified_c_indices ∧
     HasCCertificateWitness c idx
 
@@ -458,31 +459,25 @@ theorem certified_cases_iff (c : Configuration) :
 theorem all_unavoidable_configs_certified (c : Configuration)
     (hBridge : HasBatchSoundnessBridge) (h : c ∈ theUnavoidableSet) :
     isCertifiedUnavoidableConfig c := by
-  have hMemData : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
-  rcases List.get_of_mem hMemData with ⟨⟨idx, h_idx_lt⟩, h_get⟩
-  have h_size : theUnavoidableSet.data.length = 633 := unavoidable_size_eq
+  rcases Array.getElem_of_mem h with ⟨idx, h_idx_lt, h_get⟩
+  have h_size : theUnavoidableSet.size = 633 := unavoidable_size_eq
   have h_lt : idx < 633 := by
     rw [← h_size]
     exact h_idx_lt
-  have h_eq : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c := by
-    have h_eq0 : theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet.data.get ⟨idx, h_idx_lt⟩ := by
-      unfold Array.get
-      rfl
-    rw [h_eq0, h_get]
+  have h_eq : theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c := h_get
   have hB := hBridge idx h_lt
   refine ⟨master_suite_verified, idx, h_lt, h_eq, ?_⟩
   rw [← h_eq]
   exact hB
 
-/-- General connection between `Array.get` and `getElem!`. -/
+/-- General connection between `Array.getElem` and `getElem!`. -/
 theorem array_get_eq_getElem! {α : Type} [Inhabited α] (arr : Array α) (idx : Nat) (h_sz : idx < arr.size) :
-    arr.get ⟨idx, h_sz⟩ = arr[idx]! := by
+    arr[idx]'h_sz = arr[idx]! := by
   rw [getElem!_pos arr idx h_sz]
-  exact (Array.get_eq_getElem arr ⟨idx, h_sz⟩).symm
 
 /-- Connection between indexed get on theUnavoidableSet and getElem!. -/
 theorem unavoidable_get_eq_getElem! (idx : Nat) (h_lt : idx < 633) :
-    theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = theUnavoidableSet[idx]! :=
+    theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = theUnavoidableSet[idx]! :=
   array_get_eq_getElem! theUnavoidableSet idx (by rw [unavoidable_size_eq]; exact h_lt)
 
 /-- Derivation of `HasBatchSoundnessBridge` from `KernelReducerSoundnessBridge` and `master_suite_certifies_idx`:
@@ -509,7 +504,7 @@ theorem batch_soundness_of_kernel_bridge (hK : KernelReducerSoundnessBridge) :
 theorem rsst_d_certificate_witness (c : Configuration) :
   isCertifiedDConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
-      theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+      theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
       KernelReducer.verifyIdxD idx = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧
       Soundness.IterationEliminationHypothesis c sharedCfgs[idx]!.earlier sms pow3 := by
@@ -553,7 +548,7 @@ theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig
 theorem rsst_c_certificate_witness (c : Configuration) :
   isCertifiedCConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633) (sms : Array SMData) (pow3 : Array Nat),
-      theUnavoidableSet.get ⟨idx, by rw [unavoidable_size_eq]; exact h_lt⟩ = c ∧
+      theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
       c.contractEdges ≠ [] ∧
       KernelReducer.verifyIdxC idx = true ∧
       Soundness.FullRepresentationHypothesis c sms pow3 ∧

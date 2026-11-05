@@ -254,7 +254,7 @@ def computeEliminationRanks (rc : RConf) (sms : Array SMData) (pow3 : Array Nat)
     live := live0,
     orbits := orbits0,
     activeSM := sms,
-    ranks := mkArray N 0,
+    ranks := Array.replicate N 0,
     iter := 0,
     changed := true
   }
@@ -269,7 +269,7 @@ def checkFastTotal (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool :
     live := live0,
     orbits := orbits0,
     activeSM := sms,
-    ranks := mkArray N 0,
+    ranks := Array.replicate N 0,
     iter := 0,
     changed := true
   }
@@ -384,7 +384,7 @@ theorem fast_d_sound_rank0 (c : Configuration) (earlier : Array (Array Nat))
     rank := fun _ => 0,
     base := fun b hb _ =>
       extend_soundness_of_extend c earlier h_earlier h_irrefl b hb (h_all_ext b hb),
-    step := fun b hb hr_pos => by dsimp at hr_pos; omega
+    step := fun b hb hr_pos => by omega
   }
   exact dreducible_of_rank_witness c W
 
@@ -397,7 +397,7 @@ theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
       constructedRank c earlier sms pow3 b > 0 →
       ∃ θ : ColorPairing, ∀ (equiv_ab equiv_cd : Nat → Nat → Prop),
         IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
-        ∃ sm ∈ sms.data, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
+        ∃ sm ∈ sms.toList, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
               (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :
@@ -434,7 +434,7 @@ def IterationEliminationHypothesis (c : Configuration) (earlier : Array (Array N
     (sms : Array SMData) (pow3 : Array Nat) : Prop :=
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
     constructedRank c earlier sms pow3 b > 0 →
-    ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.data →
+    ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.toList →
       (boundaryTrace c b pow3 = smFitIndex sm 0) →
       ∃ t, t < 1 <<< sm.p ∧
         (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
@@ -511,7 +511,7 @@ theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Arr
       constructedRank c earlier sms pow3 b > 0 →
       ∃ θ : ColorPairing, ∀ (equiv_ab equiv_cd : Nat → Nat → Prop),
         IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
-        ∃ sm ∈ sms.data, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
+        ∃ sm ∈ sms.toList, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
               (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :

@@ -1,5 +1,3 @@
-import Lean
-    
 namespace Math
 namespace Discharging
 

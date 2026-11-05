@@ -14,11 +14,11 @@ namespace Math.Discharging
 def CARTVERT := 62
 
 def emptyAdjMat : Array (Array Int) :=
-  mkArray CARTVERT (mkArray CARTVERT (-1))
+  Array.replicate CARTVERT (Array.replicate CARTVERT (-1))
 
 def setAdjMat (adj : Array (Array Int)) (u v : Nat) (w : Int) : Array (Array Int) :=
   if u < CARTVERT && v < CARTVERT then
-    adj.set! u ((adj.get! u).set! v w)
+    adj.set! u (adj[u]!.set! v w)
   else
     adj
 
@@ -88,9 +88,9 @@ structure Outlet where
 instance : Inhabited Outlet := ⟨{ number := 0, nolines := 0, value := 0, pos := #[], low := #[], upp := #[] }⟩
 
 def doOutlet (deg : Nat) (number : Int) (X Y : Array Nat) (z : Array Nat) (b : Array (Nat × Nat)) : Option Outlet := Id.run do
-  let mut adj := getAdjMat (mkArray (5 * deg + 2) 12 |>.set! 0 deg)
+  let mut adj := getAdjMat (Array.replicate (5 * deg + 2) 12 |>.set! 0 deg)
   let n := z.size
-  let mut phi : Array Int := mkArray 17 (-1)
+  let mut phi : Array Int := Array.replicate 17 (-1)
   let mut value := 1
   let mut k := 1
   if number > 0 then
@@ -242,7 +242,7 @@ structure IsoState where
   degrees : Array Nat
 
 def getAdjBool (adjmat : Array (Array Int)) : Array UInt64 := Id.run do
-  let mut arr : Array UInt64 := mkArray CARTVERT (0 : UInt64)
+  let mut arr : Array UInt64 := Array.replicate CARTVERT (0 : UInt64)
   for u in [0 : CARTVERT] do
     let mut bits : UInt64 := 0
     for w in [0 : CARTVERT] do
@@ -278,8 +278,7 @@ structure Query where
   deriving Repr, BEq, Inhabited
 
 def parseNatList (s : String) : List Nat :=
-  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x => 
-    if x == "" then none else x.toNat?)
+  ((s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).toList).filterMap (fun x => if x.toString == "" then none else x.toString.toNat?)
 
 def parseConfMat (s : String) : ConfMat := Id.run do
   let nums := parseNatList s
@@ -288,7 +287,7 @@ def parseConfMat (s : String) : ConfMat := Id.run do
     let ring := nums[1]!
     let a := nums.getD 4 0
     let mut idx := 5 + 2 * a
-    let mut mat : Array (Array Nat) := mkArray (nverts + 1) #[]
+    let mut mat : Array (Array Nat) := Array.replicate (nverts + 1) #[]
     mat := mat.set! 0 #[nverts, ring]
     for _ in [0:nverts] do
       if idx < nums.length then
@@ -311,7 +310,7 @@ def parseConfMat (s : String) : ConfMat := Id.run do
 def getQuestion (L : ConfMat) : Array Query := Id.run do
   let nverts := L.mat[0]![0]!
   let ring := L.mat[0]![1]!
-  let mut found := mkArray (nverts + 1) false
+  let mut found := Array.replicate (nverts + 1) false
   
   let mut maxDeg := 0
   let mut best := 0
@@ -429,7 +428,7 @@ def addToList (edges : Array (Array (Array (Nat × Nat)))) (u v : Nat) (upp : Ar
 
 def getEdgelist (A_low A_upp : Array Nat) : Array (Array (Array (Nat × Nat))) := Id.run do
   let deg := A_upp[0]!
-  let mut edges : Array (Array (Array (Nat × Nat))) := mkArray 12 (mkArray 12 #[])
+  let mut edges : Array (Array (Array (Nat × Nat))) := Array.replicate 12 (Array.replicate 12 #[])
   for i in [1 : deg + 1] do
     edges := addToList edges 0 i A_upp
     let h := if i == 1 then deg else i - 1
@@ -464,8 +463,8 @@ def getEdgelist (A_low A_upp : Array Nat) : Array (Array (Array (Nat × Nat))) :
 def rootedSubConf (degree : Array Nat) (adjmat : Array (Array Int))
     (q : Array Query) (x y : Nat) (clockwise : Bool) : Option (Array Int) := Id.run do
   let deg := degree[0]!
-  let mut used := mkArray CARTVERT false
-  let mut image := mkArray CARTVERT (-1 : Int)
+  let mut used := Array.replicate CARTVERT false
+  let mut image := Array.replicate CARTVERT (-1 : Int)
   image := image.set! 0 (if clockwise then 1 else 0)
   image := image.set! q[0]!.z (x : Int)
   image := image.set! q[1]!.z (y : Int)
@@ -514,8 +513,8 @@ def checkIso (L : ConfMat) (A_low A_upp : Array Nat) (image : Array Int) (adjmat
   let verts := L.mat[0]![0]!
   let ring := L.mat[0]![1]!
   
-  let mut X : Array (Array Nat) := mkArray CARTVERT (mkArray CARTVERT 0)
-  let mut used : Array Bool := mkArray CARTVERT false
+  let mut X : Array (Array Nat) := Array.replicate CARTVERT (Array.replicate CARTVERT 0)
+  let mut used : Array Bool := Array.replicate CARTVERT false
   
   for u in [ring + 1 : verts + 1] do
     let fu := image[u]!
@@ -593,7 +592,7 @@ def checkIso (L : ConfMat) (A_low A_upp : Array Nat) (image : Array Int) (adjmat
   return true
 
 def theConfMats : Array ConfMat :=
-  (Math.u633_data.split (fun x => x == '|') |>.filter (· != "")).map parseConfMat |>.toArray
+  (((Math.u633_data.split (fun x => x == '|')).toList.map (·.toString)).filter (· != "")).map parseConfMat |>.toArray
 
 def theQuestions : Array (Array Query) :=
   theConfMats.map getQuestion
@@ -743,7 +742,7 @@ partial def verifyTreeAux (configs : List Configuration) (deg : Nat) (A_low A_up
       if x != y then
         for o in outs do
           posout := posout.push { T := o, x := y }
-      let s := mkArray posout.size 0
+      let s := Array.replicate posout.size 0
       if not (checkBound configs deg A_low A_upp posout s v 0 adjmat adjBool) then
         ok := false
         break
@@ -1992,7 +1991,7 @@ theorem verifyTreePureRec_split_pt (deg : Nat) (shiftedTable : List (List FastPo
   | hubcap _ => contradiction
 
 def verifyTreeFull (configs : List Configuration) (deg : Nat) (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) : Bool :=
-  (verifyTreeAux configs deg A_low A_upp t outs 2 0 (mkArray 16 (0, 0)) #[]).1
+  (verifyTreeAux configs deg A_low A_upp t outs 2 0 (Array.replicate 16 (0, 0)) #[]).1
 
 
 end Math.Discharging

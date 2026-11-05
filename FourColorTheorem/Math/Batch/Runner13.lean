@@ -21,7 +21,7 @@ partial def genCanonicalLive (c : RConf) (pow3 : Array Nat) : ByteArray × Array
   let N := pow3[r]!
   let live := zeros N
   let orbits : Array Orbit6 := #[]
-  let col : Array Nat := mkArray c.n 0
+  let col : Array Nat := Array.replicate c.n 0
   
   let rec go (i : Nat) (seen1 : Bool) (x cv j0 j1 j2 j3 j4 j5 : Nat) (extCount : Nat) (col : Array Nat)
       (live : ByteArray) (orbits : Array Orbit6) : (Array Nat × ByteArray × Array Orbit6 × Nat) :=

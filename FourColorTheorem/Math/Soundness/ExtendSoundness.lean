@@ -42,26 +42,26 @@ def getCol (col : Array Nat) (i : Nat) : Nat := col.getD i 0
 
 theorem size_set! (col : Array Nat) (v c : Nat) :
     (col.set! v c).size = col.size := by
-  dsimp [Array.set!, Array.setD]
+  dsimp [Array.set!, Array.setIfInBounds]
   split
-  · exact Array.size_set col ⟨v, by assumption⟩ c
+  · simp
   · rfl
 
 theorem getCol_set_eq (col : Array Nat) (v c : Nat) (hv : v < col.size) :
     getCol (col.set! v c) v = c := by
-  dsimp [getCol, Array.getD, Array.set!, Array.setD]
+  dsimp [getCol, Array.getD, Array.set!, Array.setIfInBounds]
   rw [dif_pos hv]
-  have h_sz : v < (col.set ⟨v, hv⟩ c).size := by
+  have h_sz : v < (col.set v c hv).size := by
     rw [Array.size_set]; exact hv
   rw [dif_pos h_sz]
   simp
 
 theorem getCol_set_ne (col : Array Nat) (v c i : Nat) (hv : v < col.size) (hne : i ≠ v) :
     getCol (col.set! v c) i = getCol col i := by
-  dsimp [getCol, Array.getD, Array.set!, Array.setD]
+  dsimp [getCol, Array.getD, Array.set!, Array.setIfInBounds]
   rw [dif_pos hv]
   by_cases hi : i < col.size
-  · have hi' : i < (col.set ⟨v, hv⟩ c).size := by
+  · have hi' : i < (col.set v c hv).size := by
       rw [Array.size_set]; exact hi
     rw [dif_pos hi, dif_pos hi']
     rw [Array.getElem_set]
@@ -69,13 +69,13 @@ theorem getCol_set_ne (col : Array Nat) (v c i : Nat) (hv : v < col.size) (hne :
     · rename_i h_eq
       exact False.elim (hne h_eq.symm)
     · rfl
-  · have hi' : ¬ (i < (col.set ⟨v, hv⟩ c).size) := by
+  · have hi' : ¬ (i < (col.set v c hv).size) := by
       rw [Array.size_set]; exact hi
     rw [dif_neg hi, dif_neg hi']
 
 theorem colorFree_imp (nbrs : Array Nat) (col : Array Nat) (c : Nat)
     (hFree : colorFree nbrs col c = true) :
-    ∀ x ∈ nbrs.data, getCol col x ≠ c := by
+    ∀ x ∈ nbrs.toList, getCol col x ≠ c := by
   intro x hx
   dsimp [colorFree] at hFree
   have h_all := List.all_eq_true.mp hFree x hx
@@ -176,12 +176,12 @@ theorem extend_sound_ind (earlier : Array (Array Nat)) (n : Nat) (k : Nat) :
       n - v ≤ k →
       col.size ≥ n →
       (∀ i < v, getCol col i < 4) →
-      (∀ i < v, ∀ u ∈ (earlier.getD i #[]).data, u < i → getCol col u ≠ getCol col i) →
+      (∀ i < v, ∀ u ∈ (earlier.getD i #[]).toList, u < i → getCol col u ≠ getCol col i) →
       (extend earlier n v col).1 = true →
       let col' := (extend earlier n v col).2
       (∀ i < v, getCol col' i = getCol col i) ∧
       (∀ i < n, getCol col' i < 4) ∧
-      (∀ i < n, ∀ u ∈ (earlier.getD i #[]).data, u < i → getCol col' u ≠ getCol col' i) := by
+      (∀ i < n, ∀ u ∈ (earlier.getD i #[]).toList, u < i → getCol col' u ≠ getCol col' i) := by
   induction k with
   | zero =>
     intro v col h_le h_sz h_lt4 h_adj h_ok
@@ -215,12 +215,12 @@ theorem extend_sound_ind (earlier : Array (Array Nat)) (n : Nat) (k : Nat) :
         · have : i < v := by omega
           rw [getCol_set_ne col v c i hv_sz h_iv]
           exact h_lt4 i this
-      have h_adj_1 : ∀ i < v + 1, ∀ u ∈ (earlier.getD i #[]).data, u < i → getCol col1 u ≠ getCol col1 i := by
+      have h_adj_1 : ∀ i < v + 1, ∀ u ∈ (earlier.getD i #[]).toList, u < i → getCol col1 u ≠ getCol col1 i := by
         intro i hi u hu h_u_lt
         by_cases h_iv : i = v
         · rw [h_iv]
           have h_u_ne : u ≠ v := by omega
-          have hu_v : u ∈ (earlier.getD v #[]).data := by rw [← h_iv]; exact hu
+          have hu_v : u ∈ (earlier.getD v #[]).toList := by rw [← h_iv]; exact hu
           rw [getCol_set_eq col v c hv_sz]
           rw [getCol_set_ne col v c u hv_sz h_u_ne]
           exact colorFree_imp (earlier.getD v #[]) col c h_cf u hu_v
@@ -257,8 +257,8 @@ theorem extend_sound_ind (earlier : Array (Array Nat)) (n : Nat) (k : Nat) :
 
 /-- Sound earlier-adjacency condition: `earlier` contains all earlier neighbors for each vertex. -/
 def IsSoundEarlier (c : Configuration) (earlier : Array (Array Nat)) : Prop :=
-  (∀ v < c.totalNodes, ∀ u < v, (c.adj v u = true ∨ c.adj u v = true) → u ∈ (earlier.getD v #[]).data) ∧
-  (∀ i < c.ringSize, ∀ u ∈ (earlier.getD i #[]).data, u < i → (c.adj i u = true ∨ c.adj u i = true))
+  (∀ v < c.totalNodes, ∀ u < v, (c.adj v u = true ∨ c.adj u v = true) → u ∈ (earlier.getD v #[]).toList) ∧
+  (∀ i < c.ringSize, ∀ u ∈ (earlier.getD i #[]).toList, u < i → (c.adj i u = true ∨ c.adj u i = true))
 
 /-- Irreflexivity of adjacency: no vertex is adjacent to itself. -/
 def IsIrreflexiveAdj (c : Configuration) : Prop :=
@@ -303,7 +303,7 @@ theorem extend_soundness_of_extend (c : Configuration) (earlier : Array (Array N
     intro i hi
     rw [getCol_initCol_ring c b i hi h_r_le]
     cases (b i) <;> decide
-  have h_adj_init : ∀ i < c.ringSize, ∀ u ∈ (earlier.getD i #[]).data, u < i →
+  have h_adj_init : ∀ i < c.ringSize, ∀ u ∈ (earlier.getD i #[]).toList, u < i →
       getCol (initCol c b) u ≠ getCol (initCol c b) i := by
     intro i hi u hu h_u_lt
     have hu_ring : u < c.ringSize := by omega
@@ -346,12 +346,12 @@ theorem extend_soundness_of_extend (c : Configuration) (earlier : Array (Array N
                     getCol (extend earlier c.totalNodes c.ringSize (initCol c b)).2 j :=
       colorOfNat_inj (h_lt4_all i hi) (h_lt4_all j hj) h_eq
     by_cases h_lt : i < j
-    · have h_in : i ∈ (earlier.getD j #[]).data :=
+    · have h_in : i ∈ (earlier.getD j #[]).toList :=
         h_earlier.1 j hj i h_lt (Or.inr hadj)
       have h_diff := h_no_conflicts j hj i h_in h_lt
       exact h_diff h_col_eq
     · have h_gt : j < i := by omega
-      have h_in : j ∈ (earlier.getD i #[]).data :=
+      have h_in : j ∈ (earlier.getD i #[]).toList :=
         h_earlier.1 i hi j h_gt (Or.inl hadj)
       have h_diff := h_no_conflicts i hi j h_in h_gt
       exact h_diff h_col_eq.symm

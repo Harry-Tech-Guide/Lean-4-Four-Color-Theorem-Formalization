@@ -6,6 +6,9 @@ import FourColorTheorem.Math.Batch.DischargeDeg9
 import FourColorTheorem.Math.Batch.DischargeDeg10
 import FourColorTheorem.Math.Batch.DischargeDeg11
 
+set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
+
 namespace Math.Discharging
 
 /-- Master theorem certifying that all RSST discharging trees (degrees 7 through 11)

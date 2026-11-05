@@ -69,7 +69,7 @@ def FullRepresentationHypothesis (c : Configuration) (sms : Array SMData) (pow3 
     (equiv_ab equiv_cd : Nat → Nat → Prop),
     IsValidBoundaryColoring c b →
     IsJointPlanarRingPartition c b θ equiv_ab equiv_cd →
-    ∃ (sm : SMData), sm ∈ sms.data ∧
+    ∃ (sm : SMData), sm ∈ sms.toList ∧
       RepresentsPartition c b θ equiv_ab equiv_cd sm pow3
 
 /-!
@@ -225,7 +225,7 @@ theorem exists_minimal_span (chords : List Chord) (h_ne : chords ≠ []) :
       subst this; exact Nat.le_refl _
     · rcases ih hcs with ⟨m, hm, hmin⟩
       by_cases h_le : chordSpan c ≤ chordSpan m
-      · refine ⟨c, List.mem_cons_self c cs, ?_⟩
+      · refine ⟨c, List.mem_cons_self, ?_⟩
         intro c' hc'
         cases hc' with
         | head => exact Nat.le_refl _
@@ -324,30 +324,13 @@ theorem noncrossing_matching_induction
 
 /-- Every pushed element is in the resulting array. -/
 theorem mem_push_self {α : Type} (a : Array α) (x : α) :
-    x ∈ (a.push x).data := by
-  rcases a with ⟨l⟩
-  dsimp [Array.push]
-  induction l with
-  | nil =>
-    rw [List.concat]
-    exact List.Mem.head _
-  | cons h t ih =>
-    rw [List.concat]
-    exact List.Mem.tail _ ih
+    x ∈ (a.push x).toList := by
+  simp
 
 /-- Pushing to an array preserves membership of existing elements. -/
-theorem mem_push_data {α : Type} (a : Array α) (y : α) (x : α) (hx : x ∈ a.data) :
-    x ∈ (a.push y).data := by
-  rcases a with ⟨l⟩
-  dsimp [Array.push]
-  induction l with
-  | nil => contradiction
-  | cons h t ih =>
-    rw [List.concat]
-    cases hx with
-    | head => exact List.Mem.head _
-    | tail _ hx_t =>
-      exact List.Mem.tail _ (ih hx_t)
+theorem mem_push_data {α : Type} (a : Array α) (y : α) (x : α) (hx : x ∈ a.toList) :
+    x ∈ (a.push y).toList := by
+  simp [hx]
 
 
 

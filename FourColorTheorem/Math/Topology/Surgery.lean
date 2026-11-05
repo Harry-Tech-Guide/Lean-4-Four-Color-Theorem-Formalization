@@ -263,7 +263,7 @@ theorem eraseAllDarts_length_le {D : Type} [BEq D] (darts : List D) (excised : L
   | cons d ds ih =>
     dsimp [eraseAllDarts]
     have h1 := ih (darts.erase d)
-    have h2 := List.length_erase_le d darts
+    have h2 : (darts.erase d).length ≤ darts.length := List.length_erase_le
     omega
 
 /-- Erasing a non-empty list of excised darts containing at least one dart from the list
@@ -302,7 +302,7 @@ theorem eraseAllDarts_strictly_smaller_of_mem {D : Type} [BEq D] [LawfulBEq D] (
         | tail _ h => exact h
       have hd_erased : d ∈ darts.erase x := mem_erase_of_ne hx hd_darts
       have ih_sub := ih (darts.erase x) hd_xs hd_erased
-      have hle := List.length_erase_le x darts
+      have hle : (darts.erase x).length ≤ darts.length := List.length_erase_le
       omega
 
 /-- Excising an embedded configuration with strictly positive interior size strictly reduces dart count. -/
@@ -316,9 +316,9 @@ theorem exciseConfiguration_strictly_smaller {D : Type} [DecidableEq D]
   have h_pos : 0 < c.interiorSize := h_int
   have h_range : 0 ∈ List.range c.interiorSize := List.mem_range.mpr h_pos
   have h_idx_mem : c.ringSize ∈ (List.range c.interiorSize).map (fun i => c.ringSize + i) := by
-    apply List.mem_map_of_mem (fun i => c.ringSize + i) h_range
+    exact List.mem_map_of_mem h_range
   have h_dart_mem : f c.ringSize ∈ ((List.range c.interiorSize).map (fun i => c.ringSize + i)).map f := by
-    apply List.mem_map_of_mem f h_idx_mem
+    exact List.mem_map_of_mem h_idx_mem
   have h_f_in_darts : f c.ringSize ∈ darts := by
     apply hf_mem c.ringSize
     dsimp [Math.Configuration.totalNodes]

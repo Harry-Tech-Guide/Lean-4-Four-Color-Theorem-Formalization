@@ -74,18 +74,18 @@ theorem walk_crosses_contour (H : Hypermap) (jp : JordanPartition H)
         have h_cross := hSep da db s hIn hOut_b
         cases h_cross with
         | inl h_cnt_a =>
-          exact ⟨da, List.mem_cons_self da _, h_cnt_a⟩
+          exact ⟨da, List.mem_cons_self, h_cnt_a⟩
         | inr h_cnt_b =>
           have hb_in_tail : db ∈ Walk.toList H w' := by
             cases w' with
             | refl _ => exact List.mem_singleton_self db
-            | step _ _ => exact List.mem_cons_self db _
+            | step _ _ => exact List.mem_cons_self
           exact ⟨db, List.mem_cons_of_mem da hb_in_tail, h_cnt_b⟩
       | inr h_cnt_b =>
         have hb_in_tail : db ∈ Walk.toList H w' := by
           cases w' with
           | refl _ => exact List.mem_singleton_self db
-          | step _ _ => exact List.mem_cons_self db _
+          | step _ _ => exact List.mem_cons_self
         exact ⟨db, List.mem_cons_of_mem da hb_in_tail, h_cnt_b⟩
 
 /-- Topological Jordan Walk Separation Theorem (Outside to Inside):
@@ -105,12 +105,12 @@ theorem walk_crosses_contour_outside_inside (H : Hypermap) (jp : JordanPartition
       have h_cross := step_crosses_contour_rev H jp hSep da db s hOut hIn_b
       cases h_cross with
       | inl h_cnt_a =>
-        exact ⟨da, List.mem_cons_self da _, h_cnt_a⟩
+        exact ⟨da, List.mem_cons_self, h_cnt_a⟩
       | inr h_cnt_b =>
         have hb_in_tail : db ∈ Walk.toList H w' := by
           cases w' with
           | refl _ => exact List.mem_singleton_self db
-          | step _ _ => exact List.mem_cons_self db _
+          | step _ _ => exact List.mem_cons_self
         exact ⟨db, List.mem_cons_of_mem da hb_in_tail, h_cnt_b⟩
     | inr h_not_in =>
       cases h_not_in with
@@ -121,7 +121,7 @@ theorem walk_crosses_contour_outside_inside (H : Hypermap) (jp : JordanPartition
         have hb_in_tail : db ∈ Walk.toList H w' := by
           cases w' with
           | refl _ => exact List.mem_singleton_self db
-          | step _ _ => exact List.mem_cons_self db _
+          | step _ _ => exact List.mem_cons_self
         exact ⟨db, List.mem_cons_of_mem da hb_in_tail, h_cnt_b⟩
 
 /-- Topological Jordan Kempe Chain Separation Theorem:

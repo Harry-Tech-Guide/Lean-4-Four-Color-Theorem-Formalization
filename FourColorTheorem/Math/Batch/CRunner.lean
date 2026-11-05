@@ -55,7 +55,7 @@ partial def checkContractExact (earlier : Array (Array Nat)) (alias : Array Nat)
 
 /-- Test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
 def runContractCheck (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
-  let mut alias := mkArray c.n 0
+  let mut alias := Array.replicate c.n 0
   for i in [0:c.n] do alias := alias.set! i i
   for _ in [0:c.n] do
     for (u, v) in c.contractEdges do
@@ -66,7 +66,7 @@ def runContractCheck (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool :=
       alias := alias.set! v mn
       alias := alias.set! root_u mn
       alias := alias.set! root_v mn
-  let col : Array Nat := mkArray c.n 0
+  let col : Array Nat := Array.replicate c.n 0
   return checkContractExact c.earlier alias c.n c.r 1 col pow3 live
 
 /-- Combined D-reduction fixed-point solver and C-reduction contract validator. -/

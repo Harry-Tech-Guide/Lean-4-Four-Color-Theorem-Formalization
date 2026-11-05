@@ -1,5 +1,7 @@
 import FourColorTheorem.Math.ProofTree
 
+set_option maxRecDepth 2000000
+
 namespace Math
 namespace Discharging
 

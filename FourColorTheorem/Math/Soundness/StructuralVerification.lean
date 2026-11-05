@@ -40,10 +40,10 @@ def checkSoundEarlier (c : Configuration) (earlier : Array (Array Nat)) : Bool :
   let part1 := (List.range c.totalNodes).all (fun v =>
     (List.range v).all (fun u =>
       if c.adj v u || c.adj u v then
-        (earlier.getD v #[]).data.contains u
+        (earlier.getD v #[]).toList.contains u
       else true))
   let part2 := (List.range c.ringSize).all (fun i =>
-    (earlier.getD i #[]).data.all (fun u =>
+    (earlier.getD i #[]).toList.all (fun u =>
       if u < i then
         c.adj i u || c.adj u i
       else true))
@@ -67,7 +67,7 @@ theorem sound_earlier_of_check (c : Configuration) (earlier : Array (Array Nat))
       | inl h_vu => rw [h_vu]; rfl
       | inr h_uv => rw [h_uv, Bool.or_true]
     rw [if_pos h_or] at h_u
-    change (earlier.getD v #[]).data.elem u = true at h_u
+    change (earlier.getD v #[]).toList.elem u = true at h_u
     exact List.elem_iff.mp h_u
   · intro i hi u hu hu_lt
     have hi_mem : i ∈ List.range c.ringSize := List.mem_range.mpr hi

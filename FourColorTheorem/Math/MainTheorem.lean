@@ -2,10 +2,8 @@ import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Discharging
 import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.ComputableReducer
 import FourColorTheorem.Math.Planarity
 import FourColorTheorem.Math.HypermapGraph
-import FourColorTheorem.Math.Algorithm
 import FourColorTheorem.Math.Topology.KempeTopology
 import FourColorTheorem.Math.Topology.Surgery
 import FourColorTheorem.Math.Topology.Euler
@@ -485,16 +483,6 @@ theorem unavoidability_from_discharging (H : Hypermap) [DecidableEq H.Dart] (dar
     have hContr : Discharging.UnavoidableSetExists H w.rule darts :=
       Discharging.unavoidable_set_exists_of_sum_120 H w.rule darts w.charge_sum_120
     exact False.elim (hContr hNonpos)
-
-/-- Construct an RSST reducible configuration existence witness from a PlanarDischargingWitness
-    and certificate elimination witnesses. -/
-def rsst_from_discharging_and_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (w : PlanarDischargingWitness H darts)
-    (hWit : ∀ c, c ∈ theUnavoidableSet → KempeEliminationWitness c) :
-    ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c := by
-  have ⟨c, hc_in, hc_app⟩ := unavoidability_from_discharging H darts w
-  have hc_red := dreducible_of_elimination_witness c (hWit c hc_in)
-  exact ⟨c, hc_in, hc_app, Or.inl hc_red⟩
 
 /-- Construct an RSST reducible configuration existence witness from a PlanarDischargingWitness
     and mathematical reducibility directly. -/

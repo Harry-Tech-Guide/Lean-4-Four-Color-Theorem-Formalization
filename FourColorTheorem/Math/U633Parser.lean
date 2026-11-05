@@ -2,14 +2,15 @@ import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.U633String
 import FourColorTheorem.Math.Batch.Runner
 
+set_option maxRecDepth 500000
+
 namespace Math
 
 def splitString (s : String) (c : Char) : List String :=
-  s.split (fun x => x == c)
+  (s.split (fun x => x == c)).toList.map (·.toString)
 
 def parseNatList (s : String) : List Nat :=
-  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).filterMap (fun x =>
-    if x == "" then none else x.toNat?)
+  ((s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).toList).filterMap (fun x => if x.toString == "" then none else x.toString.toNat?)
 
 def mkAdjFromFlat (n : Nat) (data : Array Bool) : Nat -> Nat -> Bool :=
   fun i j => if i * n + j < data.size then data[i * n + j]! else false
@@ -21,7 +22,7 @@ def parseConfig (s : String) : Configuration :=
     let ringSize := nums[1]!
 
     Id.run do
-      let mut flat := mkArray (numVertices * numVertices) false
+      let mut flat := Array.replicate (numVertices * numVertices) false
       -- Header: n r X Y a, followed by the 2·a contract vertices; adjacency starts after that.
       let a := nums.getD 4 0
       let mut contracts : List (Nat × Nat) := []
@@ -69,9 +70,9 @@ def parseAllConfigs (_ : Unit) : Array Configuration :=
 /-- Canonical symmetric irreflexive adjacency relation generated from `earlier` lists. -/
 def symAdj (earlier : Array (Array Nat)) (i j : Nat) : Bool :=
   if i < j then
-    (earlier.getD j #[]).data.contains i
+    (earlier.getD j #[]).toList.contains i
   else if j < i then
-    (earlier.getD i #[]).data.contains j
+    (earlier.getD i #[]).toList.contains j
   else
     false
 
@@ -96,13 +97,14 @@ theorem unavoidable_size_eq : theUnavoidableSet.size = 633 := by
 
 /-- Every configuration in the unavoidable set has interior size ≥ 4 (list boolean form),
     verified directly in the Lean 4 kernel by `rfl` over all 633 configurations. -/
-theorem unavoidable_data_all_int : theUnavoidableSet.data.all (fun c => c.interiorSize >= 4) = true := by
+-- maxRecDepth set at top of file
+theorem unavoidable_data_all_int : theUnavoidableSet.toList.all (fun c => c.interiorSize >= 4) = true := by
   rfl
 
 /-- Every configuration in the RSST unavoidable set has at least 4 interior vertices. -/
 theorem unavoidable_interior_ge_4 (c : Configuration) (h : c ∈ theUnavoidableSet) :
     c.interiorSize ≥ 4 := by
-  have hMem : c ∈ theUnavoidableSet.data := Array.mem_data.mpr h
+  have hMem : c ∈ theUnavoidableSet.toList := Array.mem_toList_iff.mpr h
   have hDec : decide (c.interiorSize >= 4) = true :=
     List.all_eq_true.mp unavoidable_data_all_int c hMem
   exact of_decide_eq_true hDec

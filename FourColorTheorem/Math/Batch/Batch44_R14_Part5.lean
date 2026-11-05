@@ -1,5 +1,8 @@
 import FourColorTheorem.Math.Batch.Runner14
 
+set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
+
 namespace Math
 namespace Batch
 

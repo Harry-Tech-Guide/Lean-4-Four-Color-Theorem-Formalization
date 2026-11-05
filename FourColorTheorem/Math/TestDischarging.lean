@@ -8,8 +8,8 @@ import FourColorTheorem.Math.Rules
 
 namespace Math.Discharging
 
-def trivial_A_low (deg : Nat) : Array Nat := mkArray (5 * deg + 2) 5 |>.set! 0 deg
-def trivial_A_upp (deg : Nat) : Array Nat := mkArray (5 * deg + 2) 12 |>.set! 0 deg
+def trivial_A_low (deg : Nat) : Array Nat := Array.replicate (5 * deg + 2) 5 |>.set! 0 deg
+def trivial_A_upp (deg : Nat) : Array Nat := Array.replicate (5 * deg + 2) 12 |>.set! 0 deg
 
 noncomputable def test7 (configs : List Configuration) (_ : Unit) : Bool :=
   let deg := 7

@@ -760,7 +760,7 @@ def withIntStepsD {α : Type} [Inhabited α] (r canonValid : Nat) (rings : List 
       let nextV := Nat.succ v
       selectBool (Nat.ble r v)
         (let bitV := Nat.shiftLeft 1 v
-         buildIntForbidAux r rings row.data (fun intMask u0 u1 u2 u3 =>
+         buildIntForbidAux r rings row.toList (fun intMask u0 u1 u2 u3 =>
            let f0 := Nat.xor canonValid u0
            let f1 := Nat.xor canonValid u1
            let f2 := Nat.xor canonValid u2
@@ -920,7 +920,7 @@ def withContractStepsC {α : Type} [Inhabited α] (r canonValid initCompat : Nat
           selectBool (Nat.blt rv v)
             (Nat.land compat (sameRingColMask v rv rings))
             compat
-         let compat2 := filterRingContractNbrs v rv canonValid alias rings row.data compat1
+         let compat2 := filterRingContractNbrs v rv canonValid alias rings row.toList compat1
          seqNat compat2 (ih nextV compat2 k))
         (let bitV := Nat.shiftLeft 1 v
          let reqMask := selectBool (and (Nat.ble r rv) (Nat.blt rv v)) (Nat.shiftLeft 1 rv) 0
@@ -929,7 +929,7 @@ def withContractStepsC {α : Type} [Inhabited α] (r canonValid initCompat : Nat
              (lookupRingCols rv rings kf)
              (kf canonValid canonValid canonValid canonValid)
          withInitF (fun i0 i1 i2 i3 =>
-           buildContractIntForbidAux r rv canonValid alias rings row.data i0 i1 i2 i3
+           buildContractIntForbidAux r rv canonValid alias rings row.toList i0 i1 i2 i3
              (fun intDiff f0 f1 f2 f3 =>
                let checkMask := Nat.lor reqMask intDiff
                seqNat bitV (seqNat reqMask (seqNat checkMask (seqNat f0 (seqNat f1 (seqNat f2 (seqNat f3
@@ -941,7 +941,7 @@ def withContractStepsC {α : Type} [Inhabited α] (r canonValid initCompat : Nat
 /-- Compute $3^{mMax-1}$-bit `L2` slice (`d_{mMax-1} = 0`) for D-reducibility of `c`. -/
 def computeInitialLiveDWithRings (rVal canonValid : Nat) (rings : List RingColMasks)
     (swapSteps1 : List SwapStep) (c : RConf) : Nat :=
-  let intSteps := (withIntStepsD rVal canonValid rings c.earlier.data StrictBox.mk).val
+  let intSteps := (withIntStepsD rVal canonValid rings c.earlier.toList StrictBox.mk).val
   let canonLive := dfsInterior intSteps 0 0 0 0 canonValid canonValid
   seqNat canonLive
     (let s12 := swapDigits12 swapSteps1 canonLive
@@ -956,14 +956,14 @@ def computeInitialLiveD (rVal mMaxVal : Nat) (swapSteps1 : List SwapStep) (c : R
 
 /-- Compute `contractCanon` ($3^{mMax-1}$-bit canonical mask of colorings extendable to the contracted configuration) for `c`. -/
 def computeContractCanonWithRings (rVal canonValid : Nat) (rings : List RingColMasks) (c : RConf) : Nat :=
-  let al := (withBuildAlias c.contractEdges.data StrictBox.mk).val
+  let al := (withBuildAlias c.contractEdges.toList StrictBox.mk).val
   @Prod.rec _ _ (fun _ => _)
     (fun ringCompat intStepsC =>
       seqNat ringCompat
         (let unextContract := dfsInterior intStepsC 0 0 0 0 ringCompat ringCompat
          let contractCanon := Nat.xor ringCompat unextContract
          seqNat contractCanon contractCanon))
-    (withContractStepsC rVal canonValid canonValid al rings c.earlier.data Prod.mk)
+    (withContractStepsC rVal canonValid canonValid al rings c.earlier.toList Prod.mk)
 
 /-- Compute `contractCanon` for C-reducibility of `c` using `rVal, mMaxVal`. -/
 def computeContractCanon (rVal mMaxVal : Nat) (c : RConf) : Nat :=
@@ -975,8 +975,8 @@ def computeContractCanon (rVal mMaxVal : Nat) (c : RConf) : Nat :=
 /-- Compute `(L2_0, contractCanon)` ($3^{mMax-1}$-bit slices) for C-reducibility of `c`. -/
 def computeInitialStateWithRings (rVal canonValid : Nat) (rings : List RingColMasks)
     (swapSteps1 : List SwapStep) (c : RConf) : Nat × Nat :=
-  let al := (withBuildAlias c.contractEdges.data StrictBox.mk).val
-  let intStepsD := (withIntStepsD rVal canonValid rings c.earlier.data StrictBox.mk).val
+  let al := (withBuildAlias c.contractEdges.toList StrictBox.mk).val
+  let intStepsD := (withIntStepsD rVal canonValid rings c.earlier.toList StrictBox.mk).val
   let canonLive := dfsInterior intStepsD 0 0 0 0 canonValid canonValid
   seqNat canonLive
     (@Prod.rec _ _ (fun _ => _)
@@ -987,7 +987,7 @@ def computeInitialStateWithRings (rVal canonValid : Nat) (rings : List RingColMa
            let s12 := swapDigits12 swapSteps1 canonLive
            let L2 := Nat.lor canonLive s12
            seqNat L2 (seqNat contractCanon (L2, contractCanon))))
-      (withContractStepsC rVal canonValid canonLive al rings c.earlier.data Prod.mk))
+      (withContractStepsC rVal canonValid canonLive al rings c.earlier.toList Prod.mk))
 
 /-- Compute `(L2_0, contractCanon)` for C-reducibility of `c` using `rVal, mMaxVal, swapSteps1`. -/
 def computeInitialState (rVal mMaxVal : Nat) (swapSteps1 : List SwapStep) (c : RConf) : Nat × Nat :=

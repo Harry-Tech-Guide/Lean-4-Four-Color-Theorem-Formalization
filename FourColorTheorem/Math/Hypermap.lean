@@ -14,10 +14,8 @@ def Perm.mul {D : Type} (p q : Perm D) : Perm D :=
   { f := fun x => p.f (q.f x),
     inv := fun x => q.inv (p.inv x),
     left_inv := fun x => by
-      dsimp
       rw [p.left_inv, q.left_inv],
     right_inv := fun x => by
-      dsimp
       rw [q.right_inv, p.right_inv] }
 
 def Perm.one {D : Type} : Perm D :=

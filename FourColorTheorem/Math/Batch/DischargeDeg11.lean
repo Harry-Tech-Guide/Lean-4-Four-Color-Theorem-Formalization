@@ -3,6 +3,7 @@ import FourColorTheorem.Math.U633Parser
 import FourColorTheorem.Math.KernelRfl
 
 set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
 
 namespace Math.Discharging
 

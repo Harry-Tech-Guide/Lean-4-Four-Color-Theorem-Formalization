@@ -83,13 +83,13 @@ theorem vertexColoring_iff_k4 (H : Spec.Hypermap) :
   · rintro ⟨vc⟩
     refine ⟨{
       color := fun d => colorToFin4 (vc.color d)
-      node_invariant := fun d => by dsimp; rw [vc.node_invariant d]
+      node_invariant := fun d => by rw [vc.node_invariant d]
       edge_proper := fun d h => vc.edge_proper d (colorToFin4_inj _ _ h)
     }⟩
   · rintro ⟨vck⟩
     refine ⟨{
       color := fun d => fin4ToColor (vck.color d)
-      node_invariant := fun d => by dsimp; rw [vck.node_invariant d]
+      node_invariant := fun d => by rw [vck.node_invariant d]
       edge_proper := fun d h => vck.edge_proper d (fin4ToColor_inj _ _ h)
     }⟩
 
@@ -100,13 +100,13 @@ theorem mapColoring_iff_k4 (H : Spec.Hypermap) :
   · rintro ⟨fc⟩
     refine ⟨{
       color := fun d => colorToFin4 (fc.color d)
-      face_invariant := fun d => by dsimp; rw [fc.face_invariant d]
+      face_invariant := fun d => by rw [fc.face_invariant d]
       edge_proper := fun d h => fc.edge_proper d (colorToFin4_inj _ _ h)
     }⟩
   · rintro ⟨fck⟩
     refine ⟨{
       color := fun d => fin4ToColor (fck.color d)
-      face_invariant := fun d => by dsimp; rw [fck.face_invariant d]
+      face_invariant := fun d => by rw [fck.face_invariant d]
       edge_proper := fun d h => fck.edge_proper d (fin4ToColor_inj _ _ h)
     }⟩
 

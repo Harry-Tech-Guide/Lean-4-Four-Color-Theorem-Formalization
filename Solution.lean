@@ -32,7 +32,7 @@ def toCore (H : Spec.Hypermap) : _root_.Hypermap where
 /-- Interior size of canonical unavoidable configuration `idx < 633`. -/
 def canonicalInteriorSize (idx : Nat) : Nat :=
   if h : idx < 633 then
-    (Math.theUnavoidableSet.get ⟨idx, by rw [Math.unavoidable_size_eq]; exact h⟩).interiorSize
+    (Math.theUnavoidableSet[idx]'(by rw [Math.unavoidable_size_eq]; exact h)).interiorSize
   else
     0
 
@@ -52,16 +52,10 @@ theorem internal_rsst_suite_valid :
   · intro idx h_lt
     dsimp [canonicalInteriorSize]
     rw [dif_pos h_lt]
-    have h_sz : idx < Math.theUnavoidableSet.data.length := by
-      rw [← Array.size, Math.unavoidable_size_eq]
-      exact h_lt
-    have h_mem_data :
-        Math.theUnavoidableSet.data.get ⟨idx, h_sz⟩ ∈ Math.theUnavoidableSet.data :=
-      List.get_mem Math.theUnavoidableSet.data idx h_sz
     have h_mem :
-        Math.theUnavoidableSet.get ⟨idx, by rw [Math.unavoidable_size_eq]; exact h_lt⟩ ∈
+        Math.theUnavoidableSet[idx]'(by rw [Math.unavoidable_size_eq]; exact h_lt) ∈
           Math.theUnavoidableSet :=
-      Array.mem_data.mp h_mem_data
+      Array.getElem_mem _
     exact Math.unavoidable_interior_ge_4 _ h_mem
   · intro idx h_lt
     rcases Math.MasterCertificate.master_suite_certifies_idx idx h_lt with ⟨_, hD⟩ | ⟨_, hC⟩

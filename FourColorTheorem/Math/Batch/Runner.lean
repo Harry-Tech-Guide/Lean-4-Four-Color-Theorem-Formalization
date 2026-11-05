@@ -98,8 +98,8 @@ def initialLiveFast (c : RConf) (pow3 : Array Nat) : ByteArray × Array Orbit6 :
   let N := pow3[r]!
   let mut live := zeros N
   let mut orbits : Array Orbit6 := #[]
-  let mut col : Array Nat := mkArray c.n 0
-  let mut d : Array Nat := mkArray r 0
+  let mut col : Array Nat := Array.replicate c.n 0
+  let mut d : Array Nat := Array.replicate r 0
   for idx in [0:N] do
     let mut t := idx
     let mut x := 0

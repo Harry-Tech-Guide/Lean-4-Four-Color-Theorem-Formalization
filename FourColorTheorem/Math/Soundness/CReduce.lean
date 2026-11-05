@@ -89,7 +89,7 @@ def computeFinalState (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Red
     live := live0,
     orbits := orbits0,
     activeSM := sms,
-    ranks := mkArray N 0,
+    ranks := Array.replicate N 0,
     iter := 0,
     changed := true
   }
@@ -138,7 +138,7 @@ def checkContractExactTotal : Nat → Array (Array Nat) → Array Nat → Nat �
 
 /-- Total fuel-bounded test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
 def runContractCheckTotal (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
-  let mut alias := mkArray c.n 0
+  let mut alias := Array.replicate c.n 0
   for i in [0:c.n] do alias := alias.set! i i
   for _ in [0:c.n] do
     for (u, v) in c.contractEdges do
@@ -149,7 +149,7 @@ def runContractCheckTotal (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bo
       alias := alias.set! v mn
       alias := alias.set! root_u mn
       alias := alias.set! root_v mn
-  let col : Array Nat := mkArray c.n 0
+  let col : Array Nat := Array.replicate c.n 0
   return checkContractExactTotal c.n c.earlier alias c.n c.r 1 col pow3 live
 
 /-- Total fuel-bounded combined D-reduction fixed-point solver and C-reduction contract validator. -/

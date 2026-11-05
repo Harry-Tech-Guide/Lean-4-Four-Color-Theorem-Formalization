@@ -10,6 +10,7 @@ import FourColorTheorem.Math.Batch.DischargeDeg7_Part5
 import FourColorTheorem.Math.Batch.DischargeDeg7_Comb2
 
 set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
 
 namespace Math.Discharging
 

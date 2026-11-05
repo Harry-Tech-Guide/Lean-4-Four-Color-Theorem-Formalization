@@ -53,8 +53,8 @@ instance : Inhabited RConf := ⟨{ n := 0, r := 0, X := 0, contract := 0, contra
 
 /-- Split on whitespace and parse every natural-number token. -/
 def parseNums (s : String) : Array Nat :=
-  (s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).foldl
-    (fun acc w => match w.toNat? with
+  ((s.split (fun ch => ch == ' ' || ch == '\n' || ch == '\r' || ch == '\t')).toArray).foldl
+    (fun acc w => match w.toString.toNat? with
       | some k => acc.push k
       | none => acc) #[]
 
@@ -71,7 +71,7 @@ def parseRConf (s : String) : RConf := Id.run do
   for i in [0:a] do
     contractEdges := contractEdges.push (nums[5 + 2*i]! - 1, nums[5 + 2*i + 1]! - 1)
   let mut idx := 5 + 2 * a
-  let mut adj : Array (Array Nat) := mkArray n #[]
+  let mut adj : Array (Array Nat) := Array.replicate n #[]
   for _ in [0:n] do
     let v := nums[idx]! - 1
     let d := nums[idx + 1]!
@@ -88,18 +88,18 @@ def parseRConf (s : String) : RConf := Id.run do
 
 /-- All 633 configurations, parsed with the correct header offset. -/
 def loadAll (_ : Unit) : Array RConf :=
-  ((u633_data.split (· == '|')).filter (fun b => b.trim != "")).toArray.map parseRConf
+  ((u633_data.split (· == '|')).toArray.map (fun b => b.toString)).filter (fun b => b.trimAscii.toString != "") |>.map parseRConf
 
 /-- `ByteArray` of `n` zeros. -/
 def zeros (n : Nat) : ByteArray := Id.run do
-  let mut b := ByteArray.mkEmpty n
+  let mut b := ByteArray.emptyWithCapacity n
   for _ in [0:n] do
     b := b.push 0
   return b
 
 /-- `ByteArray` of `n` ones. -/
 def ones (n : Nat) : ByteArray := Id.run do
-  let mut b := ByteArray.mkEmpty n
+  let mut b := ByteArray.emptyWithCapacity n
   for _ in [0:n] do
     b := b.push 1
   return b
@@ -120,7 +120,7 @@ def popcount (x : Nat) : Nat := Id.run do
 
 /-- Check if color `c` is free among all earlier neighbors of a vertex. -/
 def colorFree (nbrs : Array Nat) (col : Array Nat) (c : Nat) : Bool :=
-  nbrs.data.all (fun x => col.getD x 0 != c)
+  nbrs.toList.all (fun x => col.getD x 0 != c)
 
 /-- Backtracking: can vertices `v … n-1` be 4-coloured, given colours of `0 … v-1` in `col`? -/
 def extend (earlier : Array (Array Nat)) (n v : Nat) (col : Array Nat) : Bool × Array Nat :=
@@ -154,8 +154,8 @@ def initialLive (c : RConf) (pow3 : Array Nat) : ByteArray × Nat := Id.run do
   let N := pow3[r]!
   let mut live := zeros N
   let mut extOrbits := 0
-  let mut col : Array Nat := mkArray c.n 0
-  let mut d : Array Nat := mkArray r 0
+  let mut col : Array Nat := Array.replicate c.n 0
+  let mut d : Array Nat := Array.replicate r 0
   for idx in [0:N] do
     let mut t := idx
     let mut x := 0
@@ -310,7 +310,7 @@ partial def checkCReducible (earlier : Array (Array Nat)) (alias : Array Nat) (n
 
 def runCReduction (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
 
-  let mut alias := mkArray c.n 0
+  let mut alias := Array.replicate c.n 0
   for i in [0:c.n] do alias := alias.set! i i
   for _ in [0:c.n] do
     for (u, v) in c.contractEdges do
@@ -322,7 +322,7 @@ def runCReduction (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id
       alias := alias.set! root_u mn
       alias := alias.set! root_v mn
   
-  let col : Array Nat := mkArray c.n 0
+  let col : Array Nat := Array.replicate c.n 0
   return checkCReducible c.earlier alias c.n c.r 1 col pow3 live
 
 structure Result where
@@ -382,7 +382,7 @@ partial def checkContractExact (earlier : Array (Array Nat)) (alias : Array Nat)
 
 /-- Test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
 def runContractCheck (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
-  let mut alias := mkArray c.n 0
+  let mut alias := Array.replicate c.n 0
   for i in [0:c.n] do alias := alias.set! i i
   for _ in [0:c.n] do
     for (u, v) in c.contractEdges do
@@ -393,7 +393,7 @@ def runContractCheck (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool :=
       alias := alias.set! v mn
       alias := alias.set! root_u mn
       alias := alias.set! root_v mn
-  let col : Array Nat := mkArray c.n 0
+  let col : Array Nat := Array.replicate c.n 0
   return checkContractExact c.earlier alias c.n c.r 1 col pow3 live
 
 /-- Full reducibility check (D-reducibility and C-reducibility) of one configuration. -/

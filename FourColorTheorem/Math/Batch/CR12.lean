@@ -13,6 +13,9 @@ import FourColorTheorem.Math.Batch.CBatch23_R12_Part12
 import FourColorTheorem.Math.Batch.CBatch24_R12_Part13
 import FourColorTheorem.Math.Batch.CBatch25_R12_Part14
 
+set_option maxHeartbeats 0
+set_option maxRecDepth 10000000
+
 namespace Math
 namespace Batch
 
