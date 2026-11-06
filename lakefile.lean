@@ -10,6 +10,10 @@ lean_lib «FourColorTheorem» where
 
 lean_lib «Spec» where
 
+lean_lib «ConditionalBridge» where
+
+lean_lib «ConditionalSolution» where
+
 lean_lib «Challenge» where
 
 lean_lib «Solution» where

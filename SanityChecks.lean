@@ -1,11 +1,13 @@
 import Challenge
+import ConditionalBridge
 
 /-!
 # Semantic Non-Vacuity & Sharpness Sanity Checks (`SanityChecks.lean`)
 
 This standalone verification module proves four semantic sanity checks confirming
 that the hypermap, planarity, and coloring definitions in `Challenge.lean` / `Solution.lean`
-are neither vacuously false on the left of the implication nor trivially true on the right:
+are neither vacuously false on the left of the implication nor trivially true on the right (checks 1-4),
+and records an honest audit fact about the legacy conditional bridge (check 5):
 
 1. **Non-Vacuity of Planarity (Existence):**
    Explicit construction of the tetrahedral planar triangulation `K4_hypermap` ($K_4$ on 12 darts,
@@ -24,10 +26,13 @@ are neither vacuously false on the left of the implication nor trivially true on
    Proof that the non-planar hypermap `K5_hypermap` is NOT 4-colorable
    (`¬ Nonempty (Hypermap.VertexColoring K5_hypermap)` and
    `¬ Nonempty (Math.MapColoring K5_hypermap.dual)`).
+5. **Audit of the legacy conditional bridge (`bridge_iff_no_mc`):**
+   `Spec.ValidRSSTCertificateSuite` is satisfiable by trivial data, hence
+   `Spec.RSSTStandardizationBridge` is *equivalent* to ``no minimal counterexample exists''. The
+   conditional theorem in `ConditionalSolution.lean` is therefore not an independent result.
 -/
 
 namespace SanityChecks
-
 open Spec
 
 /-!
@@ -549,5 +554,28 @@ theorem k5_dual_not_4_map_colorable : ¬ Nonempty (Spec.MapColoring K5_hypermap.
     edge_proper := fc.edge_proper
   }
   exact k5_not_4_vertex_colorable ⟨hvc⟩
+
+/-!
+## 5. Audit: the legacy conditional bridge is equivalent to the absence of minimal counterexamples
+-/
+
+/-- Trivial data satisfies the certificate-suite specification: no real certificates are needed. -/
+theorem trivial_suite_valid :
+    Spec.ValidRSSTCertificateSuite 633 (fun _ => 4) (fun _ => true) (fun _ => true) True
+      (fun _ _ _ _ => 0) :=
+  ⟨rfl, fun _ _ => Nat.le_refl 4, fun _ _ => Or.inl rfl, trivial, fun _ _ _ _ => rfl⟩
+
+/-- Check 5: `Spec.RSSTStandardizationBridge` is literally equivalent to "no minimal counterexample
+    exists", i.e. (by well-founded descent) to the Four Color Theorem itself. -/
+theorem bridge_iff_no_mc :
+    Spec.RSSTStandardizationBridge ↔
+      ∀ (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
+        Spec.MinimalCounterexample H darts → False := by
+  constructor
+  · intro h H _ darts mc
+    exact h 633 (fun _ => 4) (fun _ => true) (fun _ => true) True (fun _ _ _ _ => 0)
+      trivial_suite_valid H darts mc
+  · intro h _ _ _ _ _ _ _ H _ darts mc
+    exact h H darts mc
 
 end SanityChecks

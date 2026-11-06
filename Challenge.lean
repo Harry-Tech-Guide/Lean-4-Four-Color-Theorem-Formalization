@@ -3,10 +3,13 @@ import Spec
 /-!
 # Palomar / Comparator Challenge Specification: The Four Color Theorem
 
-This file serves as the top-level challenge specification for the Lean 4 formalization
-of the Four Color Theorem (`Challenge.lean`), conforming to the Lean FRO `Comparator`
-and Palomar standard (< 300 lines, importing only `Spec` which has zero internal proof imports,
-and zero custom syntax/macros/notations).
+This file is the top-level challenge for the Lean 4 formalization of the Four Color Theorem
+(`Challenge.lean`), following the Lean FRO `Comparator` / Palomar convention: it imports only
+`Spec` (which has zero internal proof imports and no custom syntax, macros, or notations) and
+states the theorem with `sorry`. The proof belongs in `Solution.lean`.
+
+The statement is **hypothesis-free**: every complete, planar, bridgeless hypermap has a proper
+4-coloring of its faces.
 
 ## Core Mathematical Specification Summary (`Spec.lean`)
 - **`Spec.Hypermap`**:
@@ -25,17 +28,17 @@ and zero custom syntax/macros/notations).
   (no isthmus/bridge edges).
 - **`Spec.MapColoring H`**:
   A proper 4-coloring (`Spec.Color = {c0, c1, c2, c3}`) of the faces of `H` (constant on each
-  `face` orbit and assigning distinct colors across every `edge` pair `d` and `H.edge.f d`,
-  dual to `Spec.Hypermap.VertexColoring H.dual`).
-- **`Spec.RSSTStandardizationBridge`**:
-  Explicit topological and certificate soundness bridge connecting minimal planar
-  counterexamples and the 633-configuration RSST certificate suite (`Spec.ValidRSSTCertificateSuite`).
+  `face` orbit and assigning distinct colors across every `edge` pair `d` and `H.edge.f d`).
+
+## Known limitation of the specification
+`Spec.Hypermap.isPlanar` and friends count orbits with a **fixed fuel** equal to `darts.length`
+(and `sameVertex`/`sameFace` default to fuel `1000`). The fuel-free reformulation is tracked as
+part of the roadmap in `README.md`; until then this statement is the one being targeted.
 -/
 
 /-- The Four Color Theorem (Challenge Specification). -/
 theorem four_color_theorem (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_complete : Spec.IsCompleteDarts H darts)
     (h_planar : Spec.IsPlanar H darts)
-    (h_bridgeless : Spec.Hypermap.isBridgeless H darts)
-    (h_rsst : Spec.RSSTStandardizationBridge) :
+    (h_bridgeless : Spec.Hypermap.isBridgeless H darts) :
     Nonempty (Spec.MapColoring H) := sorry
