@@ -14,8 +14,8 @@ Follow these rules for all theorem-proving and verification work in `c:\Four Col
 
 ## 2. Targeted Module Building, RAM/CPU Throttling & Cache Protection
 
-- **Strict RAM & CPU Limits (`-M 1536 -j 1` + `build_safe.ps1`):**
-  - `lakefile.lean` enforces `weakLeanArgs := #["-M", "1536", "-j", "1"]` (1.5 GB max memory per `lean.exe` process, 1 thread per process).
+- **Strict RAM & CPU Limits (`-M 4096 -j 1` + `build_safe.ps1`):**
+  - `lakefile.lean` enforces `weakLeanArgs := #["-M", "4096", "-j", "1"]` (4 GB max memory per `lean.exe` process, 1 thread per process).
   - **NEVER run `lake build` on an umbrella target with unbuilt heavy leaf dependencies** (which would spawn 8 parallel `lean.exe` processes and exhaust the 16 GB system RAM).
   - **Always use `build_safe.ps1`** to build heavy modules sequentially one at a time at `BelowNormal` priority and 2-core affinity (`0x03`), leaving 6 of 8 logical processors and >7 GB RAM free for the OS UI:
     ```powershell

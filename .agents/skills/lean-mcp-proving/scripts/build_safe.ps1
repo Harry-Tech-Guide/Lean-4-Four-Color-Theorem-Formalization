@@ -14,7 +14,7 @@ $curProc.ProcessorAffinity = [IntPtr]0x03
 Set-Location "c:\Four Color Theorem"
 
 foreach ($t in $Targets) {
-    Write-Host "[build_safe] Building $t (1 thread, 1536 MB cap, BelowNormal priority)..."
+    Write-Host "[build_safe] Building $t (1 thread, 4096 MB cap, BelowNormal priority)..."
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     & lake build $t
     if ($LASTEXITCODE -ne 0) {

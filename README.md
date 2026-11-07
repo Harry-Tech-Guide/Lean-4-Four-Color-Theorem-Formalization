@@ -22,7 +22,7 @@ theorem four_color_theorem (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : Lis
 
 | Item | Status |
 | :--- | :--- |
-| 633 RSST reducibility certificates (249 D + 384 C, rings 6–14) | Pass **in-kernel** (`rfl`) checks — `0` `native_decide` |
+| 633 RSST reducibility certificates (249 D + 384 C, rings 6–14) | **Needs re-certification (see issue #6 below):** the 138 batch modules pass in-kernel (`rfl`) checks for `KernelReducer`, whose `kempeRound` transposes adjacent ring edges `0` and `r - 1` (`(1, ..., r-2, 0, r-1)`); the geometric reference reducer (`FastReducer.check` / `buildSMData`) agrees with RSST on all 633 configurations |
 | 5 RSST cartwheel discharging trees (degrees 7–11) | Pass **in-kernel** (`rfl`) checks |
 | Hypermap / Euler / Kempe / reducibility-game / charge-conservation theory | Proved (standard axioms only) |
 | `four_color_theorem_conditional` ([`ConditionalSolution.lean`](./ConditionalSolution.lean)) | Proved, `0` `sorry`, axioms `[propext, Classical.choice, Quot.sound]` — **but conditional, see below** |
@@ -44,7 +44,7 @@ theorem bridge_iff_no_mc :
         Spec.MinimalCounterexample H darts → False
 ```
 
-Consequently the certificates and discharging trees are real, kernel-checked computations, but **they are not yet logically connected to the theorem**. The remaining work is the mathematics that connects them (below).
+Consequently the discharging trees are real, kernel-checked computations, and the geometric reference reducer (`FastReducer.check` / `checkFastTotal` with `buildSMData`) agrees with RSST, but **they are not yet logically connected to the theorem** (and the 138 `KernelReducer` batch modules require re-certification against a corrected geometric engine; see issue #6 below).
 
 ---
 
@@ -55,7 +55,7 @@ Consequently the certificates and discharging trees are real, kernel-checked com
 3. **`appearsIn` is too weak.** It has no interior-closure condition (interior vertices may have outside neighbours) and `Configuration` stores no degrees.
 4. **`bnd_contracts` is false for C-reduction.** C-reducibility must *contract* edges in the map, not excise the interior.
 5. **Discharging prerequisites are missing:** minimum degree 5, internal 6-connectivity (Birkhoff), the degree-5/6/≥12 cases, and soundness of `verifyTree` against real neighbourhoods.
-6. **Kernel-certificate to soundness-checker refinement.** The 633 batch certificates verify `KernelReducer.verifyIdxD` / `verifyIdxC` (bit-packed bucket-trie kernel reducer); refinement to the soundness checker (`checkFastTotal` / `runContractCheckTotal`) is not yet proved.
+6. **`KernelReducer` chord-order defect & re-certification.** In `KernelReducer.kempeRound`, `initD = [L2, d0_1]` feeds edge `0` into `packToBuckets` at top stride `3^{r-2}` (bit `kBucket - 1`) while `buildCatalanTrieAux` treats the implicit edge `r - 1` as endpoint `twoP - 1`, enumerating non-crossing matchings for the cyclic order `(1, ..., r-2, 0, r-1)` instead of the geometric cycle `(1, ..., r-2, r-1, 0)`. Because transposing edges `0` and `r - 1` omits genuine geometric matchings (e.g. `[(0, 5), (1, 2), (3, 4), (6, 7)]` on `idx = 3`), `KernelReducer` is over-permissive (`verifyIdxD` returns `true` on C-configurations such as `idx = 3, 25`), so the 138 `Batch/*` certificate modules are not valid reducibility evidence as-is and must be re-certified against a corrected geometric kernel engine before proving refinement to `checkFastTotal` / `runContractCheckTotal`.
 
 ---
 
