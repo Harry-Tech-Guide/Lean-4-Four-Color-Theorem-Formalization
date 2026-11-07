@@ -437,12 +437,14 @@ def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
 /-- Kernel-to-Mathematical Certificate Soundness Bridge:
     Connects `KernelReducer.verifyIdxD idx = true` to `HasDCertificateWitness` and
     `idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`.
-    WARNING (Stage K0 Audit): `KernelReducer.kempeRound` orders ring edges as `(1, ..., r-2, 0, r-1)`,
+    WARNING (Stage K0 / K0′ Audit): `KernelReducer.kempeRound` orders ring edges as `(1, ..., r-2, 0, r-1)`,
     transposing adjacent edges `0` and `r - 1` relative to the geometric cycle `(0, 1, ..., r-1)`.
     Because this omits genuine geometric matchings and causes `verifyIdxD` to return `true` on
-    C-reducible configurations (e.g. `idx = 3, 25`), this bridge is not satisfiable as stated
-    for the unpatched `KernelReducer` and will be replaced after re-certification against a
-    corrected geometric kernel engine. -/
+    C-reducible configurations (`idx = 3, 25, ...`), this bridge is computationally refuted:
+    for `idx = 3` (coloring `m = 4642`, trace `2308`, `154` surviving orbits) and `idx = 25`
+    (coloring `m = 18658`, trace `6943`, `81` surviving orbits), `IterationEliminationHypothesis`
+    (and hence `HasDCertificateWitness`) is false while `verifyIdxD idx = true`. It will be replaced
+    after re-certification against a corrected geometric kernel engine. -/
 def KernelReducerSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
     let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)

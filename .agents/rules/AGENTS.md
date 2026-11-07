@@ -21,7 +21,7 @@ Follow these rules for all theorem-proving and verification work in `c:\Four Col
     ```powershell
     powershell -ExecutionPolicy Bypass -File "c:\Four Color Theorem\.agents\skills\lean-mcp-proving\scripts\build_safe.ps1" <Target1> <Target2> ...
     ```
-  - Keep individual `kernel_rfl` / `rfl` theorems bounded (`<= 18,000` `RemChecks` per theorem) so the C++ kernel's `m_whnf_core_cache` is freed after each theorem and peak `lean.exe` RAM stays under 400 MB.
+  - Keep individual `kernel_rfl` / `rfl` theorems bounded (`<= 18,000` `RemChecks` per theorem) so the C++ kernel's `m_whnf_core_cache` is freed after each theorem and leaf batch modules stay under 400 MB (`MasterCertificate` imports all 138 batches and needs > 1.5 GB, hence `-M 4096`).
 - **Never run concurrent `lake build` commands.** Overlapping builds corrupt the `.lake` build cache.
 - **Never run full `lake build FourColorTheorem`** in a single unthrottled invocation.
 - For fast verification of soundness, discharging, and topology modules (< 3 seconds), run:

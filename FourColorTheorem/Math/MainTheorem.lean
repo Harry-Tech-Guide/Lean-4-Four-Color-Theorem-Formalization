@@ -156,7 +156,13 @@ def HasDiskExcisionSurgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
     2. Cartwheel discharging elimination under the genuine 32-rule `Discharging.rsstChargeShift H`
        given `Discharging.DischargingTreesVerified theUnavoidableSet.toList`.
     3. Disk excision surgery (`HasDiskExcisionSurgery`) for embedded configurations with positive interior.
-    4. Kernel-to-mathematical reducer soundness bridge (`MasterCertificate.KernelReducerSoundnessBridge`). -/
+    4. Kernel-to-mathematical reducer soundness bridge (`MasterCertificate.KernelReducerSoundnessBridge`).
+    WARNING (Stage K0′ Audit): Conjunct (4) (`MasterCertificate.KernelReducerSoundnessBridge`) is
+    computationally refuted for the unpatched `KernelReducer` (e.g. `idx = 3`, coloring `m = 4642`,
+    trace `2308`), so `RSSTStandardizationBridge` is false and internal `MainTheorem` lemmas taking
+    `h_rsst : RSSTStandardizationBridge` are vacuous until re-certification. (The public
+    `ConditionalSolution.four_color_theorem_conditional` uses `Spec.RSSTStandardizationBridge` and
+    is unaffected.) -/
 def RSSTStandardizationBridge : Prop :=
   MasterCertificate.KernelReducerSoundnessBridge ∧
   ∀ (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
