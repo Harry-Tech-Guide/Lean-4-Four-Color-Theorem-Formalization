@@ -30,3 +30,7 @@ lean_exe "fourcolortheorem" where
 lean_exe "dischargetest" where
   root := `DischargeMain
   moreLeancArgs := #["-O3", "-march=native", "-mtune=native"]
+
+lean_exe "refcheck" where
+  root := `RefCheckMain
+  moreLeancArgs := #["-O3", "-march=native", "-mtune=native"]
