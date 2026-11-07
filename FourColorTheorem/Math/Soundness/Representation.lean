@@ -28,11 +28,7 @@ such that:
    the checker's `t`-th fitting trace `smFitIndex sm t`.
 -/
 
-/-- Base-3 trace index of boundary coloring b on ring vertices of configuration c.
-    Edge difference x_i = b(i) ^^^ b((i+1)%r) ∈ {1, 2, 3}.
-    Base-3 digit d_i = x_i - 1 ∈ {0, 1, 2}.
-    Returns ∑ d_i * 3^i. -/
--- Structural helper for `boundaryTrace`: accumulates `d_i * 3^i` for `i = k, ..., k + rem - 1`.
+/-- Structural helper for `boundaryTrace`: accumulates `d_i * 3^i` for `i = k, ..., k + rem - 1`. -/
 def boundaryTraceAux (r : Nat) (b : Nat → Color) (pow3 : Array Nat) : Nat → Nat → Nat → Nat
   | 0, _, acc => acc
   | rem + 1, i, acc =>
@@ -41,19 +37,12 @@ def boundaryTraceAux (r : Nat) (b : Nat → Color) (pow3 : Array Nat) : Nat → 
     let d_i := if diff > 0 then diff - 1 else 0
     boundaryTraceAux r b pow3 rem (i + 1) (acc + d_i * pow3.getD i 0)
 
-/-- Base-3 trace index of boundary coloring b on ring vertices of configuration c. -/
+/-- Base-3 trace index of boundary coloring b on ring vertices of configuration c.
+    Edge difference x_i = b(i) ^^^ b((i+1)%r) ∈ {1, 2, 3}.
+    Base-3 digit d_i = x_i - 1 ∈ {0, 1, 2}.
+    Returns ∑ d_i * 3^i. -/
 def boundaryTrace (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) : Nat :=
   boundaryTraceAux c.ringSize b pow3 c.ringSize 0 0
-
-def boundaryTraceLoopUnused (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) : Nat := Id.run do
-  let r := c.ringSize
-  let mut idx := 0
-  for i in [0:r] do
-    let nxt := (i + 1) % r
-    let diff := (b i).toNat ^^^ (b nxt).toNat
-    let d_i := if diff > 0 then diff - 1 else 0
-    idx := idx + d_i * pow3.getD i 0
-  return idx
 
 /-- Canonical ColorPairing for theta = 1:
     pairs {c0, c1} and {c2, c3}, corresponding to difference 1 in V₄. -/
@@ -125,9 +114,7 @@ def boundaryTraceTheta (c : Configuration) (b : BoundaryColoring c) (θ : ColorP
 @[simp] theorem boundaryTraceTheta_theta1 (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) :
     boundaryTraceTheta c b theta1 pow3 = boundaryTrace c b pow3 := rfl
 
-/-- The trace index of the t-th fitting coloring of a signed matching `sm`.
-    Bit k of parameter t selects delta `a[k]` (bit = 0) or delta `b[k]` (bit = 1). -/
--- Structural helper for `smFitIndex`: accumulates selected delta `a[k]` or `b[k]` for `k = i, ..., i + rem - 1`.
+/-- Structural helper for `smFitIndex`: accumulates selected delta `a[k]` or `b[k]` for `k = i, ..., i + rem - 1`. -/
 def smFitIndexAux (sm : SMData) (t : Nat) : Nat → Nat → Nat → Nat
   | 0, _, acc => acc
   | rem + 1, k, acc =>
@@ -135,15 +122,10 @@ def smFitIndexAux (sm : SMData) (t : Nat) : Nat → Nat → Nat → Nat
     let delta := if first then sm.a.getD k 0 else sm.b.getD k 0
     smFitIndexAux sm t rem (k + 1) (acc + delta)
 
+/-- The trace index of the t-th fitting coloring of a signed matching `sm`.
+    Bit k of parameter t selects delta `a[k]` (bit = 0) or delta `b[k]` (bit = 1). -/
 def smFitIndex (sm : SMData) (t : Nat) : Nat :=
   smFitIndexAux sm t sm.p 0 0
-
-def smFitIndexLoopUnused (sm : SMData) (t : Nat) : Nat := Id.run do
-  let mut j := 0
-  for k in [0:sm.p] do
-    let first := (t >>> k) &&& 1 == 0
-    j := j + (if first then sm.a.getD k 0 else sm.b.getD k 0)
-  return j
 
 /-- A signed matching `sm` faithfully represents a joint planar partition `(equiv_ab, equiv_cd)`
     for boundary coloring `b` under color pairing `θ`. -/

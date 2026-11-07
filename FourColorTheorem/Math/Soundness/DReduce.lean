@@ -169,7 +169,7 @@ def markFitCoverTotal : Nat → SMData → Nat → Nat → ByteArray → ByteArr
       let cov1 := markFitCoverTotal fuel sm (k + 1) (acc + sm.a[k]!) cov
       markFitCoverTotal fuel sm (k + 1) (acc + sm.b[k]!) cov1
 
-/-- A single deterministic elimination round of the FastReducer algorithm. -/
+/-- Structural fold over a list of signed matchings computing `(cover, nextSM)` in one iteration. -/
 def stepSMList (live : ByteArray) : List SMData → ByteArray → Array SMData → ByteArray × Array SMData
   | [], cov, nextSM => (cov, nextSM)
   | sm :: rest, cov, nextSM =>
@@ -206,6 +206,7 @@ def stepOrbitsList (cover : ByteArray) (iter : Nat) :
     else
       stepOrbitsList cover iter rest nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter)
 
+/-- A single deterministic elimination round of the FastReducer algorithm. -/
 def reducerStep (N : Nat) (st : ReducerState) : ReducerState :=
   let iter := st.iter + 1
   let (cover, nextSM) :=
@@ -219,43 +220,6 @@ def reducerStep (N : Nat) (st : ReducerState) : ReducerState :=
     ranks := ranks,
     iter := iter,
     changed := nextOrbits.size != st.orbits.size
-  }
-
-def reducerStepLoopUnused (N : Nat) (st : ReducerState) : ReducerState := Id.run do
-  let iter := st.iter + 1
-  let mut cover := zeros N
-  let mut nextSM : Array SMData := Array.mkEmpty st.activeSM.size
-  for sm in st.activeSM do
-    if allFitLiveTotal sm.p sm st.live 0 0 then
-      cover := markFitCoverTotal sm.p sm 0 0 cover
-      nextSM := nextSM.push sm
-  let mut nextOrbits : Array Orbit6 := Array.mkEmpty st.orbits.size
-  let mut live := st.live
-  let mut ranks := st.ranks
-  for orb in st.orbits do
-    if cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1 then
-      nextOrbits := nextOrbits.push orb
-    else
-      live := live.set! orb.j0 0
-      live := live.set! orb.j1 0
-      live := live.set! orb.j2 0
-      live := live.set! orb.j3 0
-      live := live.set! orb.j4 0
-      live := live.set! orb.j5 0
-      ranks := ranks.set! orb.j0 iter
-      ranks := ranks.set! orb.j1 iter
-      ranks := ranks.set! orb.j2 iter
-      ranks := ranks.set! orb.j3 iter
-      ranks := ranks.set! orb.j4 iter
-      ranks := ranks.set! orb.j5 iter
-  let changed := nextOrbits.size != st.orbits.size
-  return {
-    live := live,
-    orbits := nextOrbits,
-    activeSM := nextSM,
-    ranks := ranks,
-    iter := iter,
-    changed := changed
   }
 
 /-- Structurally recursive fixed-point elimination loop bounded by fuel. -/

@@ -1,5 +1,5 @@
-import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
+import FourColorTheorem.Math.Soundness.DReduce
 
 namespace Math
 namespace CheckerSoundness
@@ -249,15 +249,6 @@ theorem allFitLiveTotal_mono (fuel : Nat) (sm : SMData) (live1 live2 : ByteArray
       exact Bool.and_eq_true_iff.mpr
         ⟨ih (k + 1) (acc + sm.a[k]!) h_and.1, ih (k + 1) (acc + sm.b[k]!) h_and.2⟩
 
-/-- Structural fold over a list of signed matchings computing `(cover, nextSM)` in one iteration. -/
-def stepSMListUnused (live : ByteArray) : List SMData → ByteArray → Array SMData → ByteArray × Array SMData
-  | [], cov, nextSM => (cov, nextSM)
-  | sm :: rest, cov, nextSM =>
-    if allFitLiveTotal sm.p sm live 0 0 then
-      stepSMList live rest (markFitCoverTotal sm.p sm 0 0 cov) (nextSM.push sm)
-    else
-      stepSMList live rest cov nextSM
-
 theorem stepSMList_size (live : ByteArray) (sms : List SMData) (cov : ByteArray) (nextSM : Array SMData) :
     (stepSMList live sms cov nextSM).1.size = cov.size := by
   induction sms generalizing cov nextSM with
@@ -382,24 +373,6 @@ theorem byteArray_get!_set!_zero_mono (a : ByteArray) (i j : Nat)
   · rw [byteArray_get!_set!_ne a i j 0 hij] at hj
     exact hj
 
-/-- Clear all 6 trace indices of an `S₃`-orbit in `live`. -/
-def clearOrbitLiveUnused (live : ByteArray) (orb : Orbit6) : ByteArray :=
-  let l0 := live.set! orb.j0 0
-  let l1 := l0.set! orb.j1 0
-  let l2 := l1.set! orb.j2 0
-  let l3 := l2.set! orb.j3 0
-  let l4 := l3.set! orb.j4 0
-  l4.set! orb.j5 0
-
-/-- Record elimination iteration `iter` on all 6 trace indices of an `S₃`-orbit in `ranks`. -/
-def setOrbitRanksUnused (ranks : Array Nat) (orb : Orbit6) (iter : Nat) : Array Nat :=
-  let r0 := ranks.set! orb.j0 iter
-  let r1 := r0.set! orb.j1 iter
-  let r2 := r1.set! orb.j2 iter
-  let r3 := r2.set! orb.j3 iter
-  let r4 := r3.set! orb.j4 iter
-  r4.set! orb.j5 iter
-
 theorem clearOrbitLive_mono (live : ByteArray) (orb : Orbit6) (j : Nat)
     (hj : ((clearOrbitLive live orb).get! j == 1) = true) :
     (live.get! j == 1) = true := by
@@ -410,16 +383,6 @@ theorem clearOrbitLive_mono (live : ByteArray) (orb : Orbit6) (j : Nat)
   have h1 := byteArray_get!_set!_zero_mono _ orb.j2 j h2
   have h0 := byteArray_get!_set!_zero_mono _ orb.j1 j h1
   exact byteArray_get!_set!_zero_mono _ orb.j0 j h0
-
-/-- Structural fold over the orbit list in one elimination round. -/
-def stepOrbitsListUnused (cover : ByteArray) (iter : Nat) :
-    List Orbit6 → Array Orbit6 → ByteArray → Array Nat → Array Orbit6 × ByteArray × Array Nat
-  | [], nextOrbits, live, ranks => (nextOrbits, live, ranks)
-  | orb :: rest, nextOrbits, live, ranks =>
-    if cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1 then
-      stepOrbitsList cover iter rest (nextOrbits.push orb) live ranks
-    else
-      stepOrbitsList cover iter rest nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter)
 
 theorem stepOrbitsList_live_mono (cover : ByteArray) (iter : Nat) (orbs : List Orbit6)
     (nextOrbits : Array Orbit6) (live : ByteArray) (ranks : Array Nat) (j : Nat)
@@ -761,14 +724,33 @@ theorem retained_or_not_live_of_runReducerLoop (N fuel : Nat) (st : ReducerState
         exact ⟨t, ht, runReducerLoop_not_live_mono N fuel (reducerStep N st) (smFitIndex sm t) h_dead⟩
     · exact Or.inl hsm
 
+private theorem byteArray_size_push (a : ByteArray) (v : UInt8) :
+    (a.push v).size = a.size + 1 := by
+  change (a.data.push v).size = a.data.size + 1
+  simp
+
+private theorem foldl_push_zero_size (L : List Nat) (b : ByteArray) :
+    (List.foldl (fun b _ => b.push 0) b L).size = b.size + L.length := by
+  induction L generalizing b with
+  | nil => simp
+  | cons _ rest ih =>
+    simp only [List.foldl_cons, List.length_cons, ih, byteArray_size_push]
+    omega
+
+/-- The `ByteArray` produced by `zeros n` has size `n`. -/
+@[simp] theorem zeros_size (n : Nat) : (zeros n).size = n := by
+  unfold zeros
+  simp [foldl_push_zero_size]
+  rfl
+
 /-- Combined round-uncovered elimination lemma:
     Suppose `sm` satisfies the active-SM invariant at state `st` (either `sm ∈ st.activeSM.toList`
     or `sm` already has a non-live leaf in `st.live`).
-    If trace `j < (zeros N).size` is uncovered in round `st` and `smFitIndex sm 0 = j`,
+    If trace `j < N` is uncovered in round `st` and `smFitIndex sm 0 = j`,
     then `sm` has a parameter `t < 1 <<< sm.p` that is not live in `st.live` (and remains not live
     after any subsequent `runReducerLoop N fuel (reducerStep N st)`). -/
 theorem exists_not_live_of_uncovered_in_round (N : Nat) (st : ReducerState)
-    (j : Nat) (hj_bound : j < (zeros N).size)
+    (j : Nat) (hj_bound : j < N)
     (h_uncov : ((stepSMList st.live st.activeSM.toList (zeros N) (Array.mkEmpty st.activeSM.size)).1.get! j == 1) = false)
     (sm : SMData)
     (h_inv : sm ∈ st.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st.live.get! (smFitIndex sm t) == 1) = false)
@@ -778,11 +760,34 @@ theorem exists_not_live_of_uncovered_in_round (N : Nat) (st : ReducerState)
   · have h_fit_tree : smFitTree sm sm.p 0 0 0 = j := by
       rw [smFitTree_eq_smFitIndex]
       exact h_fit0
+    have hj_zeros : j < (zeros N).size := by
+      rw [zeros_size]
+      exact hj_bound
     rcases uncovered_of_stepSMList st.live st.activeSM.toList (zeros N)
-        (Array.mkEmpty st.activeSM.size) j hj_bound h_uncov sm h_active h_fit_tree with ⟨t, ht, h_dead⟩
+        (Array.mkEmpty st.activeSM.size) j hj_zeros h_uncov sm h_active h_fit_tree with ⟨t, ht, h_dead⟩
     rw [smFitTree_eq_smFitIndex] at h_dead
     exact ⟨t, ht, h_dead⟩
   · exact h_already_dead
+
+theorem sharedPow3_eq :
+    sharedPow3 =
+      #[1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049, 177147, 531441, 1594323, 4782969, 14348907] := by
+  unfold sharedPow3 powers3
+  simp
+  rfl
+
+private theorem pow3_table_getD (a : Array Nat)
+    (ha : a = #[1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683, 59049, 177147, 531441, 1594323, 4782969, 14348907])
+    (i : Nat) (hi : i ≤ 15) :
+    a.getD i 1 = 3 ^ i ∧ a[i]! = 3 ^ i := by
+  subst ha
+  revert i
+  decide
+
+/-- For every `i ≤ 15`, `sharedPow3` at index `i` equals `3 ^ i`. -/
+theorem sharedPow3_getD (i : Nat) (hi : i ≤ 15) :
+    sharedPow3.getD i 1 = 3 ^ i ∧ sharedPow3[i]! = 3 ^ i :=
+  pow3_table_getD sharedPow3 sharedPow3_eq i hi
 
 end CheckerSoundness
 end Math

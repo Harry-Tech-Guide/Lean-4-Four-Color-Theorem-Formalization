@@ -55,6 +55,7 @@ Consequently the certificates and discharging trees are real, kernel-checked com
 3. **`appearsIn` is too weak.** It has no interior-closure condition (interior vertices may have outside neighbours) and `Configuration` stores no degrees.
 4. **`bnd_contracts` is false for C-reduction.** C-reducibility must *contract* edges in the map, not excise the interior.
 5. **Discharging prerequisites are missing:** minimum degree 5, internal 6-connectivity (Birkhoff), the degree-5/6/≥12 cases, and soundness of `verifyTree` against real neighbourhoods.
+6. **Kernel-certificate to soundness-checker refinement.** The 633 batch certificates verify `KernelReducer.verifyIdxD` / `verifyIdxC` (bit-packed bucket-trie kernel reducer); refinement to the soundness checker (`checkFastTotal` / `runContractCheckTotal`) is not yet proved.
 
 ---
 
@@ -78,7 +79,7 @@ flowchart TD
 
 | Phase | Deliverable | Est. new Lean | Risk |
 | :--- | :--- | :--- | :--- |
-| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis (kernel refinement, Lemma (a) representation, iteration elimination, contract soundness) — *In progress: `S₃` color-symmetry reduction (`full_representation_of_theta1`), `LiveZero` C-reduction (`fast_c_sound_of_live_zero`), `c_contract_edges_nonempty`, `extend` completeness & involution invariance (`extend_iff_extendsToInterior`, `extend_involution_eq`), structural reflection (`unavoidable_is_ring_cycle`, `unavoidable_is_well_formed_earlier`), `xorSwapChoice_valid`, `smFitTree_eq_smFitIndex`, `boundaryTrace_relabel`, `smFitIndex_flipBits`, and `eliminated_orb_final_rank_and_live` proved* | 4k–10k | Medium |
+| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis (kernel refinement, Lemma (a) representation, iteration elimination, contract soundness) — *In progress: `S₃` color-symmetry reduction (`full_representation_of_theta1`), `LiveZero` C-reduction (`fast_c_sound_of_live_zero`), `c_contract_edges_nonempty`, `extend` completeness & involution invariance (`extend_iff_extendsToInterior`, `extend_involution_eq`), structural reflection (`unavoidable_is_ring_cycle`, `unavoidable_is_well_formed_earlier`), `xorSwapChoice_valid`, `smFitTree_eq_smFitIndex`, `zeros_size`, `sharedPow3_getD`, `boundaryTrace_relabel`, `smFitIndex_flipBits`, and `eliminated_orb_final_rank_and_live` proved* | 4k–10k | Medium |
 | 2 | Fuel-free orbits/components, Euler genus, duality, combinatorial Jordan property — *In progress: finite pigeonhole orbit closure (`orbitClosesWithin_of_complete`), unconditional fuel-independence (`getOrbit_fuel_eq_of_complete`, `countOrbits_fuel_eq_of_complete`), orbit equivalence relation, and topological duality (`numNodes_dual_of_complete`, `numFaces_dual_of_complete`, `EulerChar_dual_of_complete`) proved* | 5k–10k | Medium |
 | 3 | Structure of a minimal counterexample (Birkhoff diamond / 6-connectivity, min degree 5) | 5k–10k | High |
 | 4 | Faithful `appearsIn` + D- and C-reduction transfer to real planar maps (may require re-certifying the 633) | 6k–12k | High |

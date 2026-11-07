@@ -1,5 +1,5 @@
-import FourColorTheorem.Math.CheckerSoundness.StructuralChecks
 import FourColorTheorem.Math.CheckerSoundness.IterationProof
+import FourColorTheorem.Math.CheckerSoundness.StructuralChecks
 
 namespace Math
 namespace CheckerSoundness
@@ -29,13 +29,6 @@ This module proves the two key algebraic symmetry theorems connecting `boundaryT
    `smFitIndex (swapSM sm)` (swapping the `a` and `b` delta tables, i.e., swapping digits `1 ↔ 2`),
    and leaves `allFitLiveTotal` invariant.
 -/
-
-/-- Decode a natural number `< 4` to `Color`. -/
-def colorOfNat : Nat → Color
-  | 0 => Color.c0
-  | 1 => Color.c1
-  | 2 => Color.c2
-  | _ => Color.c3
 
 @[simp] theorem colorOfNat_toNat (col : Color) : colorOfNat col.toNat = col := by
   cases col <;> rfl
@@ -399,14 +392,14 @@ theorem exists_eliminating_round_of_not_mem_orbits (N fuel : Nat) (st : ReducerS
 /-- **Combined Eliminating Round + Signed-Matching Elimination Theorem:**
     At any eliminating round `st_k` of an orbit `orb` during `runReducerLoop N fuel st`,
     there exists an uncovered canonical pairing trace `j_θ ∈ {orb.j0, orb.j2, orb.j5}` such that
-    if `j_θ < (zeros N).size`, then for EVERY `sm ∈ st.activeSM.toList` fitting `j_θ` at `t = 0`
+    if `j_θ < N`, then for EVERY `sm ∈ st.activeSM.toList` fitting `j_θ` at `t = 0`
     (or via its `(12)`-dual `swapSM sm`), there exists a parameter `t < 1 <<< sm.p` such that
     `smFitIndex sm t` is already non-live at the start of round `st_k` (`(st_k.live.get! (smFitIndex sm t) == 1) = false`)
     and remains non-live at the end of `runReducerLoop N fuel st`. -/
 theorem round_uncovered_sm_elimination (N fuel : Nat) (st : ReducerState)
     (orb : Orbit6) (horb : orb ∈ st.orbits.toList)
     (h_not_mem : orb ∉ (runReducerLoop N fuel st).orbits.toList)
-    (h0_lt : orb.j0 < (zeros N).size) (h2_lt : orb.j2 < (zeros N).size) (h5_lt : orb.j5 < (zeros N).size) :
+    (h0_lt : orb.j0 < N) (h2_lt : orb.j2 < N) (h5_lt : orb.j5 < N) :
     ∃ st_k : ReducerState,
       orb ∈ st_k.orbits.toList ∧
       ∃ j_θ : Nat, (j_θ = orb.j0 ∨ j_θ = orb.j2 ∨ j_θ = orb.j5) ∧
@@ -419,7 +412,7 @@ theorem round_uncovered_sm_elimination (N fuel : Nat) (st : ReducerState)
     ⟨st_k, horb_k, h_uncov_k, h_sm_k, _, h_to_end⟩
   let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
   have h_pair := uncovered_pairing_of_not_covered cov orb h_uncov_k
-  have h_helper : ∀ j_θ : Nat, j_θ < (zeros N).size → (cov.get! j_θ == 1) = false →
+  have h_helper : ∀ j_θ : Nat, j_θ < N → (cov.get! j_θ == 1) = false →
       ∀ sm ∈ st.activeSM.toList, (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
       ∃ t < 1 <<< sm.p,
         (st_k.live.get! (smFitIndex sm t) == 1) = false ∧
@@ -435,8 +428,11 @@ theorem round_uncovered_sm_elimination (N fuel : Nat) (st : ReducerState)
           dsimp [swapSM] at this ⊢
           rw [this]
           exact h_fit_dual
+        have hj_zeros : j_θ < (zeros N).size := by
+          rw [zeros_size]
+          exact hj_lt
         rcases uncovered_of_stepSMList_swapSM st_k.live st_k.activeSM.toList (zeros N)
-            (Array.mkEmpty st_k.activeSM.size) j_θ hj_lt hj_uncov sm h_active h_tree_dual with
+            (Array.mkEmpty st_k.activeSM.size) j_θ hj_zeros hj_uncov sm h_active h_tree_dual with
           ⟨t, ht, h_dead⟩
         rw [smFitTree_eq_smFitIndex] at h_dead
         exact ⟨t, ht, h_dead, h_to_end (smFitIndex sm t) h_dead⟩
@@ -446,62 +442,6 @@ theorem round_uncovered_sm_elimination (N fuel : Nat) (st : ReducerState)
   · exact ⟨orb.j0, Or.inl rfl, h_helper orb.j0 h0_lt h0⟩
   · exact ⟨orb.j2, Or.inr (Or.inl rfl), h_helper orb.j2 h2_lt h2⟩
   · exact ⟨orb.j5, Or.inr (Or.inr rfl), h_helper orb.j5 h5_lt h5⟩
-
-/-- **Fundamental Orbit Elimination Round Theorem (Steps B3–B5):**
-    If `orb ∈ st.orbits.toList` and `(runReducerLoop N fuel st).orbits.isEmpty = true`,
-    then there exists a round state `st_k` reached during `runReducerLoop` such that:
-    1. `orb ∈ st_k.orbits.toList`,
-    2. `(cover_k.get! orb.j0 == 1 && cover_k.get! orb.j2 == 1 && cover_k.get! orb.j5 == 1) = false`,
-    3. Every `sm ∈ st.activeSM.toList` satisfies the active-SM invariant at `st_k`
-       (`sm ∈ st_k.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st_k.live.get! (smFitIndex sm t) == 1) = false`), and
-    4. Every trace `j` that is not live in `st_k.live` remains not live in `(runReducerLoop N fuel st).live`. -/
-theorem exists_eliminating_round_of_orbits_empty (N fuel : Nat) (st : ReducerState)
-    (orb : Orbit6) (horb : orb ∈ st.orbits.toList)
-    (h_empty : (runReducerLoop N fuel st).orbits.isEmpty = true) :
-    ∃ st_k : ReducerState,
-      orb ∈ st_k.orbits.toList ∧
-      (let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-       (cov.get! orb.j0 == 1 && cov.get! orb.j2 == 1 && cov.get! orb.j5 == 1) = false) ∧
-      (∀ sm ∈ st.activeSM.toList,
-        sm ∈ st_k.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st_k.live.get! (smFitIndex sm t) == 1) = false) ∧
-      (∀ j, (st.live.get! j == 1) = false → (st_k.live.get! j == 1) = false) ∧
-      (∀ j, (st_k.live.get! j == 1) = false → ((runReducerLoop N fuel st).live.get! j == 1) = false) := by
-  induction fuel generalizing st with
-  | zero =>
-    dsimp [runReducerLoop] at h_empty
-    rw [not_isEmpty_of_mem_toList st.orbits orb horb] at h_empty
-    contradiction
-  | succ fuel ih =>
-    dsimp [runReducerLoop] at h_empty
-    by_cases h_cond : (st.changed && !st.orbits.isEmpty) = true
-    · rw [if_pos h_cond] at h_empty
-      rcases stepOrbitsList_retained_or_uncovered
-          (stepSMList st.live st.activeSM.toList (zeros N) (Array.mkEmpty st.activeSM.size)).1
-          (st.iter + 1) st.orbits.toList (Array.mkEmpty st.orbits.size) st.live st.ranks
-          orb horb with h_ret | h_uncov
-      · rcases ih (reducerStep N st) h_ret h_empty with
-          ⟨st_k, horb_k, h_uncov_k, h_sm_k, h_from_step, h_to_end⟩
-        refine ⟨st_k, horb_k, h_uncov_k, ?_, ?_, ?_⟩
-        · intro sm hsm
-          rcases retained_or_not_live_of_reducerStep N st sm hsm with h_sm_ret | ⟨t, ht, h_dead⟩
-          · exact h_sm_k sm h_sm_ret
-          · right
-            exact ⟨t, ht, h_from_step (smFitIndex sm t) h_dead⟩
-        · intro j hj
-          exact h_from_step j (reducerStep_not_live_mono N st j hj)
-        · intro j hj
-          dsimp [runReducerLoop]
-          rw [if_pos h_cond]
-          exact h_to_end j hj
-      · refine ⟨st, horb, h_uncov, fun sm hsm => Or.inl hsm, fun _ hj => hj, ?_⟩
-        intro j hj
-        dsimp [runReducerLoop]
-        rw [if_pos h_cond]
-        exact runReducerLoop_not_live_mono N fuel (reducerStep N st) j
-          (reducerStep_not_live_mono N st j hj)
-    · rw [if_neg h_cond] at h_empty
-      rw [not_isEmpty_of_mem_toList st.orbits orb horb] at h_empty
-      contradiction
 
 /-!
 ### Part 4: Rank Bound and Rank Preservation Invariants Across `stepOrbitsList` and `runReducerLoop`
