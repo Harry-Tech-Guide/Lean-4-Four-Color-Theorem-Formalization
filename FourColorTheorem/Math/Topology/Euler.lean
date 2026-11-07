@@ -75,4 +75,48 @@ theorem euler_initial_charge_sum_eq_120 (V E F : Int)
     10 * (6 * V - 2 * E) = 120 := by
   omega
 
+/-!
+### Topological Duality Invariants for `numNodes`, `numEdges`, `numFaces`, and `EulerChar`
+-/
+
+instance instBEqDualDart (H : Hypermap) [BEq H.Dart] : BEq H.dual.Dart := ‹BEq H.Dart›
+instance instDecidableEqDualDart (H : Hypermap) [DecidableEq H.Dart] : DecidableEq H.dual.Dart := ‹DecidableEq H.Dart›
+
+/-- The number of edges of `H.dual` is definitionally equal to the number of edges of `H`. -/
+@[simp] theorem numEdges_dual (H : Hypermap) [BEq H.Dart] (fuel : Nat) (l : List H.Dart) :
+    numEdges H.dual fuel l = numEdges H fuel l := rfl
+
+/-- On any complete dart list (`∀ d : H.Dart, d ∈ darts`), the number of vertices of `H.dual`
+    equals the number of faces of `H` for all `fuel ≥ darts.length`. -/
+theorem numNodes_dual_of_complete (H : Hypermap) [DecidableEq H.Dart] (darts l : List H.Dart)
+    (h_all : ∀ d : H.Dart, d ∈ darts) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    numNodes H.dual fuel l = numFaces H fuel l :=
+  countOrbits_symm_of_complete H.face darts l h_all h_le
+
+/-- On any complete dart list (`∀ d : H.Dart, d ∈ darts`), the number of faces of `H.dual`
+    equals the number of vertices of `H` for all `fuel ≥ darts.length`. -/
+theorem numFaces_dual_of_complete (H : Hypermap) [DecidableEq H.Dart] (darts l : List H.Dart)
+    (h_all : ∀ d : H.Dart, d ∈ darts) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    numFaces H.dual fuel l = numNodes H fuel l :=
+  countOrbits_symm_of_complete H.node darts l h_all h_le
+
+/-- On any complete dart list (`∀ d : H.Dart, d ∈ darts`), the Euler characteristic `V - E + F`
+    of `H.dual` equals the Euler characteristic of `H` for all `fuel ≥ darts.length`. -/
+theorem EulerChar_dual_of_complete (H : Hypermap) [DecidableEq H.Dart] (darts l : List H.Dart)
+    (h_all : ∀ d : H.Dart, d ∈ darts) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    EulerChar H.dual fuel l = EulerChar H fuel l := by
+  dsimp [EulerChar]
+  rw [numNodes_dual_of_complete H darts l h_all h_le,
+      numFaces_dual_of_complete H darts l h_all h_le]
+  omega
+
+/-- Fuel-independence of `numNodes`, `numEdges`, `numFaces`, and `EulerChar` on any complete dart list. -/
+theorem EulerChar_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart] (darts l : List H.Dart)
+    (h_all : ∀ d : H.Dart, d ∈ darts) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    EulerChar H fuel l = EulerChar H darts.length l := by
+  dsimp [EulerChar, numNodes, numEdges, numFaces]
+  rw [countOrbits_fuel_eq_of_complete H.node darts l h_all h_le,
+      countOrbits_fuel_eq_of_complete H.edge darts l h_all h_le,
+      countOrbits_fuel_eq_of_complete H.face darts l h_all h_le]
+
 end Hypermap
