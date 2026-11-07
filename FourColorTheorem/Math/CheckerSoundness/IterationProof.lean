@@ -1,5 +1,5 @@
-import FourColorTheorem.Math.Soundness.CReduce
 import FourColorTheorem.Math.Soundness.DReduce
+import FourColorTheorem.Math.Soundness.CReduce
 
 namespace Math
 namespace CheckerSoundness

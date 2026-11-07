@@ -86,7 +86,7 @@ flowchart TD
 | 5 | Soundness of the discharging trees against real cartwheels (may require new certificates) | 8k–15k | Very high |
 | 6 | Remove `sorry` from `Solution`, pass `Comparator` and `leanchecker --fresh` | < 500 | Low |
 
-An honest total is on the order of **30,000–60,000 additional lines**.
+An honest total is on the order of **30,000–60,000 additional lines**. The Phase 1 lemmas listed above are infrastructure; `HasDCertificateWitness` and `HasCCertificateWitness` in `MasterCertificate.lean` still take `FullRepresentationHypothesis`, `IterationEliminationHypothesis`, and the C-side hypotheses as assumptions.
 
 ---
 
@@ -133,7 +133,7 @@ lake env leanchecker --fresh ConditionalSolution
 ## Rules this project holds itself to
 
 - Zero `sorry` **outside** the open theorem (`Challenge`, `Solution`).
-- Zero custom `axiom`; no `native_decide`, `bv_decide`, `Lean.ofReduceBool`, `unsafe`, `partial`, `extern`.
+- Zero custom `axiom`; no `native_decide`, `bv_decide`, `Lean.ofReduceBool`, `unsafe`, `extern`. No `partial` definition is used by any theorem (`partial` code in `FastReducer`, `Batch/Runner`, `CRunner`, `Runner13`, and `DischargingAlgo` is executable-only and kernel-opaque).
 - Zero Mathlib.
 - Follow published mathematics; no transliteration of Coq/C source.
 

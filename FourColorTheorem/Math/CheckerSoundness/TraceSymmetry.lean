@@ -1,5 +1,5 @@
-import FourColorTheorem.Math.CheckerSoundness.IterationProof
 import FourColorTheorem.Math.CheckerSoundness.StructuralChecks
+import FourColorTheorem.Math.CheckerSoundness.IterationProof
 
 namespace Math
 namespace CheckerSoundness
@@ -29,9 +29,6 @@ This module proves the two key algebraic symmetry theorems connecting `boundaryT
    `smFitIndex (swapSM sm)` (swapping the `a` and `b` delta tables, i.e., swapping digits `1 ↔ 2`),
    and leaves `allFitLiveTotal` invariant.
 -/
-
-@[simp] theorem colorOfNat_toNat (col : Color) : colorOfNat col.toNat = col := by
-  cases col <;> rfl
 
 /-- `relabelColor θ` is an `𝔽₂`-linear automorphism of the Klein four-group `(V₄, ^^^)`:
     for every `θ : ColorPairing` and all `col1, col2 : Color`,
