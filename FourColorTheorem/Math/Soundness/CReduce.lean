@@ -350,7 +350,8 @@ def LiveZeroIterationEliminationHypothesis (c : Configuration) (earlier : Array 
       ∃ t, t < 1 <<< sm.p ∧
         (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
           (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
-        (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+        (∀ b' : BoundaryColoring c, IsValidBoundaryColoring c b' →
+          boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
           LiveZero c pow3 live b' ∧
           (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)
@@ -390,7 +391,9 @@ theorem live_zero_eliminated_of_iteration (c : Configuration) (earlier : Array (
         exact hT0
       rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec, hr_orb⟩
       have h_tr_t := hTrace t ht
-      have h_orb_t := hr_orb (boundaryKempeSwap c b θ (S t)) h_tr_t
+      have hb_swapped : IsValidBoundaryColoring c (boundaryKempeSwap c b θ (S t)) :=
+        swap_preserves_valid c b θ equiv_ab equiv_cd (S t) hb hPart (hSwap t ht)
+      have h_orb_t := hr_orb (boundaryKempeSwap c b θ (S t)) hb_swapped h_tr_t
       refine ⟨S t, hSwap t ht, h_orb_t.1, ?_⟩
       have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
         cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
@@ -442,7 +445,7 @@ theorem iteration_elimination_of_live_zero_all (c : Configuration) (earlier : Ar
   refine ⟨θ, ?_⟩
   intro sm hsm hfit0
   rcases hθ sm hsm hfit0 with ⟨t, ht, hr_dec, hr_orb⟩
-  exact ⟨t, ht, hr_dec, fun b' hb' => (hr_orb b' hb').2⟩
+  exact ⟨t, ht, hr_dec, fun b' hb' htr' => (hr_orb b' hb' htr').2⟩
 
 /-- Master C-Reducibility Theorem from `LiveZeroIterationEliminationHypothesis`:
     Does not require the global `IterationEliminationHypothesis` (which only holds when all orbits are eliminated);

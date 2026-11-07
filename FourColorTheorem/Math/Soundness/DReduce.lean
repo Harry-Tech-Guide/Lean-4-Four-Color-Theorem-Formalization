@@ -431,7 +431,8 @@ def IterationEliminationHypothesis (c : Configuration) (earlier : Array (Array N
       ∃ t, t < 1 <<< sm.p ∧
         (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
           (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
-        (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+        (∀ b' : BoundaryColoring c, IsValidBoundaryColoring c b' →
+          boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
           (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)
 
@@ -471,9 +472,11 @@ theorem step_of_iteration_elimination (c : Configuration) (earlier : Array (Arra
     dsimp [constructedRank]
     rw [h_not_ext]
     rfl
+  have hb_swapped : IsValidBoundaryColoring c (boundaryKempeSwap c b θ (S t)) :=
+    swap_preserves_valid c b θ equiv_ab equiv_cd (S t) hb hPart (hSwap t ht)
   rw [h_rank_b]
   dsimp [constructedRank]
-  rw [hr_orb (boundaryKempeSwap c b θ (S t)) (hTrace t ht)]
+  rw [hr_orb (boundaryKempeSwap c b θ (S t)) hb_swapped (hTrace t ht)]
   split
   · omega
   · omega
