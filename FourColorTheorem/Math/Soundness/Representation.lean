@@ -10,6 +10,7 @@ open FastReducer
 open Batch
 
 set_option linter.unusedVariables false
+set_option linter.constructorNameAsVariable false
 
 /-!
 # Combinatorial Representation of Joint Planar Partitions (Lemma (a))
@@ -41,6 +42,76 @@ def boundaryTrace (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat
     idx := idx + d_i * pow3.getD i 0
   return idx
 
+/-- Canonical ColorPairing for theta = 1:
+    pairs {c0, c1} and {c2, c3}, corresponding to difference 1 in V₄. -/
+def theta1 : ColorPairing where
+  a := Color.c0
+  b := Color.c1
+  c := Color.c2
+  d := Color.c3
+  distinct := by decide
+
+/-- Canonical ColorPairing for theta = 2:
+    pairs {c0, c2} and {c1, c3}, corresponding to difference 2 in V₄. -/
+def theta2 : ColorPairing where
+  a := Color.c0
+  b := Color.c2
+  c := Color.c1
+  d := Color.c3
+  distinct := by decide
+
+/-- Canonical ColorPairing for theta = 3:
+    pairs {c0, c3} and {c1, c2}, corresponding to difference 3 in V₄. -/
+def theta3 : ColorPairing where
+  a := Color.c0
+  b := Color.c3
+  c := Color.c1
+  d := Color.c2
+  distinct := by decide
+
+/-- Helper: relabel `col` by an S₃ involution fixing `c0` based on the XOR difference of `a` and `b`. -/
+def relabelColorAux (a b col : Color) : Color :=
+  let δ := a.toNat ^^^ b.toNat
+  if δ == 2 then
+    match col with
+    | Color.c0 => Color.c0
+    | Color.c1 => Color.c2
+    | Color.c2 => Color.c1
+    | Color.c3 => Color.c3
+  else if δ == 3 then
+    match col with
+    | Color.c0 => Color.c0
+    | Color.c1 => Color.c3
+    | Color.c2 => Color.c2
+    | Color.c3 => Color.c1
+  else col
+
+/-- Relabel colors by an S₃ involution fixing `c0` so that the within-pair XOR difference
+    `δ = θ.a.toNat ^^^ θ.b.toNat` of `θ` maps to `1` (the difference of `theta1`):
+    - if `δ = 1` (`theta1`), identity on colors;
+    - if `δ = 2` (`theta2`), swap `c1 ↔ c2`;
+    - if `δ = 3` (`theta3`), swap `c1 ↔ c3`. -/
+def relabelColor (θ : ColorPairing) (col : Color) : Color :=
+  relabelColorAux θ.a θ.b col
+
+/-- Relabel a boundary coloring so that pairing `θ` is normalized to `theta1`. -/
+def relabelBoundary (θ : ColorPairing) (b : Nat → Color) : Nat → Color :=
+  fun i => relabelColor θ (b i)
+
+/-- Base-3 trace index of boundary coloring `b` normalized with respect to color pairing `θ`.
+    For `θ = theta1`, this is definitionally `boundaryTrace c b pow3` (`orb.j0`).
+    For `θ = theta2`, this applies the `c1 ↔ c2` color permutation (`orb.j2`).
+    For `θ = theta3`, this applies the `c1 ↔ c3` color permutation (`orb.j5`). -/
+def boundaryTraceTheta (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing) (pow3 : Array Nat) : Nat :=
+  boundaryTrace c (relabelBoundary θ b) pow3
+
+@[simp] theorem relabelColor_theta1 (col : Color) : relabelColor theta1 col = col := rfl
+
+@[simp] theorem relabelBoundary_theta1 (b : Nat → Color) : relabelBoundary theta1 b = b := rfl
+
+@[simp] theorem boundaryTraceTheta_theta1 (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) :
+    boundaryTraceTheta c b theta1 pow3 = boundaryTrace c b pow3 := rfl
+
 /-- The trace index of the t-th fitting coloring of a signed matching `sm`.
     Bit k of parameter t selects delta `a[k]` (bit = 0) or delta `b[k]` (bit = 1). -/
 def smFitIndex (sm : SMData) (t : Nat) : Nat := Id.run do
@@ -58,7 +129,7 @@ def RepresentsPartition (c : Configuration) (b : BoundaryColoring c) (θ : Color
     (∀ t, t < 1 <<< sm.p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S t)) ∧
     (∀ i, S 0 i = false) ∧
     (∀ t, t < 1 <<< sm.p →
-      boundaryTrace c (boundaryKempeSwap c b θ (S t)) pow3 = smFitIndex sm t)
+      boundaryTraceTheta c (boundaryKempeSwap c b θ (S t)) θ pow3 = smFitIndex sm t)
 
 /-- Full Lemma (a) Representation Property (RSST / Gonthier):
     For every configuration `c`, valid boundary coloring `b`, color pairing `θ`, and
@@ -371,7 +442,7 @@ theorem full_swap_is_valid (c : Configuration) (b : BoundaryColoring c) (θ : Co
 theorem zero_pair_represents (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
     (equiv_ab equiv_cd : Nat → Nat → Prop) (pow3 : Array Nat)
     (sm : SMData) (h_p0 : sm.p = 0)
-    (h_trace : boundaryTrace c b pow3 = smFitIndex sm 0) :
+    (h_trace : boundaryTraceTheta c b θ pow3 = smFitIndex sm 0) :
     RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 := by
   refine ⟨fun _ => fun _ => false, ?_, ?_, ?_⟩
   · intro t ht
@@ -530,9 +601,9 @@ theorem represents_partition_step
     (h_trace : ∀ S_rest,
       (∀ t, t < 1 <<< sm_rest.p → IsValidSwapChoice c b θ equiv_ab equiv_cd (S_rest t)) →
       (∀ i, S_rest 0 i = false) →
-      (∀ t, t < 1 <<< sm_rest.p → boundaryTrace c (boundaryKempeSwap c b θ (S_rest t)) pow3 = smFitIndex sm_rest t) →
+      (∀ t, t < 1 <<< sm_rest.p → boundaryTraceTheta c (boundaryKempeSwap c b θ (S_rest t)) θ pow3 = smFitIndex sm_rest t) →
       ∀ t, t < 1 <<< sm_ext.p →
-        boundaryTrace c (boundaryKempeSwap c b θ (combineSwapChoice S_rest K t)) pow3 = smFitIndex sm_ext t)
+        boundaryTraceTheta c (boundaryKempeSwap c b θ (combineSwapChoice S_rest K t)) θ pow3 = smFitIndex sm_ext t)
     (h_rep : RepresentsPartition c b θ equiv_ab equiv_cd sm_rest pow3) :
     RepresentsPartition c b θ equiv_ab equiv_cd sm_ext pow3 := by
   rcases h_rep with ⟨S_rest, hS_valid, hS0, hT_rest⟩
@@ -543,6 +614,182 @@ theorem represents_partition_step
   · intro i
     exact combineSwapChoice_zero S_rest K hS0 i
   · exact h_trace S_rest hS_valid hS0 hT_rest
+
+/-!
+### Part (iv): S₃ Color Symmetry & Reduction of Arbitrary `θ` to `theta1`
+-/
+
+/-- `relabelColor θ` is an involution on `Color`. -/
+theorem relabelColor_inv (θ : ColorPairing) (col : Color) :
+    relabelColor θ (relabelColor θ col) = col := by
+  dsimp [relabelColor]
+  cases θ.a <;> cases θ.b <;> cases col <;> rfl
+
+/-- `relabelColor θ` is injective on `Color`. -/
+theorem relabelColor_inj (θ : ColorPairing) (c1 c2 : Color) :
+    relabelColor θ c1 = relabelColor θ c2 ↔ c1 = c2 := by
+  constructor
+  · intro h
+    have h' := congrArg (relabelColor θ) h
+    rwa [relabelColor_inv, relabelColor_inv] at h'
+  · intro h; rw [h]
+
+/-- For every valid 4-color pairing `θ`, conjugating `θ.swap` by `relabelColor θ` yields `theta1.swap`. -/
+theorem relabelColor_swap (θ : ColorPairing) (col : Color) :
+    relabelColor θ (θ.swap col) = theta1.swap (relabelColor θ col) := by
+  rcases θ with ⟨x1, x2, x3, x4, h⟩
+  cases col <;> cases x1 <;> cases x2 <;> cases x3 <;> cases x4 <;> revert h <;> decide
+
+/-- Relabelling a valid boundary coloring preserves `IsValidBoundaryColoring`. -/
+theorem relabelBoundary_valid (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (hb : IsValidBoundaryColoring c b) :
+    IsValidBoundaryColoring c (relabelBoundary θ b) := by
+  intro i j hi hj hadj h_eq
+  have h_col : b i = b j := (relabelColor_inj θ (b i) (b j)).mp h_eq
+  exact hb i j hi hj hadj h_col
+
+/-- Relabelling commutes with `boundaryKempeSwap`, converting `θ` into `theta1`. -/
+theorem relabelBoundary_swap (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (S : Nat → Bool) :
+    relabelBoundary θ (boundaryKempeSwap c b θ S) =
+      boundaryKempeSwap c (relabelBoundary θ b) theta1 S := by
+  funext i
+  dsimp [relabelBoundary, boundaryKempeSwap]
+  split
+  · exact relabelColor_swap θ (b i)
+  · rfl
+
+theorem relabelColor_ab_of_pos (θ : ColorPairing) (col : Color)
+    (ha : relabelColor θ θ.a = Color.c0 ∨ relabelColor θ θ.a = Color.c1) :
+    (col = θ.a ∨ col = θ.b) ↔ (relabelColor θ col = theta1.a ∨ relabelColor θ col = theta1.b) := by
+  rcases θ with ⟨x1, x2, x3, x4, h⟩
+  cases col <;> cases x1 <;> cases x2 <;> cases x3 <;> cases x4 <;> revert h ha <;> decide
+
+theorem relabelColor_cd_of_pos (θ : ColorPairing) (col : Color)
+    (ha : relabelColor θ θ.a = Color.c0 ∨ relabelColor θ θ.a = Color.c1) :
+    (col = θ.c ∨ col = θ.d) ↔ (relabelColor θ col = theta1.c ∨ relabelColor θ col = theta1.d) := by
+  rcases θ with ⟨x1, x2, x3, x4, h⟩
+  cases col <;> cases x1 <;> cases x2 <;> cases x3 <;> cases x4 <;> revert h ha <;> decide
+
+theorem relabelColor_ab_of_neg (θ : ColorPairing) (col : Color)
+    (ha : ¬ (relabelColor θ θ.a = Color.c0 ∨ relabelColor θ θ.a = Color.c1)) :
+    (col = θ.a ∨ col = θ.b) ↔ (relabelColor θ col = theta1.c ∨ relabelColor θ col = theta1.d) := by
+  rcases θ with ⟨x1, x2, x3, x4, h⟩
+  cases col <;> cases x1 <;> cases x2 <;> cases x3 <;> cases x4 <;> revert h ha <;> decide
+
+theorem relabelColor_cd_of_neg (θ : ColorPairing) (col : Color)
+    (ha : ¬ (relabelColor θ θ.a = Color.c0 ∨ relabelColor θ θ.a = Color.c1)) :
+    (col = θ.c ∨ col = θ.d) ↔ (relabelColor θ col = theta1.a ∨ relabelColor θ col = theta1.b) := by
+  rcases θ with ⟨x1, x2, x3, x4, h⟩
+  cases col <;> cases x1 <;> cases x2 <;> cases x3 <;> cases x4 <;> revert h ha <;> decide
+
+/-- Under `relabelColor θ`, the pairs `{θ.a, θ.b}` and `{θ.c, θ.d}` map either to
+    `({theta1.a, theta1.b}, {theta1.c, theta1.d})` or to `({theta1.c, theta1.d}, {theta1.a, theta1.b})`. -/
+theorem relabelColor_pair_cases (θ : ColorPairing) :
+    ((∀ col, (col = θ.a ∨ col = θ.b) ↔ (relabelColor θ col = theta1.a ∨ relabelColor θ col = theta1.b)) ∧
+     (∀ col, (col = θ.c ∨ col = θ.d) ↔ (relabelColor θ col = theta1.c ∨ relabelColor θ col = theta1.d))) ∨
+    ((∀ col, (col = θ.a ∨ col = θ.b) ↔ (relabelColor θ col = theta1.c ∨ relabelColor θ col = theta1.d)) ∧
+     (∀ col, (col = θ.c ∨ col = θ.d) ↔ (relabelColor θ col = theta1.a ∨ relabelColor θ col = theta1.b))) := by
+  by_cases ha : relabelColor θ θ.a = Color.c0 ∨ relabelColor θ θ.a = Color.c1
+  · exact Or.inl ⟨fun col => relabelColor_ab_of_pos θ col ha, fun col => relabelColor_cd_of_pos θ col ha⟩
+  · exact Or.inr ⟨fun col => relabelColor_ab_of_neg θ col ha, fun col => relabelColor_cd_of_neg θ col ha⟩
+
+/-- Swapping `(equiv_ab, equiv_cd)` preserves `IsValidSwapChoice`. -/
+theorem validSwapChoice_symm (c : Configuration) (b1 b2 : BoundaryColoring c) (θ1 θ2 : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop) (S : Nat → Bool)
+    (h : IsValidSwapChoice c b1 θ1 equiv_cd equiv_ab S) :
+    IsValidSwapChoice c b2 θ2 equiv_ab equiv_cd S where
+  ring_only := h.ring_only
+  respects_ab := h.respects_cd
+  respects_cd := h.respects_ab
+
+/-- Keeping `(equiv_ab, equiv_cd)` in order preserves `IsValidSwapChoice` across relabelling. -/
+theorem validSwapChoice_relabel (c : Configuration) (b1 b2 : BoundaryColoring c) (θ1 θ2 : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop) (S : Nat → Bool)
+    (h : IsValidSwapChoice c b1 θ1 equiv_ab equiv_cd S) :
+    IsValidSwapChoice c b2 θ2 equiv_ab equiv_cd S where
+  ring_only := h.ring_only
+  respects_ab := h.respects_ab
+  respects_cd := h.respects_cd
+
+/-- Relabelling a joint planar ring partition under `θ` yields a joint planar ring partition
+    for `(relabelBoundary θ b, theta1)`, either on `(equiv_ab, equiv_cd)` or on `(equiv_cd, equiv_ab)`. -/
+theorem relabelBoundary_partition (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop)
+    (hPart : IsJointPlanarRingPartition c b θ equiv_ab equiv_cd) :
+    IsJointPlanarRingPartition c (relabelBoundary θ b) theta1 equiv_ab equiv_cd ∨
+    IsJointPlanarRingPartition c (relabelBoundary θ b) theta1 equiv_cd equiv_ab := by
+  rcases relabelColor_pair_cases θ with ⟨hab, hcd⟩ | ⟨hab, hcd⟩
+  · left
+    refine {
+      ab_refl := fun i hi h => hPart.ab_refl i hi ((hab (b i)).mpr h)
+      ab_symm := hPart.ab_symm
+      ab_trans := hPart.ab_trans
+      ab_color := fun i hi j hj h => (hab (b i)).mp (hPart.ab_color i hi j hj h)
+      cd_refl := fun i hi h => hPart.cd_refl i hi ((hcd (b i)).mpr h)
+      cd_symm := hPart.cd_symm
+      cd_trans := hPart.cd_trans
+      cd_color := fun i hi j hj h => (hcd (b i)).mp (hPart.cd_color i hi j hj h)
+      ab_adj := fun i hi j hj hadj hi_c hj_c =>
+        hPart.ab_adj i hi j hj hadj ((hab (b i)).mpr hi_c) ((hab (b j)).mpr hj_c)
+      cd_adj := fun i hi j hj hadj hi_c hj_c =>
+        hPart.cd_adj i hi j hj hadj ((hcd (b i)).mpr hi_c) ((hcd (b j)).mpr hj_c)
+      ab_noncross := hPart.ab_noncross
+      cd_noncross := hPart.cd_noncross
+      cross_ab_cd := hPart.cross_ab_cd
+      cross_cd_ab := hPart.cross_cd_ab
+    }
+  · right
+    refine {
+      ab_refl := fun i hi h => hPart.cd_refl i hi ((hcd (b i)).mpr h)
+      ab_symm := hPart.cd_symm
+      ab_trans := hPart.cd_trans
+      ab_color := fun i hi j hj h => (hcd (b i)).mp (hPart.cd_color i hi j hj h)
+      cd_refl := fun i hi h => hPart.ab_refl i hi ((hab (b i)).mpr h)
+      cd_symm := hPart.ab_symm
+      cd_trans := hPart.ab_trans
+      cd_color := fun i hi j hj h => (hab (b i)).mp (hPart.ab_color i hi j hj h)
+      ab_adj := fun i hi j hj hadj hi_c hj_c =>
+        hPart.cd_adj i hi j hj hadj ((hcd (b i)).mpr hi_c) ((hcd (b j)).mpr hj_c)
+      cd_adj := fun i hi j hj hadj hi_c hj_c =>
+        hPart.ab_adj i hi j hj hadj ((hab (b i)).mpr hi_c) ((hab (b j)).mpr hj_c)
+      ab_noncross := hPart.cd_noncross
+      cd_noncross := hPart.ab_noncross
+      cross_ab_cd := hPart.cross_cd_ab
+      cross_cd_ab := hPart.cross_ab_cd
+    }
+
+/-- S₃ Reduction Theorem for Lemma (a):
+    To establish `FullRepresentationHypothesis c sms pow3` for all 24 color pairings `θ`,
+    it suffices to prove representation for the single canonical pairing `theta1`. -/
+theorem full_representation_of_theta1 (c : Configuration) (sms : Array SMData) (pow3 : Array Nat)
+    (h_theta1 : ∀ (b : BoundaryColoring c) (equiv_ab equiv_cd : Nat → Nat → Prop),
+      IsValidBoundaryColoring c b →
+      IsJointPlanarRingPartition c b theta1 equiv_ab equiv_cd →
+      ∃ (sm : SMData), sm ∈ sms.toList ∧
+        RepresentsPartition c b theta1 equiv_ab equiv_cd sm pow3) :
+    FullRepresentationHypothesis c sms pow3 := by
+  intro b θ equiv_ab equiv_cd hb hPart
+  have hb_rel := relabelBoundary_valid c b θ hb
+  rcases relabelBoundary_partition c b θ equiv_ab equiv_cd hPart with hPart1 | hPart2
+  · rcases h_theta1 (relabelBoundary θ b) equiv_ab equiv_cd hb_rel hPart1 with
+      ⟨sm, hsm, S, hSwap, hS0, hTrace⟩
+    refine ⟨sm, hsm, S, ?_, hS0, ?_⟩
+    · intro t ht
+      exact validSwapChoice_relabel c (relabelBoundary θ b) b theta1 θ equiv_ab equiv_cd (S t) (hSwap t ht)
+    · intro t ht
+      dsimp [boundaryTraceTheta]
+      rw [relabelBoundary_swap]
+      exact hTrace t ht
+  · rcases h_theta1 (relabelBoundary θ b) equiv_cd equiv_ab hb_rel hPart2 with
+      ⟨sm, hsm, S, hSwap, hS0, hTrace⟩
+    refine ⟨sm, hsm, S, ?_, hS0, ?_⟩
+    · intro t ht
+      exact validSwapChoice_symm c (relabelBoundary θ b) b theta1 θ equiv_ab equiv_cd (S t) (hSwap t ht)
+    · intro t ht
+      dsimp [boundaryTraceTheta]
+      rw [relabelBoundary_swap]
+      exact hTrace t ht
 
 end Soundness
 end Math

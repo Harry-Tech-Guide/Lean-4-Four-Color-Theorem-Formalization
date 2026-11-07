@@ -40,33 +40,6 @@ checker (`FastReducer.lean`, `Batch/Runner.lean`) and the adversarial Kempe elim
    Combines the constructed rank witness and fixed-point data to prove `IsDReducible c`.
 -/
 
-/-- Canonical ColorPairing for theta = 1:
-    pairs {c0, c1} and {c2, c3}, corresponding to difference 1 in V_4. -/
-def theta1 : ColorPairing where
-  a := Color.c0
-  b := Color.c1
-  c := Color.c2
-  d := Color.c3
-  distinct := by decide
-
-/-- Canonical ColorPairing for theta = 2:
-    pairs {c0, c2} and {c1, c3}, corresponding to difference 2 in V_4. -/
-def theta2 : ColorPairing where
-  a := Color.c0
-  b := Color.c2
-  c := Color.c1
-  d := Color.c3
-  distinct := by decide
-
-/-- Canonical ColorPairing for theta = 3:
-    pairs {c0, c3} and {c1, c2}, corresponding to difference 3 in V_4. -/
-def theta3 : ColorPairing where
-  a := Color.c0
-  b := Color.c3
-  c := Color.c1
-  d := Color.c2
-  distinct := by decide
-
 /-- Proof that theta1.swap corresponds to XOR with 1 on color indices. -/
 theorem theta1_swap_eq (col : Color) :
     (theta1.swap col).toNat = col.toNat ^^^ 1 := by
@@ -400,13 +373,16 @@ theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
         ∃ sm ∈ sms.toList, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
-              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
+            (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
+                (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)) :
     ConstructedRankStep c earlier sms pow3 := by
   intro b hb hr_pos
   rcases h_step_rep b hb hr_pos with ⟨θ, hPart⟩
   refine ⟨θ, ?_⟩
   intro equiv_ab equiv_cd hP
-  rcases hPart equiv_ab equiv_cd hP with ⟨sm, hsm, ⟨S, hSwap, hS0, hTrace⟩, t, ht, hr_dec⟩
+  rcases hPart equiv_ab equiv_cd hP with ⟨sm, hsm, ⟨S, hSwap, hS0, hTrace⟩, t, ht, hr_dec, hr_orb⟩
   refine ⟨S t, hSwap t ht, ?_⟩
   have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
     cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
@@ -422,23 +398,27 @@ theorem step_of_representation (c : Configuration) (earlier : Array (Array Nat))
     rfl
   rw [h_rank_b]
   dsimp [constructedRank]
-  rw [hTrace t ht]
+  rw [hr_orb (boundaryKempeSwap c b θ (S t)) (hTrace t ht)]
   split
   · omega
   · omega
 
 /-- Iteration elimination property of the FastReducer fixed point:
     When all orbits are eliminated, every surviving coloring at positive rank has an uncovered pairing θ
-    where all representing signed matchings contain a parameter t eliminated at an earlier iteration. -/
+    where all representing signed matchings contain a parameter t eliminated at an earlier iteration,
+    and `computeEliminationRanks` is S₃-invariant across `boundaryTraceTheta`. -/
 def IterationEliminationHypothesis (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat) : Prop :=
   ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
     constructedRank c earlier sms pow3 b > 0 →
     ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.toList →
-      (boundaryTrace c b pow3 = smFitIndex sm 0) →
+      (boundaryTraceTheta c b θ pow3 = smFitIndex sm 0) →
       ∃ t, t < 1 <<< sm.p ∧
         (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
-          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
+        (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
+            (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)
 
 /-- Connection from Lemma (a) FullRepresentationHypothesis and iteration elimination to ConstructedRankStep:
     Every partition is represented by an SMData and uncovered status guarantees elimination at an
@@ -458,11 +438,11 @@ theorem step_of_iteration_elimination (c : Configuration) (earlier : Array (Arra
     exact Nat.two_pow_pos sm.p
   have h_swap0 : boundaryKempeSwap c b θ (S 0) = b :=
     boundaryKempeSwap_zero c b θ (S 0) hS0
-  have h_fit0 : boundaryTrace c b pow3 = smFitIndex sm 0 := by
+  have h_fit0 : boundaryTraceTheta c b θ pow3 = smFitIndex sm 0 := by
     have hT0 := hTrace 0 h_zero_lt
     rw [h_swap0] at hT0
     exact hT0
-  rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec⟩
+  rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec, hr_orb⟩
   refine ⟨S t, hSwap t ht, ?_⟩
   have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
     cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
@@ -478,7 +458,7 @@ theorem step_of_iteration_elimination (c : Configuration) (earlier : Array (Arra
     rfl
   rw [h_rank_b]
   dsimp [constructedRank]
-  rw [hTrace t ht]
+  rw [hr_orb (boundaryKempeSwap c b θ (S t)) (hTrace t ht)]
   split
   · omega
   · omega
@@ -514,7 +494,10 @@ theorem fast_d_sound_of_representation (c : Configuration) (earlier : Array (Arr
         ∃ sm ∈ sms.toList, RepresentsPartition c b θ equiv_ab equiv_cd sm pow3 ∧
           ∃ t, t < 1 <<< sm.p ∧
             (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
-              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0) :
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
+            (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+              (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
+                (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)) :
     IsDReducible c := by
   have hbase := hbase_of_checkFast c earlier sms pow3 h_check
   have hstep := step_of_representation c earlier sms pow3 h_step_rep

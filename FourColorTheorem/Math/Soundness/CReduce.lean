@@ -335,7 +335,138 @@ theorem creducible_of_rank_witness (c : Configuration) (h_contract : c.contractE
   have hD := dreducible_of_rank_witness c W
   exact dreducible_implies_creducible c h_contract hD
 
-/-- Unconditional C-reducibility deduction from a SubKempeRankWitness on `extendsToContracted`. -/
+/-- Iteration elimination property restricted to boundary colorings eliminated in the fixed point (`LiveZero`):
+    For every valid boundary coloring `b` with `LiveZero` and `constructedRank > 0`, there is an uncovered
+    pairing `θ` where every representing `sm` has a parameter `t` whose trace is also `LiveZero` and
+    was eliminated at a strictly earlier iteration. -/
+def LiveZeroIterationEliminationHypothesis (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat) : Prop :=
+  let live := (computeFinalState (rconfOfConfig c earlier) sms pow3).live
+  ∀ (b : BoundaryColoring c), IsValidBoundaryColoring c b →
+    LiveZero c pow3 live b →
+    constructedRank c earlier sms pow3 b > 0 →
+    ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.toList →
+      (boundaryTraceTheta c b θ pow3 = smFitIndex sm 0) →
+      ∃ t, t < 1 <<< sm.p ∧
+        (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
+        (∀ b' : BoundaryColoring c, boundaryTraceTheta c b' θ pow3 = smFitIndex sm t →
+          LiveZero c pow3 live b' ∧
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b' pow3) 0 =
+            (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0)
+
+/-- Proof that `FullRepresentationHypothesis` and `LiveZeroIterationEliminationHypothesis` imply
+    `LiveZeroEliminationHypothesis` via a `SubKempeRankWitness` on `LiveZero`. -/
+theorem live_zero_eliminated_of_iteration (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (h_rep : FullRepresentationHypothesis c sms pow3)
+    (h_lz_elim : LiveZeroIterationEliminationHypothesis c earlier sms pow3) :
+    LiveZeroEliminationHypothesis c earlier sms pow3 := by
+  let live := (computeFinalState (rconfOfConfig c earlier) sms pow3).live
+  let W : SubKempeRankWitness c (LiveZero c pow3 live) := {
+    rank := constructedRank c earlier sms pow3
+    base := fun b hb _hP hr0 => by
+      have h_ext_bool : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true := by
+        dsimp [constructedRank] at hr0
+        split at hr0
+        · assumption
+        · contradiction
+      exact extend_soundness_of_extend c earlier h_earlier h_irrefl b hb h_ext_bool
+    step := fun b hb hP hr_pos => by
+      rcases h_lz_elim b hb hP hr_pos with ⟨θ, hθ⟩
+      refine ⟨θ, ?_⟩
+      intro equiv_ab equiv_cd hPart
+      rcases h_rep b θ equiv_ab equiv_cd hb hPart with ⟨sm, hsm, S, hSwap, hS0, hTrace⟩
+      have h_zero_lt : 0 < 1 <<< sm.p := by
+        rw [Nat.shiftLeft_eq, Nat.one_mul]
+        exact Nat.two_pow_pos sm.p
+      have h_swap0 : boundaryKempeSwap c b θ (S 0) = b :=
+        boundaryKempeSwap_zero c b θ (S 0) hS0
+      have h_fit0 : boundaryTraceTheta c b θ pow3 = smFitIndex sm 0 := by
+        have hT0 := hTrace 0 h_zero_lt
+        rw [h_swap0] at hT0
+        exact hT0
+      rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec, hr_orb⟩
+      have h_tr_t := hTrace t ht
+      have h_orb_t := hr_orb (boundaryKempeSwap c b θ (S t)) h_tr_t
+      refine ⟨S t, hSwap t ht, h_orb_t.1, ?_⟩
+      have h_not_ext : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 = false := by
+        cases h : (FastReducer.extend earlier c.totalNodes c.ringSize (initCol c b)).1 with
+        | true =>
+          dsimp [constructedRank] at hr_pos
+          rw [h] at hr_pos
+          contradiction
+        | false => rfl
+      have h_rank_b : constructedRank c earlier sms pow3 b =
+          (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 + 1 := by
+        dsimp [constructedRank]
+        rw [h_not_ext]
+        rfl
+      rw [h_rank_b]
+      dsimp [constructedRank]
+      rw [h_orb_t.2]
+      split
+      · omega
+      · omega
+  }
+  exact eliminated_of_sub_rank_witness c (LiveZero c pow3 live) W
+
+/-- Connecting `ContractCheckSoundnessHypothesis`, `runContractCheckTotal = true`,
+    `FullRepresentationHypothesis`, and `LiveZeroIterationEliminationHypothesis` directly to `ContractSoundness`. -/
+theorem contract_soundness_of_check (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (h_rep : FullRepresentationHypothesis c sms pow3)
+    (h_lz_elim : LiveZeroIterationEliminationHypothesis c earlier sms pow3)
+    (h_csound_chk : ContractCheckSoundnessHypothesis c earlier pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live)
+    (h_run : runContractCheckTotal (rconfOfConfig c earlier) pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live = true) :
+    ContractSoundness c earlier sms pow3 := by
+  right
+  have h_lz := live_zero_eliminated_of_iteration c earlier sms pow3 h_earlier h_irrefl h_rep h_lz_elim
+  exact contract_eliminated_of_live_zero c earlier sms pow3 h_csound_chk h_run h_lz
+
+/-- When all valid boundary colorings are eliminated (`LiveZero`), `LiveZeroIterationEliminationHypothesis`
+    implies the global `IterationEliminationHypothesis`. -/
+theorem iteration_elimination_of_live_zero_all (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_all_lz : ∀ b, IsValidBoundaryColoring c b →
+      LiveZero c pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live b)
+    (h_lz_elim : LiveZeroIterationEliminationHypothesis c earlier sms pow3) :
+    IterationEliminationHypothesis c earlier sms pow3 := by
+  intro b hb hr_pos
+  have h_lz := h_all_lz b hb
+  rcases h_lz_elim b hb h_lz hr_pos with ⟨θ, hθ⟩
+  refine ⟨θ, ?_⟩
+  intro sm hsm hfit0
+  rcases hθ sm hsm hfit0 with ⟨t, ht, hr_dec, hr_orb⟩
+  exact ⟨t, ht, hr_dec, fun b' hb' => (hr_orb b' hb').2⟩
+
+/-- Master C-Reducibility Theorem from `LiveZeroIterationEliminationHypothesis`:
+    Does not require the global `IterationEliminationHypothesis` (which only holds when all orbits are eliminated);
+    instead uses `LiveZeroIterationEliminationHypothesis` on the eliminated subset. -/
+theorem fast_c_sound_of_live_zero (c : Configuration) (earlier : Array (Array Nat))
+    (sms : Array SMData) (pow3 : Array Nat)
+    (h_contract : c.contractEdges ≠ [])
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (h_rep : FullRepresentationHypothesis c sms pow3)
+    (h_lz_elim : LiveZeroIterationEliminationHypothesis c earlier sms pow3)
+    (h_csound_chk : ContractCheckSoundnessHypothesis c earlier pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live)
+    (h_run : runContractCheckTotal (rconfOfConfig c earlier) pow3 (computeFinalState (rconfOfConfig c earlier) sms pow3).live = true) :
+    IsCReducible c := by
+  have h_csound := contract_soundness_of_check c earlier sms pow3 h_earlier h_irrefl h_rep h_lz_elim h_csound_chk h_run
+  cases h_csound with
+  | inl _ =>
+    have h_lz := live_zero_eliminated_of_iteration c earlier sms pow3 h_earlier h_irrefl h_rep h_lz_elim
+    have h_elim := contract_eliminated_of_live_zero c earlier sms pow3 h_csound_chk h_run h_lz
+    exact fast_c_sound_of_contract c h_contract h_elim
+  | inr h_contract_elim =>
+    exact fast_c_sound_of_contract c h_contract h_contract_elim
+
+/-- Unconditional C-reducibility deduction from ` SubKempeRankWitness` on `extendsToContracted`. -/
 theorem creducible_of_sub_witness (c : Configuration) (h_contract : c.contractEdges ≠ [])
     (W : SubKempeRankWitness c (extendsToContracted c)) :
     IsCReducible c := by
