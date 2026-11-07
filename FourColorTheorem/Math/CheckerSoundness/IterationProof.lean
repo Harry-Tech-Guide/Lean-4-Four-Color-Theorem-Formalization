@@ -250,7 +250,7 @@ theorem allFitLiveTotal_mono (fuel : Nat) (sm : SMData) (live1 live2 : ByteArray
         ⟨ih (k + 1) (acc + sm.a[k]!) h_and.1, ih (k + 1) (acc + sm.b[k]!) h_and.2⟩
 
 /-- Structural fold over a list of signed matchings computing `(cover, nextSM)` in one iteration. -/
-def stepSMList (live : ByteArray) : List SMData → ByteArray → Array SMData → ByteArray × Array SMData
+def stepSMListUnused (live : ByteArray) : List SMData → ByteArray → Array SMData → ByteArray × Array SMData
   | [], cov, nextSM => (cov, nextSM)
   | sm :: rest, cov, nextSM =>
     if allFitLiveTotal sm.p sm live 0 0 then
@@ -383,7 +383,7 @@ theorem byteArray_get!_set!_zero_mono (a : ByteArray) (i j : Nat)
     exact hj
 
 /-- Clear all 6 trace indices of an `S₃`-orbit in `live`. -/
-def clearOrbitLive (live : ByteArray) (orb : Orbit6) : ByteArray :=
+def clearOrbitLiveUnused (live : ByteArray) (orb : Orbit6) : ByteArray :=
   let l0 := live.set! orb.j0 0
   let l1 := l0.set! orb.j1 0
   let l2 := l1.set! orb.j2 0
@@ -392,7 +392,7 @@ def clearOrbitLive (live : ByteArray) (orb : Orbit6) : ByteArray :=
   l4.set! orb.j5 0
 
 /-- Record elimination iteration `iter` on all 6 trace indices of an `S₃`-orbit in `ranks`. -/
-def setOrbitRanks (ranks : Array Nat) (orb : Orbit6) (iter : Nat) : Array Nat :=
+def setOrbitRanksUnused (ranks : Array Nat) (orb : Orbit6) (iter : Nat) : Array Nat :=
   let r0 := ranks.set! orb.j0 iter
   let r1 := r0.set! orb.j1 iter
   let r2 := r1.set! orb.j2 iter
@@ -412,7 +412,7 @@ theorem clearOrbitLive_mono (live : ByteArray) (orb : Orbit6) (j : Nat)
   exact byteArray_get!_set!_zero_mono _ orb.j0 j h0
 
 /-- Structural fold over the orbit list in one elimination round. -/
-def stepOrbitsList (cover : ByteArray) (iter : Nat) :
+def stepOrbitsListUnused (cover : ByteArray) (iter : Nat) :
     List Orbit6 → Array Orbit6 → ByteArray → Array Nat → Array Orbit6 × ByteArray × Array Nat
   | [], nextOrbits, live, ranks => (nextOrbits, live, ranks)
   | orb :: rest, nextOrbits, live, ranks =>
@@ -583,6 +583,206 @@ theorem setOrbitRanks_all_eq (ranks : Array Nat) (orb : Orbit6) (iter : Nat)
   · exact array_getD_set!_preserves_val r4 orb.j5 orb.j3 iter
       (array_getD_set!_preserves_val r3 orb.j4 orb.j3 iter hr3)
   · exact array_getD_set!_preserves_val r4 orb.j5 orb.j4 iter hr4
+
+theorem array_getElem!_eq_getD_zero (a : Array Nat) (k : Nat) :
+    a[k]! = a.getD k 0 := by
+  simp [Array.getElem!_eq_getD]
+
+/-- Equivalence between `smFitTree` and `smFitIndexAux` on `k .. k + fuel - 1`. -/
+theorem smFitTree_eq_smFitIndexAux (sm : SMData) (fuel k t acc : Nat)
+    (h_le : k + fuel ≤ sm.p) :
+    smFitTree sm fuel k (t >>> k) acc = smFitIndexAux sm t fuel k acc := by
+  induction fuel generalizing k acc with
+  | zero => rfl
+  | succ fuel ih =>
+    have hk : ¬ (k ≥ sm.p) := by omega
+    have h_le' : (k + 1) + fuel ≤ sm.p := by omega
+    dsimp [smFitTree, smFitIndexAux]
+    rw [if_neg hk]
+    have h_shift : (t >>> k) >>> 1 = t >>> (k + 1) := by
+      rw [← Nat.shiftRight_add]
+    have h_delta :
+        (if ((t >>> k) &&& 1) == 0 then sm.a[k]! else sm.b[k]!) =
+        (if ((t >>> k) &&& 1) == 0 then sm.a.getD k 0 else sm.b.getD k 0) := by
+      rw [array_getElem!_eq_getD_zero, array_getElem!_eq_getD_zero]
+    rw [h_shift, h_delta]
+    exact ih (k + 1) (acc + if ((t >>> k) &&& 1) == 0 then sm.a.getD k 0 else sm.b.getD k 0) h_le'
+
+/-- Exact equivalence between the tree index `smFitTree sm sm.p 0 t 0` and `smFitIndex sm t`
+    for every `sm : SMData` and `t : Nat`, closing Audit Gap G4. -/
+theorem smFitTree_eq_smFitIndex (sm : SMData) (t : Nat) :
+    smFitTree sm sm.p 0 t 0 = smFitIndex sm t := by
+  have h := smFitTree_eq_smFitIndexAux sm sm.p 0 t 0 (by omega)
+  rwa [Nat.shiftRight_zero] at h
+
+/-!
+### Step B3: `reducerStep` and `runReducerLoop` State and Monotonicity Invariants
+-/
+
+theorem clearOrbitLive_size (live : ByteArray) (orb : Orbit6) :
+    (clearOrbitLive live orb).size = live.size := by
+  unfold clearOrbitLive
+  rw [byteArray_size_set!, byteArray_size_set!, byteArray_size_set!,
+      byteArray_size_set!, byteArray_size_set!, byteArray_size_set!]
+
+theorem setOrbitRanks_size (ranks : Array Nat) (orb : Orbit6) (iter : Nat) :
+    (setOrbitRanks ranks orb iter).size = ranks.size := by
+  unfold setOrbitRanks
+  rw [array_size_set!, array_size_set!, array_size_set!,
+      array_size_set!, array_size_set!, array_size_set!]
+
+theorem stepOrbitsList_live_size (cover : ByteArray) (iter : Nat) (orbs : List Orbit6)
+    (nextOrbits : Array Orbit6) (live : ByteArray) (ranks : Array Nat) :
+    (stepOrbitsList cover iter orbs nextOrbits live ranks).2.1.size = live.size := by
+  induction orbs generalizing nextOrbits live ranks with
+  | nil => rfl
+  | cons orb rest ih =>
+    dsimp [stepOrbitsList]
+    split
+    · exact ih (nextOrbits.push orb) live ranks
+    · rw [ih nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter),
+          clearOrbitLive_size]
+
+theorem stepOrbitsList_ranks_size (cover : ByteArray) (iter : Nat) (orbs : List Orbit6)
+    (nextOrbits : Array Orbit6) (live : ByteArray) (ranks : Array Nat) :
+    (stepOrbitsList cover iter orbs nextOrbits live ranks).2.2.size = ranks.size := by
+  induction orbs generalizing nextOrbits live ranks with
+  | nil => rfl
+  | cons orb rest ih =>
+    dsimp [stepOrbitsList]
+    split
+    · exact ih (nextOrbits.push orb) live ranks
+    · rw [ih nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter),
+          setOrbitRanks_size]
+
+theorem reducerStep_live_size (N : Nat) (st : ReducerState) :
+    (reducerStep N st).live.size = st.live.size := by
+  dsimp [reducerStep]
+  exact stepOrbitsList_live_size _ _ _ _ _ _
+
+theorem reducerStep_ranks_size (N : Nat) (st : ReducerState) :
+    (reducerStep N st).ranks.size = st.ranks.size := by
+  dsimp [reducerStep]
+  exact stepOrbitsList_ranks_size _ _ _ _ _ _
+
+theorem runReducerLoop_live_size (N fuel : Nat) (st : ReducerState) :
+    (runReducerLoop N fuel st).live.size = st.live.size := by
+  induction fuel generalizing st with
+  | zero => rfl
+  | succ fuel ih =>
+    dsimp [runReducerLoop]
+    split
+    · rw [ih (reducerStep N st), reducerStep_live_size]
+    · rfl
+
+theorem runReducerLoop_ranks_size (N fuel : Nat) (st : ReducerState) :
+    (runReducerLoop N fuel st).ranks.size = st.ranks.size := by
+  induction fuel generalizing st with
+  | zero => rfl
+  | succ fuel ih =>
+    dsimp [runReducerLoop]
+    split
+    · rw [ih (reducerStep N st), reducerStep_ranks_size]
+    · rfl
+
+/-- Liveness is monotone decreasing across `reducerStep`: if `j` is live after `reducerStep`, it was live before. -/
+theorem reducerStep_live_mono (N : Nat) (st : ReducerState) (j : Nat)
+    (hj : ((reducerStep N st).live.get! j == 1) = true) :
+    (st.live.get! j == 1) = true := by
+  dsimp [reducerStep] at hj
+  exact stepOrbitsList_live_mono _ _ _ _ _ _ j hj
+
+/-- Contrapositive of `reducerStep_live_mono`: once `(st.live.get! j == 1) = false`, it stays `false` after `reducerStep`. -/
+theorem reducerStep_not_live_mono (N : Nat) (st : ReducerState) (j : Nat)
+    (hj : (st.live.get! j == 1) = false) :
+    ((reducerStep N st).live.get! j == 1) = false := by
+  cases h : ((reducerStep N st).live.get! j == 1) with
+  | false => rfl
+  | true =>
+    have h_prev := reducerStep_live_mono N st j h
+    rw [hj] at h_prev
+    contradiction
+
+/-- Liveness is monotone decreasing across `runReducerLoop`. -/
+theorem runReducerLoop_live_mono (N fuel : Nat) (st : ReducerState) (j : Nat)
+    (hj : ((runReducerLoop N fuel st).live.get! j == 1) = true) :
+    (st.live.get! j == 1) = true := by
+  induction fuel generalizing st with
+  | zero => exact hj
+  | succ fuel ih =>
+    dsimp [runReducerLoop] at hj
+    split at hj
+    · exact reducerStep_live_mono N st j (ih (reducerStep N st) hj)
+    · exact hj
+
+/-- Once a trace `j` is not live (`(st.live.get! j == 1) = false`), it remains not live
+    after any number of `runReducerLoop` iterations. -/
+theorem runReducerLoop_not_live_mono (N fuel : Nat) (st : ReducerState) (j : Nat)
+    (hj : (st.live.get! j == 1) = false) :
+    ((runReducerLoop N fuel st).live.get! j == 1) = false := by
+  cases h : ((runReducerLoop N fuel st).live.get! j == 1) with
+  | false => rfl
+  | true =>
+    have h_prev := runReducerLoop_live_mono N fuel st j h
+    rw [hj] at h_prev
+    contradiction
+
+/-- Active signed-matching invariant across `reducerStep`:
+    every `sm ∈ st.activeSM.toList` is either retained in `(reducerStep N st).activeSM.toList`
+    or has a parameter `t < 1 <<< sm.p` that is not live in `st.live` (and hence not live in `(reducerStep N st).live`). -/
+theorem retained_or_not_live_of_reducerStep (N : Nat) (st : ReducerState) (sm : SMData)
+    (hsm : sm ∈ st.activeSM.toList) :
+    sm ∈ (reducerStep N st).activeSM.toList ∨
+      ∃ t < 1 <<< sm.p, (((reducerStep N st).live).get! (smFitIndex sm t) == 1) = false := by
+  dsimp [reducerStep]
+  rcases retained_or_not_live_of_stepSMList st.live st.activeSM.toList (zeros N)
+      (Array.mkEmpty st.activeSM.size) sm hsm with h_ret | ⟨t, ht, h_not_live⟩
+  · exact Or.inl h_ret
+  · right
+    rw [smFitTree_eq_smFitIndex] at h_not_live
+    refine ⟨t, ht, ?_⟩
+    exact reducerStep_not_live_mono N st (smFitIndex sm t) h_not_live
+
+/-- Active signed-matching invariant across `runReducerLoop`:
+    every `sm ∈ st.activeSM.toList` is either retained in `(runReducerLoop N fuel st).activeSM.toList`
+    or has a parameter `t < 1 <<< sm.p` that is not live in `(runReducerLoop N fuel st).live`. -/
+theorem retained_or_not_live_of_runReducerLoop (N fuel : Nat) (st : ReducerState) (sm : SMData)
+    (hsm : sm ∈ st.activeSM.toList) :
+    sm ∈ (runReducerLoop N fuel st).activeSM.toList ∨
+      ∃ t < 1 <<< sm.p, (((runReducerLoop N fuel st).live).get! (smFitIndex sm t) == 1) = false := by
+  induction fuel generalizing st with
+  | zero => exact Or.inl hsm
+  | succ fuel ih =>
+    dsimp [runReducerLoop]
+    split
+    · rcases retained_or_not_live_of_reducerStep N st sm hsm with h_ret | ⟨t, ht, h_dead⟩
+      · exact ih (reducerStep N st) h_ret
+      · right
+        exact ⟨t, ht, runReducerLoop_not_live_mono N fuel (reducerStep N st) (smFitIndex sm t) h_dead⟩
+    · exact Or.inl hsm
+
+/-- Combined round-uncovered elimination lemma:
+    Suppose `sm` satisfies the active-SM invariant at state `st` (either `sm ∈ st.activeSM.toList`
+    or `sm` already has a non-live leaf in `st.live`).
+    If trace `j < (zeros N).size` is uncovered in round `st` and `smFitIndex sm 0 = j`,
+    then `sm` has a parameter `t < 1 <<< sm.p` that is not live in `st.live` (and remains not live
+    after any subsequent `runReducerLoop N fuel (reducerStep N st)`). -/
+theorem exists_not_live_of_uncovered_in_round (N : Nat) (st : ReducerState)
+    (j : Nat) (hj_bound : j < (zeros N).size)
+    (h_uncov : ((stepSMList st.live st.activeSM.toList (zeros N) (Array.mkEmpty st.activeSM.size)).1.get! j == 1) = false)
+    (sm : SMData)
+    (h_inv : sm ∈ st.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st.live.get! (smFitIndex sm t) == 1) = false)
+    (h_fit0 : smFitIndex sm 0 = j) :
+    ∃ t < 1 <<< sm.p, (st.live.get! (smFitIndex sm t) == 1) = false := by
+  rcases h_inv with h_active | h_already_dead
+  · have h_fit_tree : smFitTree sm sm.p 0 0 0 = j := by
+      rw [smFitTree_eq_smFitIndex]
+      exact h_fit0
+    rcases uncovered_of_stepSMList st.live st.activeSM.toList (zeros N)
+        (Array.mkEmpty st.activeSM.size) j hj_bound h_uncov sm h_active h_fit_tree with ⟨t, ht, h_dead⟩
+    rw [smFitTree_eq_smFitIndex] at h_dead
+    exact ⟨t, ht, h_dead⟩
+  · exact h_already_dead
 
 end CheckerSoundness
 end Math

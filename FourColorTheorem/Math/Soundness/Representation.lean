@@ -32,7 +32,20 @@ such that:
     Edge difference x_i = b(i) ^^^ b((i+1)%r) ∈ {1, 2, 3}.
     Base-3 digit d_i = x_i - 1 ∈ {0, 1, 2}.
     Returns ∑ d_i * 3^i. -/
-def boundaryTrace (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) : Nat := Id.run do
+-- Structural helper for `boundaryTrace`: accumulates `d_i * 3^i` for `i = k, ..., k + rem - 1`.
+def boundaryTraceAux (r : Nat) (b : Nat → Color) (pow3 : Array Nat) : Nat → Nat → Nat → Nat
+  | 0, _, acc => acc
+  | rem + 1, i, acc =>
+    let nxt := (i + 1) % r
+    let diff := (b i).toNat ^^^ (b nxt).toNat
+    let d_i := if diff > 0 then diff - 1 else 0
+    boundaryTraceAux r b pow3 rem (i + 1) (acc + d_i * pow3.getD i 0)
+
+/-- Base-3 trace index of boundary coloring b on ring vertices of configuration c. -/
+def boundaryTrace (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) : Nat :=
+  boundaryTraceAux c.ringSize b pow3 c.ringSize 0 0
+
+def boundaryTraceLoopUnused (c : Configuration) (b : BoundaryColoring c) (pow3 : Array Nat) : Nat := Id.run do
   let r := c.ringSize
   let mut idx := 0
   for i in [0:r] do
@@ -114,7 +127,18 @@ def boundaryTraceTheta (c : Configuration) (b : BoundaryColoring c) (θ : ColorP
 
 /-- The trace index of the t-th fitting coloring of a signed matching `sm`.
     Bit k of parameter t selects delta `a[k]` (bit = 0) or delta `b[k]` (bit = 1). -/
-def smFitIndex (sm : SMData) (t : Nat) : Nat := Id.run do
+-- Structural helper for `smFitIndex`: accumulates selected delta `a[k]` or `b[k]` for `k = i, ..., i + rem - 1`.
+def smFitIndexAux (sm : SMData) (t : Nat) : Nat → Nat → Nat → Nat
+  | 0, _, acc => acc
+  | rem + 1, k, acc =>
+    let first := (t >>> k) &&& 1 == 0
+    let delta := if first then sm.a.getD k 0 else sm.b.getD k 0
+    smFitIndexAux sm t rem (k + 1) (acc + delta)
+
+def smFitIndex (sm : SMData) (t : Nat) : Nat :=
+  smFitIndexAux sm t sm.p 0 0
+
+def smFitIndexLoopUnused (sm : SMData) (t : Nat) : Nat := Id.run do
   let mut j := 0
   for k in [0:sm.p] do
     let first := (t >>> k) &&& 1 == 0
@@ -460,7 +484,7 @@ theorem zero_pair_represents (c : Configuration) (b : BoundaryColoring c) (θ : 
 /-- Base condition: combining swap choices preserves the identity swap at t = 0. -/
 theorem combine_swap_zero (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
     (hS0 : ∀ i, S_rest 0 i = false) (i : Nat) :
-    (if (0 &&& 1 == 1) ∧ K i then true else S_rest (0 >>> 1) i) = false := by
+    (if (0 &&& 1 == 1) ∧ K i then !(S_rest (0 >>> 1) i) else S_rest (0 >>> 1) i) = false := by
   dsimp
   exact hS0 i
 
@@ -469,7 +493,7 @@ theorem combine_swap_zero (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [
     while higher bits `t >>> 1` select swap choices on the remaining chords. -/
 def combineSwapChoice (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
     (t : Nat) (i : Nat) : Bool :=
-  if (t &&& 1 == 1) ∧ K i then true else S_rest (t >>> 1) i
+  if (t &&& 1 == 1) ∧ K i then !(S_rest (t >>> 1) i) else S_rest (t >>> 1) i
 
 /-- At parameter t = 0, the combined swap choice is identity everywhere if S_rest is. -/
 theorem combineSwapChoice_zero (S_rest : Nat → (Nat → Bool)) (K : Nat → Prop) [DecidablePred K]
@@ -518,7 +542,7 @@ theorem combineSwapChoice_valid (c : Configuration) (b : BoundaryColoring c) (θ
     by_cases hKi : K i
     · have hKj : K j := hK_iff.mp hKi
       by_cases h_bit : t &&& 1 == 1
-      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩]
+      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩, hS_eq]
       · rw [if_neg (fun h => h_bit h.1), if_neg (fun h => h_bit h.1)]
         exact hS_eq
     · have hKj : ¬ K j := fun hj => hKi (hK_iff.mpr hj)
@@ -531,7 +555,7 @@ theorem combineSwapChoice_valid (c : Configuration) (b : BoundaryColoring c) (θ
     by_cases hKi : K i
     · have hKj : K j := hK_iff.mp hKi
       by_cases h_bit : t &&& 1 == 1
-      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩]
+      · rw [if_pos ⟨h_bit, hKi⟩, if_pos ⟨h_bit, hKj⟩, hS_eq]
       · rw [if_neg (fun h => h_bit h.1), if_neg (fun h => h_bit h.1)]
         exact hS_eq
     · have hKj : ¬ K j := fun hj => hKi (hK_iff.mpr hj)
@@ -790,6 +814,63 @@ theorem full_representation_of_theta1 (c : Configuration) (sms : Array SMData) (
       dsimp [boundaryTraceTheta]
       rw [relabelBoundary_swap]
       exact hTrace t ht
+
+/-- Explicit `p`-chord XOR swap choice over an indexed family of chord ring regions `K : Nat → Nat → Bool`:
+    for parameter `t < 2^p`, vertex `i` is swapped iff an odd number of active chords (`(t >>> k) &&& 1 == 1`)
+    contain `i` (`K k i = true`). -/
+def xorSwapChoice (K : Nat → Nat → Bool) : Nat → Nat → Nat → Bool
+  | 0, _, _ => false
+  | p + 1, t, i =>
+    let prev := xorSwapChoice K p t i
+    if ((t >>> p) &&& 1 == 1) && K p i then !prev else prev
+
+/-- At parameter `t = 0`, `xorSwapChoice K p 0 i = false` for all `p` and `i`. -/
+theorem xorSwapChoice_zero (K : Nat → Nat → Bool) (p i : Nat) :
+    xorSwapChoice K p 0 i = false := by
+  induction p with
+  | zero => rfl
+  | succ p ih =>
+    dsimp [xorSwapChoice]
+    rw [Nat.zero_shiftRight, ih]
+    rfl
+
+/-- If each chord region `K k` (`k < p`) is supported on the ring (`K k i = true → i < c.ringSize`)
+    and is constant on every `equiv_ab` and `equiv_cd` class, then `xorSwapChoice K p t` is a valid
+    boundary Kempe swap choice for every `t`. -/
+theorem xorSwapChoice_valid (c : Configuration) (b : BoundaryColoring c) (θ : ColorPairing)
+    (equiv_ab equiv_cd : Nat → Nat → Prop)
+    (K : Nat → Nat → Bool) (p : Nat)
+    (hK_ring : ∀ k < p, ∀ i, K k i = true → i < c.ringSize)
+    (hK_ab : ∀ k < p, ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_ab i j → K k i = K k j)
+    (hK_cd : ∀ k < p, ∀ i < c.ringSize, ∀ j < c.ringSize, equiv_cd i j → K k i = K k j)
+    (t : Nat) :
+    IsValidSwapChoice c b θ equiv_ab equiv_cd (xorSwapChoice K p t) := by
+  induction p with
+  | zero =>
+    refine ⟨fun _ h => by contradiction, fun _ _ _ _ _ => rfl, fun _ _ _ _ _ => rfl⟩
+  | succ p ih =>
+    have h_prev := ih
+      (fun k hk => hK_ring k (Nat.lt_succ_of_lt hk))
+      (fun k hk => hK_ab k (Nat.lt_succ_of_lt hk))
+      (fun k hk => hK_cd k (Nat.lt_succ_of_lt hk))
+    refine ⟨?_, ?_, ?_⟩
+    · intro i hi
+      dsimp [xorSwapChoice] at hi
+      cases h_cond : (((t >>> p) &&& 1 == 1) && K p i)
+      · rw [h_cond] at hi
+        exact h_prev.ring_only i hi
+      · rw [Bool.and_eq_true] at h_cond
+        exact hK_ring p (Nat.lt_succ_self p) i h_cond.2
+    · intro i hi j hj hab
+      dsimp [xorSwapChoice]
+      have h_prev_eq := h_prev.respects_ab i hi j hj hab
+      have hK_eq := hK_ab p (Nat.lt_succ_self p) i hi j hj hab
+      rw [h_prev_eq, hK_eq]
+    · intro i hi j hj hcd
+      dsimp [xorSwapChoice]
+      have h_prev_eq := h_prev.respects_cd i hi j hj hcd
+      have hK_eq := hK_cd p (Nat.lt_succ_self p) i hi j hj hcd
+      rw [h_prev_eq, hK_eq]
 
 end Soundness
 end Math

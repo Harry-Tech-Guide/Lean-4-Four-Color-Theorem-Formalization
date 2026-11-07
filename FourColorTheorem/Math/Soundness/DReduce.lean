@@ -170,7 +170,58 @@ def markFitCoverTotal : Nat → SMData → Nat → Nat → ByteArray → ByteArr
       markFitCoverTotal fuel sm (k + 1) (acc + sm.b[k]!) cov1
 
 /-- A single deterministic elimination round of the FastReducer algorithm. -/
-def reducerStep (N : Nat) (st : ReducerState) : ReducerState := Id.run do
+def stepSMList (live : ByteArray) : List SMData → ByteArray → Array SMData → ByteArray × Array SMData
+  | [], cov, nextSM => (cov, nextSM)
+  | sm :: rest, cov, nextSM =>
+    if allFitLiveTotal sm.p sm live 0 0 then
+      stepSMList live rest (markFitCoverTotal sm.p sm 0 0 cov) (nextSM.push sm)
+    else
+      stepSMList live rest cov nextSM
+
+/-- Clear all 6 trace indices of an `S₃`-orbit in `live`. -/
+def clearOrbitLive (live : ByteArray) (orb : Orbit6) : ByteArray :=
+  let l0 := live.set! orb.j0 0
+  let l1 := l0.set! orb.j1 0
+  let l2 := l1.set! orb.j2 0
+  let l3 := l2.set! orb.j3 0
+  let l4 := l3.set! orb.j4 0
+  l4.set! orb.j5 0
+
+/-- Record elimination iteration `iter` on all 6 trace indices of an `S₃`-orbit in `ranks`. -/
+def setOrbitRanks (ranks : Array Nat) (orb : Orbit6) (iter : Nat) : Array Nat :=
+  let r0 := ranks.set! orb.j0 iter
+  let r1 := r0.set! orb.j1 iter
+  let r2 := r1.set! orb.j2 iter
+  let r3 := r2.set! orb.j3 iter
+  let r4 := r3.set! orb.j4 iter
+  r4.set! orb.j5 iter
+
+/-- Structural fold over the orbit list in one elimination round. -/
+def stepOrbitsList (cover : ByteArray) (iter : Nat) :
+    List Orbit6 → Array Orbit6 → ByteArray → Array Nat → Array Orbit6 × ByteArray × Array Nat
+  | [], nextOrbits, live, ranks => (nextOrbits, live, ranks)
+  | orb :: rest, nextOrbits, live, ranks =>
+    if cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1 then
+      stepOrbitsList cover iter rest (nextOrbits.push orb) live ranks
+    else
+      stepOrbitsList cover iter rest nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter)
+
+def reducerStep (N : Nat) (st : ReducerState) : ReducerState :=
+  let iter := st.iter + 1
+  let (cover, nextSM) :=
+    stepSMList st.live st.activeSM.toList (zeros N) (Array.mkEmpty st.activeSM.size)
+  let (nextOrbits, live, ranks) :=
+    stepOrbitsList cover iter st.orbits.toList (Array.mkEmpty st.orbits.size) st.live st.ranks
+  {
+    live := live,
+    orbits := nextOrbits,
+    activeSM := nextSM,
+    ranks := ranks,
+    iter := iter,
+    changed := nextOrbits.size != st.orbits.size
+  }
+
+def reducerStepLoopUnused (N : Nat) (st : ReducerState) : ReducerState := Id.run do
   let iter := st.iter + 1
   let mut cover := zeros N
   let mut nextSM : Array SMData := Array.mkEmpty st.activeSM.size

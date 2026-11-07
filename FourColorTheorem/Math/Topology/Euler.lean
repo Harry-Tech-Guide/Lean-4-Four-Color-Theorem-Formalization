@@ -79,8 +79,8 @@ theorem euler_initial_charge_sum_eq_120 (V E F : Int)
 ### Topological Duality Invariants for `numNodes`, `numEdges`, `numFaces`, and `EulerChar`
 -/
 
-instance instBEqDualDart (H : Hypermap) [BEq H.Dart] : BEq H.dual.Dart := ‹BEq H.Dart›
-instance instDecidableEqDualDart (H : Hypermap) [DecidableEq H.Dart] : DecidableEq H.dual.Dart := ‹DecidableEq H.Dart›
+local instance instBEqDualDart (H : Hypermap) [BEq H.Dart] : BEq H.dual.Dart := ‹BEq H.Dart›
+local instance instDecidableEqDualDart (H : Hypermap) [DecidableEq H.Dart] : DecidableEq H.dual.Dart := ‹DecidableEq H.Dart›
 
 /-- The number of edges of `H.dual` is definitionally equal to the number of edges of `H`. -/
 @[simp] theorem numEdges_dual (H : Hypermap) [BEq H.Dart] (fuel : Nat) (l : List H.Dart) :

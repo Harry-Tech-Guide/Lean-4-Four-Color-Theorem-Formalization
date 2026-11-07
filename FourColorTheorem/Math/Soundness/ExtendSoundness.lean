@@ -356,6 +356,191 @@ theorem extend_soundness_of_extend (c : Configuration) (earlier : Array (Array N
       have h_diff := h_no_conflicts i hi j h_in h_gt
       exact h_diff h_col_eq.symm
 
+/-- Well-formed earlier-adjacency condition: every entry in `earlier[v]` is a strictly
+    earlier vertex (`u < v`) that is adjacent to `v` in `c`. -/
+def IsWellFormedEarlier (c : Configuration) (earlier : Array (Array Nat)) : Prop :=
+  ∀ v < c.totalNodes, ∀ u ∈ (earlier.getD v #[]).toList, u < v ∧ c.adj v u = true
+
+theorem colorFree_of_valid (nbrs : Array Nat) (col : Array Nat) (c : Nat)
+    (h_diff : ∀ x ∈ nbrs.toList, getCol col x ≠ c) :
+    colorFree nbrs col c = true := by
+  dsimp [colorFree]
+  apply List.all_eq_true.mpr
+  intro x hx
+  have hne := h_diff x hx
+  dsimp [getCol] at hne
+  exact bne_iff_ne.mpr hne
+
+/-- If any color `c < 4` is free at vertex `v < n` and leads to a successful extension,
+    then `(extend earlier n v col).1 = true`. -/
+theorem extend_step_complete (earlier : Array (Array Nat)) (n v : Nat) (col : Array Nat)
+    (hv : v < n) (c : Nat) (hc : c < 4)
+    (h_cf : colorFree (earlier.getD v #[]) col c = true)
+    (h_ok : (extend earlier n (v + 1) (col.set! v c)).1 = true) :
+    (extend earlier n v col).1 = true := by
+  let nbrs := earlier.getD v #[]
+  let r0 := if colorFree nbrs col 0 then extend earlier n (v + 1) (col.set! v 0) else (false, col)
+  let r1 := if colorFree nbrs col 1 then extend earlier n (v + 1) (col.set! v 1) else (false, col)
+  let r2 := if colorFree nbrs col 2 then extend earlier n (v + 1) (col.set! v 2) else (false, col)
+  let r3 := if colorFree nbrs col 3 then extend earlier n (v + 1) (col.set! v 3) else (false, col)
+  have h_res : extend earlier n v col =
+      (if r0.1 then r0 else if r1.1 then r1 else if r2.1 then r2 else if r3.1 then r3 else (false, col)) := by
+    conv => lhs; rw [extend]; rw [dif_pos hv]
+  rw [h_res]
+  by_cases hr0 : r0.1 = true
+  · rw [if_pos hr0]; exact hr0
+  · rw [if_neg hr0]
+    by_cases hr1 : r1.1 = true
+    · rw [if_pos hr1]; exact hr1
+    · rw [if_neg hr1]
+      by_cases hr2 : r2.1 = true
+      · rw [if_pos hr2]; exact hr2
+      · rw [if_neg hr2]
+        by_cases hr3 : r3.1 = true
+        · rw [if_pos hr3]; exact hr3
+        · exfalso
+          have hc_cases : c = 0 ∨ c = 1 ∨ c = 2 ∨ c = 3 := by omega
+          rcases hc_cases with rfl | rfl | rfl | rfl
+          · apply hr0; dsimp [r0, nbrs]; rw [if_pos h_cf]; exact h_ok
+          · apply hr1; dsimp [r1, nbrs]; rw [if_pos h_cf]; exact h_ok
+          · apply hr2; dsimp [r2, nbrs]; rw [if_pos h_cf]; exact h_ok
+          · apply hr3; dsimp [r3, nbrs]; rw [if_pos h_cf]; exact h_ok
+
+/-- Inductive completeness of `FastReducer.extend`:
+    if a valid configuration coloring `full` agrees with `col` on all vertices `< v`,
+    then `(extend earlier n v col).1 = true`. -/
+theorem extend_complete_ind (c : Configuration) (earlier : Array (Array Nat))
+    (h_wf : IsWellFormedEarlier c earlier)
+    (full : Nat → Color) (h_valid : IsValidConfigColoring c full)
+    (k : Nat) :
+    ∀ (v : Nat) (col : Array Nat),
+      c.totalNodes - v ≤ k →
+      col.size ≥ c.totalNodes →
+      (∀ i < v, getCol col i = (full i).toNat) →
+      (extend earlier c.totalNodes v col).1 = true := by
+  induction k with
+  | zero =>
+    intro v col h_le _ _
+    have hv : ¬ (v < c.totalNodes) := by omega
+    rw [extend, dif_neg hv]
+  | succ k ih =>
+    intro v col h_le h_sz h_agree
+    by_cases hv : v < c.totalNodes
+    · let cv := (full v).toNat
+      have hcv_lt : cv < 4 := by
+        dsimp [cv]; cases (full v) <;> decide
+      have h_cf : colorFree (earlier.getD v #[]) col cv = true := by
+        apply colorFree_of_valid
+        intro u hu
+        rcases h_wf v hv u hu with ⟨hu_lt, hadj⟩
+        rw [h_agree u hu_lt]
+        intro h_eq
+        have h_col_eq : full u = full v := by
+          have : colorOfNat (full u).toNat = colorOfNat (full v).toNat := by
+            dsimp [cv] at h_eq
+            rw [h_eq]
+          rwa [colorOfNat_toNat, colorOfNat_toNat] at this
+        have hu_tot : u < c.totalNodes := by omega
+        exact h_valid v u hv hu_tot hadj h_col_eq.symm
+      let col1 := col.set! v cv
+      have h_sz1 : col1.size ≥ c.totalNodes := by
+        rw [size_set!]; exact h_sz
+      have hv_sz : v < col.size := by omega
+      have h_agree1 : ∀ i < v + 1, getCol col1 i = (full i).toNat := by
+        intro i hi
+        by_cases hiv : i = v
+        · subst hiv
+          exact getCol_set_eq col i cv hv_sz
+        · have hi_lt : i < v := by omega
+          rw [getCol_set_ne col v cv i hv_sz hiv]
+          exact h_agree i hi_lt
+      have h_le1 : c.totalNodes - (v + 1) ≤ k := by omega
+      have h_ok_step := ih (v + 1) col1 h_le1 h_sz1 h_agree1
+      exact extend_step_complete earlier c.totalNodes v col hv cv hcv_lt h_cf h_ok_step
+    · rw [extend, dif_neg hv]
+
+/-- Completeness of `FastReducer.extend`:
+    if `b` extends to the interior of `c` and `IsWellFormedEarlier c earlier` holds,
+    then `(extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true`. -/
+theorem extend_complete (c : Configuration) (earlier : Array (Array Nat))
+    (h_wf : IsWellFormedEarlier c earlier)
+    (b : BoundaryColoring c) (h_ext : extendsToInterior c b) :
+    (extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true := by
+  rcases h_ext with ⟨full, h_ring, h_valid⟩
+  have h_r_le : c.ringSize ≤ c.totalNodes := by
+    dsimp [Configuration.totalNodes]; omega
+  have h_sz : (initCol c b).size ≥ c.totalNodes := by
+    rw [initCol_size]; omega
+  have h_agree : ∀ i < c.ringSize, getCol (initCol c b) i = (full i).toNat := by
+    intro i hi
+    rw [getCol_initCol_ring c b i hi h_r_le, h_ring i hi]
+  exact extend_complete_ind c earlier h_wf full h_valid
+    (c.totalNodes - c.ringSize) c.ringSize (initCol c b) (Nat.le_refl _) h_sz h_agree
+
+/-- Exact decision equivalence for `FastReducer.extend`:
+    for any valid boundary coloring `b`, `extend` returns `true` if and only if `extendsToInterior c b`. -/
+theorem extend_iff_extendsToInterior (c : Configuration) (earlier : Array (Array Nat))
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_wf : IsWellFormedEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (b : BoundaryColoring c) (hb : IsValidBoundaryColoring c b) :
+    (extend earlier c.totalNodes c.ringSize (initCol c b)).1 = true ↔
+      extendsToInterior c b :=
+  ⟨extend_soundness_of_extend c earlier h_earlier h_irrefl b hb,
+   extend_complete c earlier h_wf b⟩
+
+/-- If `σ : Color → Color` is injective, `extendsToInterior c b` implies `extendsToInterior c (fun i => σ (b i))`. -/
+theorem extendsToInterior_perm (c : Configuration) (b : BoundaryColoring c)
+    (σ : Color → Color) (h_inj : ∀ col1 col2, σ col1 = σ col2 → col1 = col2)
+    (h_ext : extendsToInterior c b) :
+    extendsToInterior c (fun i => σ (b i)) := by
+  rcases h_ext with ⟨full, h_ring, h_valid⟩
+  refine ⟨fun i => σ (full i), ?_, ?_⟩
+  · intro i hi
+    dsimp
+    rw [h_ring i hi]
+  · intro i j hi hj hadj h_eq
+    exact h_valid i j hi hj hadj (h_inj (full i) (full j) h_eq)
+
+/-- If `σ : Color → Color` is an involution (`∀ col, σ (σ col) = col`),
+    `extendsToInterior` is invariant under relabeling by `σ`. -/
+theorem extendsToInterior_involution_iff (c : Configuration) (b : BoundaryColoring c)
+    (σ : Color → Color) (h_inv : ∀ col, σ (σ col) = col) :
+    extendsToInterior c (fun i => σ (b i)) ↔ extendsToInterior c b := by
+  have h_inj : ∀ col1 col2, σ col1 = σ col2 → col1 = col2 := by
+    intro col1 col2 h
+    have := congrArg σ h
+    rwa [h_inv, h_inv] at this
+  constructor
+  · intro h_ext
+    have h2 := extendsToInterior_perm c (fun i => σ (b i)) σ h_inj h_ext
+    have h_id : (fun i => σ (σ (b i))) = b := by
+      funext i; exact h_inv (b i)
+    rwa [h_id] at h2
+  · exact extendsToInterior_perm c b σ h_inj
+
+/-- Under `IsSoundEarlier`, `IsWellFormedEarlier`, and `IsIrreflexiveAdj`,
+    `FastReducer.extend` is invariant under any color involution `σ` on valid boundary colorings. -/
+theorem extend_involution_eq (c : Configuration) (earlier : Array (Array Nat))
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_wf : IsWellFormedEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (b : BoundaryColoring c) (hb : IsValidBoundaryColoring c b)
+    (σ : Color → Color) (h_inv : ∀ col, σ (σ col) = col) :
+    (extend earlier c.totalNodes c.ringSize (initCol c (fun i => σ (b i)))).1 =
+      (extend earlier c.totalNodes c.ringSize (initCol c b)).1 := by
+  have h_inj : ∀ col1 col2, σ col1 = σ col2 → col1 = col2 := by
+    intro col1 col2 h
+    have := congrArg σ h
+    rwa [h_inv, h_inv] at this
+  have hb_σ : IsValidBoundaryColoring c (fun i => σ (b i)) := by
+    intro i j hi hj hadj h_eq
+    exact hb i j hi hj hadj (h_inj (b i) (b j) h_eq)
+  have h_iff1 := extend_iff_extendsToInterior c earlier h_earlier h_wf h_irrefl (fun i => σ (b i)) hb_σ
+  have h_iff2 := extend_iff_extendsToInterior c earlier h_earlier h_wf h_irrefl b hb
+  have h_ext_iff := extendsToInterior_involution_iff c b σ h_inv
+  exact Bool.eq_iff_iff.mpr (h_iff1.trans (h_ext_iff.trans h_iff2.symm))
+
 end Soundness
 end Math
 

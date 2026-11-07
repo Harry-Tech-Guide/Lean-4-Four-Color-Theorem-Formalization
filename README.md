@@ -78,8 +78,8 @@ flowchart TD
 
 | Phase | Deliverable | Est. new Lean | Risk |
 | :--- | :--- | :--- | :--- |
-| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis (kernel refinement, Lemma (a) representation, iteration elimination, contract soundness) | 4k–10k | Medium |
-| 2 | Fuel-free orbits/components, Euler genus, duality, combinatorial Jordan property | 5k–10k | Medium |
+| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis (kernel refinement, Lemma (a) representation, iteration elimination, contract soundness) — *In progress: `S₃` color-symmetry reduction (`full_representation_of_theta1`), `LiveZero` C-reduction (`fast_c_sound_of_live_zero`), `c_contract_edges_nonempty`, `extend` completeness & involution invariance (`extend_iff_extendsToInterior`, `extend_involution_eq`), structural reflection (`unavoidable_is_ring_cycle`, `unavoidable_is_well_formed_earlier`), `xorSwapChoice_valid`, `smFitTree_eq_smFitIndex`, `boundaryTrace_relabel`, `smFitIndex_flipBits`, and `eliminated_orb_final_rank_and_live` proved* | 4k–10k | Medium |
+| 2 | Fuel-free orbits/components, Euler genus, duality, combinatorial Jordan property — *In progress: finite pigeonhole orbit closure (`orbitClosesWithin_of_complete`), unconditional fuel-independence (`getOrbit_fuel_eq_of_complete`, `countOrbits_fuel_eq_of_complete`), orbit equivalence relation, and topological duality (`numNodes_dual_of_complete`, `numFaces_dual_of_complete`, `EulerChar_dual_of_complete`) proved* | 5k–10k | Medium |
 | 3 | Structure of a minimal counterexample (Birkhoff diamond / 6-connectivity, min degree 5) | 5k–10k | High |
 | 4 | Faithful `appearsIn` + D- and C-reduction transfer to real planar maps (may require re-certifying the 633) | 6k–12k | High |
 | 5 | Soundness of the discharging trees against real cartwheels (may require new certificates) | 8k–15k | Very high |
