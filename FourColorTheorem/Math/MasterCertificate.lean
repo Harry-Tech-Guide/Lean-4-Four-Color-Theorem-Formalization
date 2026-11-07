@@ -13,6 +13,7 @@ import FourColorTheorem.Math.Reducibility
 import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
 import FourColorTheorem.Math.Soundness.StructuralVerification
+import FourColorTheorem.Math.CheckerSoundness.IterationElimination
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000
@@ -658,6 +659,62 @@ theorem rsst_all_unavoidable_reducible (c : Configuration)
   cases hCert with
   | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)
   | inr hC => exact Or.inr (rsst_c_certificate_soundness c hC)
+
+/-- **Stage D3 D-Reducibility Soundness Theorem (`rsst_d_sound_of_checkFast`):**
+    For any unavoidable configuration `c = theUnavoidableSet[idx]!` (`idx < 633`),
+    `IsSoundEarlier`, `IsWellFormedEarlier`, and `IsIrreflexiveAdj` are discharged by reflection,
+    and `IterationEliminationHypothesis` is reduced to `InitialLiveSpec`, `FullRepresentationHypothesis`,
+    and `checkFastTotal = true`. -/
+theorem rsst_d_sound_of_checkFast (c : Configuration) (idx : Nat) (h_lt : idx < 633)
+    (h_c_eq : c = theUnavoidableSet[idx]!)
+    (h_check : Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
+      (canonicalSMData c) Batch.sharedPow3 = true)
+    (h_rep : Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3)
+    (h_init : CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier
+      (canonicalSMData c) Batch.sharedPow3) :
+    IsDReducible c := by
+  have h_irrefl : Soundness.IsIrreflexiveAdj c := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_irreflexive idx h_lt
+  have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_sound_earlier idx h_lt
+  have h_wf : Soundness.IsWellFormedEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact CheckerSoundness.unavoidable_is_well_formed_earlier idx h_lt
+  exact CheckerSoundness.fast_d_sound_of_initialLiveSpec c sharedCfgs[idx]!.earlier
+    (canonicalSMData c) Batch.sharedPow3 h_check h_earlier h_wf h_irrefl h_rep h_init
+
+/-- **Stage D3 C-Reducibility Soundness Theorem (`rsst_c_sound_of_contract_check`):**
+    For any C-certified unavoidable configuration `c = theUnavoidableSet[idx]!` (`idx < 633`, `idx ∈ certified_c_indices`),
+    `c.contractEdges ≠ []`, `IsSoundEarlier`, `IsWellFormedEarlier`, and `IsIrreflexiveAdj` are discharged by reflection,
+    and `LiveZeroIterationEliminationHypothesis` is reduced to `InitialLiveSpec`, `FullRepresentationHypothesis`,
+    `ContractCheckSoundnessHypothesis`, and `runContractCheckTotal = true`. -/
+theorem rsst_c_sound_of_contract_check (c : Configuration) (idx : Nat) (h_lt : idx < 633)
+    (hc : idx ∈ certified_c_indices)
+    (h_c_eq : c = theUnavoidableSet[idx]!)
+    (h_rep : Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3)
+    (h_init : CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier
+      (canonicalSMData c) Batch.sharedPow3)
+    (h_csound_chk : Soundness.ContractCheckSoundnessHypothesis c sharedCfgs[idx]!.earlier Batch.sharedPow3
+      (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live)
+    (h_run : Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
+      (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true) :
+    IsCReducible c := by
+  have h_contract : c.contractEdges ≠ [] := by
+    rw [h_c_eq, ← unavoidable_get_eq_getElem! idx h_lt]
+    exact c_contract_edges_nonempty idx h_lt hc
+  have h_irrefl : Soundness.IsIrreflexiveAdj c := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_irreflexive idx h_lt
+  have h_earlier : Soundness.IsSoundEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact Soundness.unavoidable_is_sound_earlier idx h_lt
+  have h_wf : Soundness.IsWellFormedEarlier c sharedCfgs[idx]!.earlier := by
+    rw [h_c_eq]
+    exact CheckerSoundness.unavoidable_is_well_formed_earlier idx h_lt
+  exact CheckerSoundness.fast_c_sound_of_initialLiveSpec c sharedCfgs[idx]!.earlier
+    (canonicalSMData c) Batch.sharedPow3 h_contract h_earlier h_wf h_irrefl h_rep h_init h_csound_chk h_run
 
 end MasterCertificate
 end Math
