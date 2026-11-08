@@ -11,8 +11,7 @@ open FastReducer
 def cbatch02_indices : List Nat :=
   [25]
 
-theorem cert_config_25_c_red : checkIdxCFast (buildSMData 9 sharedPow3) 25 = true :=
-  KernelReducer.verifyIdxC_of_D 25 (by kernel_rfl)
+theorem cert_config_25_c_red : checkIdxCFast (buildSMData 9 sharedPow3) 25 = true := by kernel_rfl
 
 theorem cert_cbatch02_r9 : checkCRingBatch 9 cbatch02_indices = true := by
   dsimp only [cbatch02_indices, checkCRingBatch, List.all]

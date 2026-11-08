@@ -691,9 +691,9 @@ def buildRingColLoop {α : Type} [Inhabited α] (mMax : Nat) :
       let totalMask := Nat.sub (Nat.shiftLeft 1 P) 1
       seqNat canonValid (seqNat totalMask
         (k canonValid totalMask
-          (RingColMasks.mk 0 canonValid 0 0 0 ::
-           RingColMasks.mk 1 0 canonValid 0 0 ::
-           RingColMasks.mk mMax 0 x1_00 x1_30 x1_20 :: []))))
+          (RingColMasks.mk 0 0 canonValid 0 0 ::
+           RingColMasks.mk (Nat.sub mMax 1) 0 x1_00 x1_30 x1_20 ::
+           RingColMasks.mk mMax x1_00 0 x1_20 x1_30 :: []))))
     (fun _ ih u P
          x1_00 x1_01 x1_10 x1_11 x1_20 x1_21 x1_30 x1_31
          k =>
@@ -711,7 +711,7 @@ def buildRingColLoop {α : Type} [Inhabited α] (mMax : Nat) :
               let c2_u := Nat.land canonValid (Nat.mul x1_31 repFactor)
               let c3_u := Nat.land canonValid (Nat.mul x1_21 repFactor)
               seqNat c0_u (seqNat c1_u (seqNat c2_u (seqNat c3_u
-                (k canonValid totalMask (RingColMasks.mk u c0_u c1_u c2_u c3_u :: rest))))))))
+                (k canonValid totalMask (RingColMasks.mk (Nat.sub u 1) c0_u c1_u c2_u c3_u :: rest))))))))
 
 /-- Compute `canonValidMask` and `rings : List RingColMasks` for ring size `r = mMax + 1` in CPS. -/
 def withRingColMasks {α : Type} [Inhabited α] (mMax : Nat) (k : Nat → List RingColMasks → α) : α :=
@@ -1317,6 +1317,42 @@ def verifyIdxD (idx : Nat) : Bool :=
 def verifyIdxC (idx : Nat) : Bool :=
   let c := (getRConfBox idx).val
   verifyRConfC (buildEngine c.r) c
+
+/-- Run up to `fuel` rounds of Kempe reduction for D-reducibility with early fixpoint exit (`nextL2 == L2`). -/
+def runDLiveLoopFast
+    (pTop : Nat)
+    (swapSteps1 : List SwapStep)
+    (packLevels : List (List PackCellSpec))
+    (unpackRevLevels : List (List UnpackCellSpec))
+    (bucketSpecs : List BucketCatalanSpec)
+    (fuel : Nat) : Nat → Bool :=
+  @Nat.rec (fun _ => Nat → Bool)
+    (fun L2 => Nat.beq L2 0)
+    (fun _ ih L2 =>
+      selectBool (Nat.beq L2 0)
+        true
+        (let nextL2 := kempeRound pTop swapSteps1 packLevels unpackRevLevels bucketSpecs L2
+         seqNat nextL2
+           (selectBool (Nat.beq nextL2 L2) false (ih nextL2))))
+    fuel
+
+def runEngineDFast (ke : KempeEngine) (fuel L2 : Nat) : Bool :=
+  @KempeEngine.rec (fun _ => Bool)
+    (fun pTop swapSteps1 packLevels unpackRevLevels bucketSpecs =>
+      runDLiveLoopFast pTop swapSteps1 packLevels unpackRevLevels bucketSpecs fuel L2)
+    ke
+
+/-- Verify D-reducibility of configuration at index `idx` with early fixpoint exit on non-D-reducible configs. -/
+def verifyIdxDFast (idx : Nat) : Bool :=
+  let c := (getRConfBox idx).val
+  let rVal := c.r
+  let mMaxVal := Nat.sub rVal 1
+  let mMax1 := Nat.sub mMaxVal 1
+  let swapSteps1 := (buildSwapSteps mMax1).val
+  let live0 := computeInitialLiveD rVal mMaxVal swapSteps1 c
+  selectBool (Nat.beq live0 0)
+    true
+    (runEngineDFast (buildKempeEngine rVal) 120 live0)
 
 /-- Compute initial `L2` for configuration `idx`. -/
 def initLiveIdx (idx : Nat) : Nat :=

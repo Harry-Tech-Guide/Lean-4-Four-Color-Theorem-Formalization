@@ -11,20 +11,15 @@ open FastReducer
 def cbatch07_indices : List Nat :=
   [55, 57, 59, 113, 115]
 
-theorem cert_config_55_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 55 = true :=
-  KernelReducer.verifyIdxC_of_D 55 (by kernel_rfl)
+theorem cert_config_55_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 55 = true := by kernel_rfl
 
-theorem cert_config_57_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 57 = true :=
-  KernelReducer.verifyIdxC_of_D 57 (by kernel_rfl)
+theorem cert_config_57_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 57 = true := by kernel_rfl
 
-theorem cert_config_59_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 59 = true :=
-  KernelReducer.verifyIdxC_of_D 59 (by kernel_rfl)
+theorem cert_config_59_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 59 = true := by kernel_rfl
 
-theorem cert_config_113_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 113 = true :=
-  KernelReducer.verifyIdxC_of_D 113 (by kernel_rfl)
+theorem cert_config_113_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 113 = true := by kernel_rfl
 
-theorem cert_config_115_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 115 = true :=
-  KernelReducer.verifyIdxC_of_D 115 (by kernel_rfl)
+theorem cert_config_115_c_red : checkIdxCFast (buildSMData 11 sharedPow3) 115 = true := by kernel_rfl
 
 theorem cert_cbatch07_r11 : checkCRingBatch 11 cbatch07_indices = true := by
   dsimp only [cbatch07_indices, checkCRingBatch, List.all]

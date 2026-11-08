@@ -11,23 +11,17 @@ open FastReducer
 def cbatch18_indices : List Nat :=
   [342, 344, 345, 346, 352, 353]
 
-theorem cert_config_342_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 342 = true :=
-  KernelReducer.verifyIdxC_of_D 342 (by kernel_rfl)
+theorem cert_config_342_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 342 = true := by kernel_rfl
 
-theorem cert_config_344_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 344 = true :=
-  KernelReducer.verifyIdxC_of_D 344 (by kernel_rfl)
+theorem cert_config_344_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 344 = true := by kernel_rfl
 
-theorem cert_config_345_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 345 = true :=
-  KernelReducer.verifyIdxC_of_D 345 (by kernel_rfl)
+theorem cert_config_345_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 345 = true := by kernel_rfl
 
-theorem cert_config_346_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 346 = true :=
-  KernelReducer.verifyIdxC_of_D 346 (by kernel_rfl)
+theorem cert_config_346_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 346 = true := by kernel_rfl
 
-theorem cert_config_352_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 352 = true :=
-  KernelReducer.verifyIdxC_of_D 352 (by kernel_rfl)
+theorem cert_config_352_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 352 = true := by kernel_rfl
 
-theorem cert_config_353_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 353 = true :=
-  KernelReducer.verifyIdxC_of_D 353 (by kernel_rfl)
+theorem cert_config_353_c_red : checkIdxCFast (buildSMData 12 sharedPow3) 353 = true := by kernel_rfl
 
 theorem cert_cbatch18_r12 : checkCRingBatch 12 cbatch18_indices = true := by
   dsimp only [cbatch18_indices, checkCRingBatch, List.all]

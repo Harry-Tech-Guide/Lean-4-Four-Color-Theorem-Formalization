@@ -437,14 +437,13 @@ def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
 /-- Kernel-to-Mathematical Certificate Soundness Bridge:
     Connects `KernelReducer.verifyIdxD idx = true` to `HasDCertificateWitness` and
     `idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`.
-    WARNING (Stage K0 / K0′ Audit): `KernelReducer.kempeRound` orders ring edges as `(1, ..., r-2, 0, r-1)`,
-    transposing adjacent edges `0` and `r - 1` relative to the geometric cycle `(0, 1, ..., r-1)`.
-    Because this omits genuine geometric matchings and causes `verifyIdxD` to return `true` on
-    C-reducible configurations (`idx = 3, 25, ...`), this bridge is computationally refuted:
-    for `idx = 3` (coloring `m = 4642`, trace `2308`, `154` surviving orbits) and `idx = 25`
-    (coloring `m = 18658`, trace `6943`, `81` surviving orbits), `IterationEliminationHypothesis`
-    (and hence `HasDCertificateWitness`) is false while `verifyIdxD idx = true`. It will be replaced
-    after re-certification against a corrected geometric kernel engine. -/
+    NOTE (Stages K1–K3): `KernelReducer.buildRingColLoop` has been fixed to use the canonical
+    $d_{r-2} = 0$ slice (geometric chord order $(0, 1, \dots, r-3, r-2, r-1)$), and all 138
+    `Batch/*` and `CBatch/*` modules are re-certified in-kernel (`249/249` D + `384/384` C =
+    `633/633` configurations, `0` false D-reducible configs). Discharging this bridge requires
+    proving the slice refinement theorem (`verifyIdxD` / `verifyIdxC` → `checkFastTotal` /
+    `runContractCheckTotal`) together with `InitialLiveSpec`, `FullRepresentationHypothesis`,
+    and `ContractCheckSoundnessHypothesis`. -/
 def KernelReducerSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
     let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
