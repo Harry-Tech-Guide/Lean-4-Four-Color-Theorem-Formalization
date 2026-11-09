@@ -274,13 +274,15 @@ theorem stepSMList_preserves_one (live : ByteArray) (sms : List SMData)
 
 /-- Fundamental Uncovered Matching Theorem:
     If trace index `j < cov.size` remains uncovered (`get! j != 1`) after `stepSMList`,
-    then every signed matching `sm ∈ sms` fitting `j` at `t = 0` (`smFitTree sm sm.p 0 0 0 = j`)
-    has `allFitLiveTotal sm.p sm live 0 0 = false`, and therefore possesses a parameter
-    `t < 1 <<< sm.p` whose leaf trace index `smFitTree sm sm.p 0 t 0` is not live (`live.get! idx != 1`). -/
+    then every signed matching `sm ∈ sms` fitting `j` at some `t₀ < 1 <<< sm.p`
+    (`smFitTree sm sm.p 0 t₀ 0 = j`) has `allFitLiveTotal sm.p sm live 0 0 = false`, and therefore
+    possesses a parameter `t < 1 <<< sm.p` whose leaf trace index `smFitTree sm sm.p 0 t 0`
+    is not live (`live.get! idx != 1`). -/
 theorem uncovered_of_stepSMList (live : ByteArray) (sms : List SMData)
     (cov : ByteArray) (nextSM : Array SMData) (j : Nat) (hj_bound : j < cov.size)
     (h_uncov : ((stepSMList live sms cov nextSM).1.get! j == 1) = false)
-    (sm : SMData) (hsm : sm ∈ sms) (h_fit0 : smFitTree sm sm.p 0 0 0 = j) :
+    (sm : SMData) (hsm : sm ∈ sms) (t₀ : Nat) (ht₀ : t₀ < 1 <<< sm.p)
+    (h_fit0 : smFitTree sm sm.p 0 t₀ 0 = j) :
     ∃ t < 1 <<< sm.p, (live.get! (smFitTree sm sm.p 0 t 0) == 1) = false := by
   induction sms generalizing cov nextSM with
   | nil => contradiction
@@ -293,14 +295,11 @@ theorem uncovered_of_stepSMList (live : ByteArray) (sms : List SMData)
       | true =>
         exfalso
         rw [h_all, if_pos rfl] at h_uncov
-        have h_zero_lt : 0 < 1 <<< sm.p := by
-          rw [Nat.shiftLeft_eq, Nat.one_mul]
-          exact Nat.two_pow_pos sm.p
-        have h_leaf_bound : smFitTree sm sm.p 0 0 0 < cov.size := by
+        have h_leaf_bound : smFitTree sm sm.p 0 t₀ 0 < cov.size := by
           rw [h_fit0]; exact hj_bound
         have h_cov1 : ((markFitCoverTotal sm.p sm 0 0 cov).get! j == 1) = true := by
           rw [← h_fit0]
-          exact markFitCoverTotal_sets_leaf sm.p sm 0 0 cov 0 h_zero_lt h_leaf_bound
+          exact markFitCoverTotal_sets_leaf sm.p sm 0 0 cov t₀ ht₀ h_leaf_bound
         have h_cov_end := stepSMList_preserves_one live rest
           (markFitCoverTotal sm.p sm 0 0 cov) (nextSM.push sm) j h_cov1
         rw [h_cov_end] at h_uncov
@@ -748,7 +747,7 @@ private theorem foldl_push_zero_size (L : List Nat) (b : ByteArray) :
 /-- Combined round-uncovered elimination lemma:
     Suppose `sm` satisfies the active-SM invariant at state `st` (either `sm ∈ st.activeSM.toList`
     or `sm` already has a non-live leaf in `st.live`).
-    If trace `j < N` is uncovered in round `st` and `smFitIndex sm 0 = j`,
+    If trace `j < N` is uncovered in round `st` and `smFitIndex sm t₀ = j` for some `t₀ < 1 <<< sm.p`,
     then `sm` has a parameter `t < 1 <<< sm.p` that is not live in `st.live` (and remains not live
     after any subsequent `runReducerLoop N fuel (reducerStep N st)`). -/
 theorem exists_not_live_of_uncovered_in_round (N : Nat) (st : ReducerState)
@@ -756,17 +755,17 @@ theorem exists_not_live_of_uncovered_in_round (N : Nat) (st : ReducerState)
     (h_uncov : ((stepSMList st.live st.activeSM.toList (zeros N) (Array.mkEmpty st.activeSM.size)).1.get! j == 1) = false)
     (sm : SMData)
     (h_inv : sm ∈ st.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st.live.get! (smFitIndex sm t) == 1) = false)
-    (h_fit0 : smFitIndex sm 0 = j) :
+    (t₀ : Nat) (ht₀ : t₀ < 1 <<< sm.p) (h_fit0 : smFitIndex sm t₀ = j) :
     ∃ t < 1 <<< sm.p, (st.live.get! (smFitIndex sm t) == 1) = false := by
   rcases h_inv with h_active | h_already_dead
-  · have h_fit_tree : smFitTree sm sm.p 0 0 0 = j := by
+  · have h_fit_tree : smFitTree sm sm.p 0 t₀ 0 = j := by
       rw [smFitTree_eq_smFitIndex]
       exact h_fit0
     have hj_zeros : j < (zeros N).size := by
       rw [zeros_size]
       exact hj_bound
     rcases uncovered_of_stepSMList st.live st.activeSM.toList (zeros N)
-        (Array.mkEmpty st.activeSM.size) j hj_zeros h_uncov sm h_active h_fit_tree with ⟨t, ht, h_dead⟩
+        (Array.mkEmpty st.activeSM.size) j hj_zeros h_uncov sm h_active t₀ ht₀ h_fit_tree with ⟨t, ht, h_dead⟩
     rw [smFitTree_eq_smFitIndex] at h_dead
     exact ⟨t, ht, h_dead⟩
   · exact h_already_dead

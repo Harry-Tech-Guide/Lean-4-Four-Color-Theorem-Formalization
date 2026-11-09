@@ -1,4 +1,5 @@
 import FourColorTheorem.Math.CheckerSoundness.InitialLiveProof
+import FourColorTheorem.Math.CheckerSoundness.BuildSMDataSoundness
 import FourColorTheorem.Math.Soundness.ContractSoundness
 
 namespace Math
@@ -265,9 +266,9 @@ theorem liveZeroIterationElimination_of_initialLiveSpec (c : Configuration) (ear
     · rw [h_eq_a]; exact ⟨hja_lt, hja_uncov⟩
     · rw [h_eq_b]; exact ⟨hjb_lt, hjb_uncov⟩
   refine ⟨θ, ?_⟩
-  intro sm hsm h_fit0
+  intro sm hsm ⟨t₀, ht₀, h_fit0⟩
   rcases exists_not_live_of_uncovered_in_round N st_k (boundaryTraceTheta c b θ pow3)
-      hθ_uncov.1 hθ_uncov.2 sm (h_sm_k sm hsm) h_fit0.symm with ⟨t, ht, h_dead⟩
+      hθ_uncov.1 hθ_uncov.2 sm (h_sm_k sm hsm) t₀ ht₀ h_fit0.symm with ⟨t, ht, h_dead⟩
   have h_not_in_k : ∀ orb' ∈ st_k.orbits.toList, ¬ inOrbit6 orb' (smFitIndex sm t) :=
     fun orb' h_mem => not_inOrbit6_of_not_live st_k.live orb' (smFitIndex sm t) (h_inv_k.allLive orb' h_mem) h_dead
   have h_not_in_step : ∀ orb' ∈ (reducerStep N st_k).orbits.toList, ¬ inOrbit6 orb' (smFitIndex sm t) :=
@@ -425,6 +426,40 @@ theorem fast_c_sound_of_wellFormed (c : Configuration) (earlier : Array (Array N
     IsCReducible c :=
   fast_c_sound_of_initialLiveSpec c earlier sms sharedPow3 h_contract h_ring h_earlier h_wf h_irrefl h_rep
     (initialLiveSpec_sharedPow3_of_wellFormed c earlier h_ring h_earlier h_wf h_irrefl hr_le) h_run
+
+/-- **Main Theorem A2.a (`fast_d_sound_canonical_of_wellFormed`):**
+    Fully unconditional D-reducibility checker soundness theorem for `buildSMDataTotal c.ringSize sharedPow3`:
+    `FullRepresentationHypothesis`, `InitialLiveSpec`, and `IterationEliminationHypothesis`
+    are all proved unconditionally! -/
+theorem fast_d_sound_canonical_of_wellFormed (c : Configuration) (earlier : Array (Array Nat))
+    (h_check : checkFastTotal (rconfOfConfig c earlier) (buildSMDataTotal c.ringSize sharedPow3) sharedPow3 = true)
+    (h_ring : IsRingCycle c)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_wf : IsWellFormedEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (hr_le : c.ringSize ≤ 15) :
+    IsDReducible c :=
+  fast_d_sound_of_wellFormed c earlier (buildSMDataTotal c.ringSize sharedPow3)
+    h_check h_ring h_earlier h_wf h_irrefl hr_le
+    (fullRepresentation_sharedPow3_of_ringCycle c h_ring)
+
+/-- **Main Theorem A2.b (`fast_c_sound_canonical_of_wellFormed`):**
+    Fully unconditional C-reducibility checker soundness theorem for `buildSMDataTotal c.ringSize sharedPow3`:
+    `FullRepresentationHypothesis`, `InitialLiveSpec`, `LiveZeroIterationEliminationHypothesis`,
+    and `ContractCheckSoundnessHypothesis` are all proved unconditionally! -/
+theorem fast_c_sound_canonical_of_wellFormed (c : Configuration) (earlier : Array (Array Nat))
+    (h_contract : c.contractEdges ≠ [])
+    (h_ring : IsRingCycle c)
+    (h_earlier : IsSoundEarlier c earlier)
+    (h_wf : IsWellFormedEarlier c earlier)
+    (h_irrefl : IsIrreflexiveAdj c)
+    (hr_le : c.ringSize ≤ 15)
+    (h_run : runContractCheckTotal (rconfOfConfig c earlier) sharedPow3
+      (computeFinalState (rconfOfConfig c earlier) (buildSMDataTotal c.ringSize sharedPow3) sharedPow3).live = true) :
+    IsCReducible c :=
+  fast_c_sound_of_wellFormed c earlier (buildSMDataTotal c.ringSize sharedPow3)
+    h_contract h_ring h_earlier h_wf h_irrefl hr_le
+    (fullRepresentation_sharedPow3_of_ringCycle c h_ring) h_run
 
 end CheckerSoundness
 end Math

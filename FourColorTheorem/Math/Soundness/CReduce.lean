@@ -375,7 +375,7 @@ def LiveZeroIterationEliminationHypothesis (c : Configuration) (earlier : Array 
     LiveZero c pow3 live b →
     constructedRank c earlier sms pow3 b > 0 →
     ∃ θ : ColorPairing, ∀ (sm : SMData), sm ∈ sms.toList →
-      (boundaryTraceTheta c b θ pow3 = smFitIndex sm 0) →
+      (∃ t₀ < 1 <<< sm.p, boundaryTraceTheta c b θ pow3 = smFitIndex sm t₀) →
       ∃ t, t < 1 <<< sm.p ∧
         (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (smFitIndex sm t) 0 <
           (computeEliminationRanks (rconfOfConfig c earlier) sms pow3).getD (boundaryTrace c b pow3) 0 ∧
@@ -408,16 +408,13 @@ theorem live_zero_eliminated_of_iteration (c : Configuration) (earlier : Array (
       rcases h_lz_elim b hb hP hr_pos with ⟨θ, hθ⟩
       refine ⟨θ, ?_⟩
       intro equiv_ab equiv_cd hPart
-      rcases h_rep b θ equiv_ab equiv_cd hb hPart with ⟨sm, hsm, S, hSwap, hS0, hTrace⟩
-      have h_zero_lt : 0 < 1 <<< sm.p := by
-        rw [Nat.shiftLeft_eq, Nat.one_mul]
-        exact Nat.two_pow_pos sm.p
-      have h_swap0 : boundaryKempeSwap c b θ (S 0) = b :=
-        boundaryKempeSwap_zero c b θ (S 0) hS0
-      have h_fit0 : boundaryTraceTheta c b θ pow3 = smFitIndex sm 0 := by
-        have hT0 := hTrace 0 h_zero_lt
+      rcases h_rep b θ equiv_ab equiv_cd hb hPart with ⟨sm, hsm, S, hSwap, ⟨t₀, ht₀, hSt₀⟩, hTrace⟩
+      have h_swap0 : boundaryKempeSwap c b θ (S t₀) = b :=
+        boundaryKempeSwap_zero c b θ (S t₀) hSt₀
+      have h_fit0 : ∃ t₀ < 1 <<< sm.p, boundaryTraceTheta c b θ pow3 = smFitIndex sm t₀ := by
+        have hT0 := hTrace t₀ ht₀
         rw [h_swap0] at hT0
-        exact hT0
+        exact ⟨t₀, ht₀, hT0⟩
       rcases hθ sm hsm h_fit0 with ⟨t, ht, hr_dec, hr_orb⟩
       have h_tr_t := hTrace t ht
       have hb_swapped : IsValidBoundaryColoring c (boundaryKempeSwap c b θ (S t)) :=
