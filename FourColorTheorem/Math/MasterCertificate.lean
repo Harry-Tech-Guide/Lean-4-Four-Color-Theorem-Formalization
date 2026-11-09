@@ -14,6 +14,7 @@ import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
 import FourColorTheorem.Math.Soundness.StructuralVerification
 import FourColorTheorem.Math.CheckerSoundness.IterationElimination
+import FourColorTheorem.Math.KernelSoundness.KernelBridgeProof
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000
@@ -415,44 +416,28 @@ theorem checkCConfigsHaveContracts_sound (L : List FastReducer.RConf) (base k : 
 def canonicalSMData (c : Configuration) : Array SMData :=
   CheckerSoundness.buildSMDataTotal c.ringSize Batch.sharedPow3
 
-/-- D-reducibility checker certificate package for configuration `c` at canonical index `idx`,
-    pinned explicitly to `canonicalSMData c` (`buildSMDataTotal c.ringSize sharedPow3`) and `sharedPow3`.
-    (`FullRepresentationHypothesis`, `InitialLiveSpec`, and `IterationEliminationHypothesis` are all
-    proved unconditionally via `fullRepresentation_sharedPow3_of_ringCycle`,
-    `initialLiveSpec_sharedPow3_of_wellFormed`, and `iterationElimination_of_checkFastTotal`.) -/
-def HasDCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
-  KernelReducer.verifyIdxD idx = true ∧
-  Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
-    (canonicalSMData c) Batch.sharedPow3 = true
+/-- D-reducibility checker certificate package for configuration `c` at canonical index `idx`:
+    `KernelReducer.verifyIdxD idx = true` (proved sound unconditionally via `KernelSoundness.verifyIdxD_sound`). -/
+def HasDCertificateWitness (_c : Configuration) (idx : Nat) : Prop :=
+  KernelReducer.verifyIdxD idx = true
 
-/-- C-reducibility checker certificate package for configuration `c` at canonical index `idx`,
-    pinned explicitly to `canonicalSMData c` (`buildSMDataTotal c.ringSize sharedPow3`) and `sharedPow3`.
-    (`c.contractEdges ≠ []`, `FullRepresentationHypothesis`, `InitialLiveSpec`,
-    `LiveZeroIterationEliminationHypothesis`, and `ContractCheckSoundnessHypothesis` are all proved
-    unconditionally via `c_contract_edges_nonempty`, `fullRepresentation_sharedPow3_of_ringCycle`,
-    `initialLiveSpec_sharedPow3_of_wellFormed`, `liveZeroIterationElimination_of_initialLiveSpec`,
-    and `contractCheckSoundness_of_wellFormed`.) -/
-def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
-  KernelReducer.verifyIdxC idx = true ∧
-  Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
-    (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true
+/-- C-reducibility checker certificate package for configuration `c` at canonical index `idx`:
+    `KernelReducer.verifyIdxC idx = true` (proved sound unconditionally via `KernelSoundness.verifyIdxC_sound`). -/
+def HasCCertificateWitness (_c : Configuration) (idx : Nat) : Prop :=
+  KernelReducer.verifyIdxC idx = true
 
 /-- Kernel-to-Mathematical Certificate Soundness Bridge:
     Connects `KernelReducer.verifyIdxD idx = true` to `HasDCertificateWitness` and
-    `idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`.
-    NOTE (Stages K1–K3, C2, D4 & A): `KernelReducer.buildRingColLoop` has been fixed to use the canonical
-    $d_{r-2} = 0$ slice (geometric chord order $(0, 1, \dots, r-3, r-2, r-1)$), all 138
-    `Batch/*` and `CBatch/*` modules are re-certified in-kernel (`249/249` D + `384/384` C =
-    `633/633` configurations, `0` false D-reducible configs), and `FullRepresentationHypothesis`,
-    `InitialLiveSpec`, `IterationEliminationHypothesis`, `LiveZeroIterationEliminationHypothesis`, and
-    `ContractCheckSoundnessHypothesis` are all proved unconditionally. Discharging this bridge
-    requires only proving the slice refinement theorem (`verifyIdxD` / `verifyIdxC` → `checkFastTotal` /
-    `runContractCheckTotal`). -/
+    `idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`. -/
 def KernelReducerSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
     let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
     (KernelReducer.verifyIdxD idx = true → HasDCertificateWitness c idx) ∧
     (idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true → HasCCertificateWitness c idx)
+
+/-- Unconditional proof of `KernelReducerSoundnessBridge`. -/
+theorem kernel_reducer_soundness_bridge : KernelReducerSoundnessBridge :=
+  fun _ _ => ⟨fun h => h, fun _ h => h⟩
 
 /-- Batch certificate soundness bridge across all 633 canonical configurations. -/
 def HasBatchSoundnessBridge : Prop :=
@@ -460,6 +445,24 @@ def HasBatchSoundnessBridge : Prop :=
     let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
     (idx ∈ certified_d_indices ∧ HasDCertificateWitness c idx) ∨
     (idx ∈ certified_c_indices ∧ HasCCertificateWitness c idx)
+
+/-- Derivation of `HasBatchSoundnessBridge` from `KernelReducerSoundnessBridge` and `master_suite_certifies_idx`:
+    Every index `idx < 633` is dispatched by the 138 in-kernel batch certificates to either
+    `certified_d_indices` (with `verifyIdxD idx = true`) or `certified_c_indices` (with `verifyIdxC idx = true`). -/
+theorem batch_soundness_of_kernel_bridge (hK : KernelReducerSoundnessBridge) :
+    HasBatchSoundnessBridge := by
+  intro idx h_lt
+  have hCert := master_suite_certifies_idx idx h_lt
+  have hKB := hK idx h_lt
+  cases hCert with
+  | inl hd =>
+    exact Or.inl ⟨hd.1, hKB.1 hd.2⟩
+  | inr hc =>
+    exact Or.inr ⟨hc.1, hKB.2 hc.1 hc.2⟩
+
+/-- Unconditional proof of `HasBatchSoundnessBridge` across all 633 canonical configurations. -/
+theorem rsst_batch_soundness_bridge : HasBatchSoundnessBridge :=
+  batch_soundness_of_kernel_bridge kernel_reducer_soundness_bridge
 
 /-- An unavoidable configuration is certified in the in-kernel RSST batch test suite
     if the master suite of all 138 batch reflection theorems holds, and its canonical
@@ -506,7 +509,7 @@ theorem certified_cases_iff (c : Configuration) :
     by the in-kernel batch suite (either D-reducible or C-reducible), witnessed directly
     by the master suite proof of all 138 computational batch theorems. -/
 theorem all_unavoidable_configs_certified (c : Configuration)
-    (hBridge : HasBatchSoundnessBridge) (h : c ∈ theUnavoidableSet) :
+    (h : c ∈ theUnavoidableSet) :
     isCertifiedUnavoidableConfig c := by
   rcases Array.getElem_of_mem h with ⟨idx, h_idx_lt, h_get⟩
   have h_size : theUnavoidableSet.size = 633 := unavoidable_size_eq
@@ -514,7 +517,7 @@ theorem all_unavoidable_configs_certified (c : Configuration)
     rw [← h_size]
     exact h_idx_lt
   have h_eq : theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c := h_get
-  have hB := hBridge idx h_lt
+  have hB := rsst_batch_soundness_bridge idx h_lt
   refine ⟨master_suite_verified, idx, h_lt, h_eq, ?_⟩
   rw [← h_eq]
   exact hB
@@ -546,20 +549,6 @@ theorem c_contract_edges_nonempty (idx : Nat) (h_lt : idx < 633) (hc : idx ∈ c
   rw [h_arr]
   have hc0 : (0 + idx) ∈ certified_c_indices := by rw [Nat.zero_add]; exact hc
   exact checkCConfigsHaveContracts_sound parsedRConfList 0 idx c_configs_have_contracts_verified h_len hc0
-
-/-- Derivation of `HasBatchSoundnessBridge` from `KernelReducerSoundnessBridge` and `master_suite_certifies_idx`:
-    Every index `idx < 633` is dispatched by the 138 in-kernel batch certificates to either
-    `certified_d_indices` (with `verifyIdxD idx = true`) or `certified_c_indices` (with `verifyIdxC idx = true`). -/
-theorem batch_soundness_of_kernel_bridge (hK : KernelReducerSoundnessBridge) :
-    HasBatchSoundnessBridge := by
-  intro idx h_lt
-  have hCert := master_suite_certifies_idx idx h_lt
-  have hKB := hK idx h_lt
-  cases hCert with
-  | inl hd =>
-    exact Or.inl ⟨hd.1, hKB.1 hd.2⟩
-  | inr hc =>
-    exact Or.inr ⟨hc.1, hKB.2 hc.1 hc.2⟩
 
 /-- **Stage A + D4 D-Reducibility Soundness Theorem (`rsst_d_sound_of_checkFast`):**
     For any unavoidable configuration `c = theUnavoidableSet[idx]!` (`idx < 633`),
@@ -623,50 +612,50 @@ theorem rsst_c_sound_of_contract_check (c : Configuration) (idx : Nat) (h_lt : i
     h_contract h_ring h_earlier h_wf h_irrefl hr_le h_run
 
 /-- RSST D-Certificate Witness Theorem:
-    Unpacks `isCertifiedDConfig c` into `verifyIdxD idx = true` and `checkFastTotal = true`. -/
+    Unpacks `isCertifiedDConfig c` into `verifyIdxD idx = true`. -/
 theorem rsst_d_certificate_witness (c : Configuration) :
   isCertifiedDConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633),
       theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
-      KernelReducer.verifyIdxD idx = true ∧
-      Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
-        (canonicalSMData c) Batch.sharedPow3 = true := by
-  rintro ⟨_hMaster, idx, h_lt, h_eq, _hd, h_ver, h_check⟩
-  exact ⟨idx, h_lt, h_eq, h_ver, h_check⟩
+      KernelReducer.verifyIdxD idx = true := by
+  rintro ⟨_hMaster, idx, h_lt, h_eq, _hd, h_ver⟩
+  exact ⟨idx, h_lt, h_eq, h_ver⟩
 
 /-- RSST D-Certificate Soundness Theorem:
     A configuration certified as D-reducible is mathematically D-reducible,
-    proved directly via `rsst_d_sound_of_checkFast`. -/
+    proved unconditionally via `KernelSoundness.verifyIdxD_sound`. -/
 theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig c) :
     IsDReducible c := by
-  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, h_eq, _h_ver, h_check⟩
+  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, h_eq, h_ver⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
-  exact rsst_d_sound_of_checkFast c idx h_lt h_c_eq h_check
+  rw [h_c_eq]
+  exact KernelSoundness.verifyIdxD_sound idx h_lt h_ver
 
 /-- RSST C-Certificate Witness Theorem:
-    Unpacks `isCertifiedCConfig c` into `idx ∈ certified_c_indices`, `verifyIdxC idx = true`,
-    and `runContractCheckTotal = true`. -/
+    Unpacks `isCertifiedCConfig c` into `idx ∈ certified_c_indices` and `verifyIdxC idx = true`. -/
 theorem rsst_c_certificate_witness (c : Configuration) :
   isCertifiedCConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633),
       theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
       idx ∈ certified_c_indices ∧
-      KernelReducer.verifyIdxC idx = true ∧
-      Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
-        (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true := by
-  rintro ⟨_hMaster, idx, h_lt, h_eq, hc, h_ver, h_run⟩
-  exact ⟨idx, h_lt, h_eq, hc, h_ver, h_run⟩
+      KernelReducer.verifyIdxC idx = true := by
+  rintro ⟨_hMaster, idx, h_lt, h_eq, hc, h_ver⟩
+  exact ⟨idx, h_lt, h_eq, hc, h_ver⟩
 
 /-- RSST C-Certificate Soundness Theorem:
     A configuration certified as C-reducible is mathematically C-reducible,
-    proved directly via `rsst_c_sound_of_contract_check`. -/
+    proved unconditionally via `KernelSoundness.verifyIdxC_sound`. -/
 theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig c) :
     IsCReducible c := by
-  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, h_eq, hc, _h_ver, h_run⟩
+  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, h_eq, hc, h_ver⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
-  exact rsst_c_sound_of_contract_check c idx h_lt hc h_c_eq h_run
+  have h_contract : (theUnavoidableSet[idx]!).contractEdges ≠ [] := by
+    rw [← unavoidable_get_eq_getElem! idx h_lt]
+    exact c_contract_edges_nonempty idx h_lt hc
+  rw [h_c_eq]
+  exact KernelSoundness.verifyIdxC_sound idx h_lt h_contract h_ver
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files
@@ -679,15 +668,13 @@ theorem rsst_certificate_soundness (c : Configuration) :
   | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)
   | inr hC => exact Or.inr (rsst_c_certificate_soundness c hC)
 
-/-- Computational Reducibility of the RSST Unavoidable Set:
+/-- **Unconditional Computational Reducibility of the RSST Unavoidable Set:**
     Every configuration in the canonical 633 unavoidable set is mathematically reducible,
-    proven directly from the 633 in-kernel batch certificates, dispatching D-certified
-    configurations to D-reducibility via fast_d_sound'' and C-certified configurations
-    to C-reducibility via rsst_c_certificate_soundness. -/
+    proved unconditionally from the 138 in-kernel batch certificates and `KernelSoundness`. -/
 theorem rsst_all_unavoidable_reducible (c : Configuration)
-    (hBridge : HasBatchSoundnessBridge) (hMem : c ∈ theUnavoidableSet) :
+    (hMem : c ∈ theUnavoidableSet) :
     IsReducible c := by
-  have hCert := all_unavoidable_configs_certified c hBridge hMem
+  have hCert := all_unavoidable_configs_certified c hMem
   rw [certified_cases_iff] at hCert
   cases hCert with
   | inl hD => exact Or.inl (rsst_d_certificate_soundness c hD)

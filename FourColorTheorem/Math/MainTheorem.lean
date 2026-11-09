@@ -151,19 +151,14 @@ def HasDiskExcisionSurgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
             Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col' =
               boundaryKempeSwap c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col) θ S)
 
-/-- Explicit topological and certificate soundness bridge for minimal planar counterexamples:
+/-- Explicit topological standardization bridge for minimal planar counterexamples:
     1. Minimal counterexample triangulation Euler equations (`V - E + F = 2`, `2E = 3F`, `∑ deg = 2E`).
     2. Cartwheel discharging elimination under the genuine 32-rule `Discharging.rsstChargeShift H`
        given `Discharging.DischargingTreesVerified theUnavoidableSet.toList`.
     3. Disk excision surgery (`HasDiskExcisionSurgery`) for embedded configurations with positive interior.
-    4. Kernel-to-mathematical reducer soundness bridge (`MasterCertificate.KernelReducerSoundnessBridge`).
-    NOTE (Stages K1–K3): `KernelReducer.buildRingColLoop` has been fixed to the canonical
-    geometric chord order $(0, 1, \dots, r-1)$ and all 138 `Batch/*` and `CBatch/*` certificate
-    modules are re-certified in-kernel (`249/249` D + `384/384` C = `633/633` configurations,
-    `0` false D-reducible configs). Conjunct (4) remains an unproved refinement hypothesis until
-    Stage D4 / Stage E′ is completed. -/
+    (Phase 1 computational & mathematical reducibility of all 633 configurations in `theUnavoidableSet`
+    is proved 100% unconditionally via `MasterCertificate.rsst_all_unavoidable_reducible`.) -/
 def RSSTStandardizationBridge : Prop :=
-  MasterCertificate.KernelReducerSoundnessBridge ∧
   ∀ (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
     IsCompleteDarts H darts →
     IsPlanar H darts →
@@ -322,7 +317,7 @@ theorem rsst_mc_has_disk_excision_surgery (H : Hypermap) [DecidableEq H.Dart] (d
     (mc : MinimalCounterexample H darts) (c : Configuration) (h_int : c.interiorSize > 0)
     (hApp : appearsIn c H darts) :
     HasDiskExcisionSurgery H darts c := by
-  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  have hStd := h_rsst H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
   exact hStd.2.2 c h_int hApp
 
 /-- The RSST Disk Excision Principle:
@@ -531,7 +526,7 @@ theorem rsst_mc_triangulation_euler (H : Hypermap) [DecidableEq H.Dart] (darts :
     Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
     ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
     2 * E = 3 * F := by
-  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  have hStd := h_rsst H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
   exact hStd.1
 
 /-- The RSST Discharging Elimination Property:
@@ -545,7 +540,7 @@ theorem rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (dar
   ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
     ∀ v ∈ (Hypermap.extractGraph H darts).vertices,
       Discharging.finalCharge H (Discharging.rsstChargeShift H) darts v ≤ 0 := by
-  have hStd := h_rsst.2 H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
+  have hStd := h_rsst H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
   exact hStd.2.1 h_trees
 
 /-- The RSST Discharging Witness Theorem:
@@ -574,24 +569,22 @@ theorem rsst_unavoidability (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts :=
   unavoidability_from_discharging H darts (rsst_discharging_witness H darts h_rsst mc)
 
-/-- Computational Reducibility of the RSST Unavoidable Set:
+/-- **Unconditional Computational Reducibility of the RSST Unavoidable Set:**
     Every configuration in the canonical 633 unavoidable set is mathematically reducible
-    (D-reducible or C-reducible), proven directly from the in-kernel batch certificates
-    across all 138 batch files (`MasterCertificate.master_suite_certifies_idx`) and the RSST certificate soundness bridge. -/
-theorem rsst_all_unavoidable_reducible (c : Configuration)
-    (hBridge : MasterCertificate.HasBatchSoundnessBridge) :
+    (D-reducible or C-reducible), proven unconditionally from the in-kernel batch certificates
+    across all 138 batch files (`MasterCertificate.master_suite_certifies_idx`) and `KernelSoundness`. -/
+theorem rsst_all_unavoidable_reducible (c : Configuration) :
     c ∈ theUnavoidableSet → IsReducible c :=
-  MasterCertificate.rsst_all_unavoidable_reducible c hBridge
+  MasterCertificate.rsst_all_unavoidable_reducible c
 
 /-- The Combined RSST Reducible Configuration Theorem:
-    Proved constructively by combining RSST Unavoidability and computational Reducibility. -/
+    Proved constructively by combining RSST Unavoidability and unconditional Reducibility. -/
 theorem rsst_unavoidable_reducible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts ∧ IsReducible c := by
   have ⟨c, hc_in, hc_app⟩ := rsst_unavoidability H darts h_rsst mc
-  have hBridge := MasterCertificate.batch_soundness_of_kernel_bridge h_rsst.1
-  have hc_red := rsst_all_unavoidable_reducible c hBridge hc_in
+  have hc_red := rsst_all_unavoidable_reducible c hc_in
   exact ⟨c, hc_in, hc_app, hc_red⟩
 
 /-- The Unavoidability Theorem:

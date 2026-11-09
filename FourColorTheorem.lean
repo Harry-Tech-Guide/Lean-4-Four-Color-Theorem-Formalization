@@ -4,13 +4,9 @@ import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.Kempe
 import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Degree5
-import FourColorTheorem.Math.Degree4
 import FourColorTheorem.Math.Discharging
 import FourColorTheorem.Math.Rules
-import FourColorTheorem.Math.Algorithm
 import FourColorTheorem.Math.MainTheorem
-import FourColorTheorem.Math.Checker
 import FourColorTheorem.Math.Unavoidability
 import FourColorTheorem.Math.U633String
 import FourColorTheorem.Math.U633Parser
@@ -37,3 +33,4 @@ import FourColorTheorem.Math.Batch.CR14
 import FourColorTheorem.Math.Soundness.DReduce
 import FourColorTheorem.Math.Soundness.CReduce
 import FourColorTheorem.Math.Soundness.StructuralVerification
+import FourColorTheorem.Math.KernelSoundness.KernelBridgeProof

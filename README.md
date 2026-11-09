@@ -22,7 +22,7 @@ theorem four_color_theorem (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : Lis
 
 | Item | Status |
 | :--- | :--- |
-| 633 RSST reducibility certificates (249 D + 384 C, rings 6–14) | Pass **in-kernel** (`kernel_rfl` / `rfl`) checks across all 138 batch modules (`Batch01`–`Batch52` and `CBatch01`–`CBatch86`) under the canonical geometric ring order $(0, 1, \dots, r-1)$ (`249/249` D-reducible, `384/384` C-reducible, `0` false D-reducible, `0` RSST mismatches; formal refinement to `checkFastTotal` / `runContractCheckTotal` in progress — see issue #6 below) |
+| 633 RSST reducibility certificates (249 D + 384 C, rings 6–14) | **Proved unconditionally (`Math.rsst_all_unavoidable_reducible : ∀ c ∈ theUnavoidableSet, IsReducible c`)**: pass **in-kernel** (`kernel_rfl` / `rfl`) checks across all 138 batch modules (`Batch01`–`Batch52` and `CBatch01`–`CBatch86`) under the canonical geometric ring order $(0, 1, \dots, r-1)$ (`249/249` D-reducible, `384/384` C-reducible, `0` false D-reducible, `0` RSST mismatches) and are formally proved sound end-to-end (`verifyIdxD_sound`, `verifyIdxC_sound` in `FourColorTheorem/Math/KernelSoundness/`) |
 | 5 RSST cartwheel discharging trees (degrees 7–11) | Pass **in-kernel** (`rfl`) checks |
 | Hypermap / Euler / Kempe / reducibility-game / charge-conservation theory | Proved (standard axioms only) |
 | `four_color_theorem_conditional` ([`ConditionalSolution.lean`](./ConditionalSolution.lean)) | Proved, `0` `sorry`, axioms `[propext, Classical.choice, Quot.sound]` — **but conditional, see below** |
@@ -44,7 +44,7 @@ theorem bridge_iff_no_mc :
         Spec.MinimalCounterexample H darts → False
 ```
 
-Consequently the discharging trees and the 138 reducibility batch modules (`KernelReducer.verifyIdxD` / `verifyIdxC` under the canonical geometric chord order) are real, kernel-checked computations that agree 100% with RSST across all 633 configurations (`249/249` D + `384/384` C, `0` false D-reducible configs; and the proof-target checker `checkFastTotal` / `runContractCheckTotal` has been verified across all 496/496 configurations with $r \le 13$), but **they are not yet logically connected to the theorem** (see issue #6 below).
+Consequently the discharging trees and the 138 reducibility batch modules (`KernelReducer.verifyIdxD` / `verifyIdxC` under the canonical geometric chord order) are real, kernel-checked computations that agree 100% with RSST across all 633 configurations (`249/249` D + `384/384` C, `0` false D-reducible configs) and are now **formally proved sound end-to-end** in `FourColorTheorem/Math/KernelSoundness/`, yielding the unconditional theorem `Math.rsst_all_unavoidable_reducible : ∀ c ∈ theUnavoidableSet, IsReducible c`. What remains open in `MainTheorem.RSSTStandardizationBridge` are the Phase 2–5 topological and discharging obligations (see issues #1–#5 below).
 
 ---
 
@@ -55,7 +55,7 @@ Consequently the discharging trees and the 138 reducibility batch modules (`Kern
 3. **`appearsIn` is too weak.** It has no interior-closure condition (interior vertices may have outside neighbours) and `Configuration` stores no degrees.
 4. **`bnd_contracts` is false for C-reduction.** C-reducibility must *contract* edges in the map, not excise the interior.
 5. **Discharging prerequisites are missing:** minimum degree 5, internal 6-connectivity (Birkhoff), the degree-5/6/≥12 cases, and soundness of `verifyTree` against real neighbourhoods.
-6. **`KernelReducer` refinement to `checkFastTotal` / `runContractCheckTotal` (`KernelReducerSoundnessBridge`).** The Stage K0 chord-order defect in `KernelReducer.buildRingColLoop` (which previously fixed $d_0 = 0$ instead of $d_{r-2} = 0$ and transposed adjacent ring edges `0` and `r - 1`) has been **fixed in Stage K1**, all **138 `Batch/*` and `CBatch/*` certificate modules** (`Batch01`–`Batch52` and `CBatch01`–`CBatch86`) have been **re-certified in-kernel** (`249/249` D-reducible + `384/384` C-reducible = `633/633` configurations, `0` false D-reducible configurations), and **all five** mathematical/combinatorial checker soundness obligations (`FullRepresentationHypothesis` / RSST Lemma (a), `InitialLiveSpec`, `IterationEliminationHypothesis`, `LiveZeroIterationEliminationHypothesis`, and `ContractCheckSoundnessHypothesis`) have been proved unconditionally (`fullRepresentation_of_ringCycle`, `fast_d_sound_canonical_of_wellFormed`, `fast_c_sound_canonical_of_wellFormed`, `rsst_d_sound_of_checkFast`, `rsst_c_sound_of_contract_check`). What remains for Phase 1 is proving the formal refinement theorem from `KernelReducer.verifyIdxD` / `verifyIdxC` (under the canonical slice bijection $\text{traceIdx}(j) = j + d_{r-1}(j)\cdot 3^{r-1}$) to `checkFastTotal` / `runContractCheckTotal`.
+6. **[RESOLVED] `KernelReducer` end-to-end soundness (`KernelReducerSoundnessBridge`).** The Stage K0 chord-order defect in `KernelReducer.buildRingColLoop` was fixed in Stage K1, all **138 `Batch/*` and `CBatch/*` certificate modules** (`Batch01`–`Batch52` and `CBatch01`–`CBatch86`) were re-certified in-kernel (`249/249` D + `384/384` C = `633/633`), all five combinatorial checker soundness obligations were proved in `CheckerSoundness/*` and `Soundness/*`, and the 9,963-line `KernelSoundness/*` stack (`KernelSlice.lean`, `KernelInitialSoundness.lean`, `KernelKempeSoundness.lean`, `KernelBridgeProof.lean`) proved `verifyIdxD_sound` and `verifyIdxC_sound`, making `Math.rsst_all_unavoidable_reducible : ∀ c ∈ theUnavoidableSet, IsReducible c` **100% unconditional** (`0 sorry`, standard axioms `[propext, Classical.choice, Quot.sound]`).
 
 ---
 
@@ -63,7 +63,7 @@ Consequently the discharging trees and the 138 reducibility batch modules (`Kern
 
 ```mermaid
 flowchart TD
-    P1["1. Checker soundness: unconditional all 633 configurations reducible"]
+    P1["1. Checker soundness: unconditional all 633 configurations reducible (COMPLETED)"]
     P2["2. Fuel-free map theory, Euler genus, duality, Jordan property"]
     P3["3. Minimal counterexample: cubic, dual is internally 6-connected triangulation, min degree 5"]
     P4["4. Faithful configuration embedding + D/C reduction transfer via planar Kempe chains"]
@@ -79,14 +79,14 @@ flowchart TD
 
 | Phase | Deliverable | Est. new Lean | Risk |
 | :--- | :--- | :--- | :--- |
-| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis (kernel refinement, Lemma (a) representation, iteration elimination, contract soundness) — *In progress: `S₃` color-symmetry reduction (`full_representation_of_theta1`), `LiveZero` C-reduction (`fast_c_sound_of_live_zero`), `c_contract_edges_nonempty`, `ContractCheckSoundnessHypothesis` (`contractCheckSoundness_of_wellFormed`), `extend` completeness, involution & `S₃` relabelling invariance (`extend_iff_extendsToInterior`, `extend_involution_eq`, `extend_relabelBoundary_eq`), structural reflection (`unavoidable_is_ring_cycle`, `unavoidable_is_well_formed_earlier`, `unavoidable_ring_le_15`), `xorSwapChoice_valid`, `smFitTree_eq_smFitIndex`, `zeros_size`, `sharedPow3_getD`, `boundaryTrace_relabel`, `smFitIndex_flipBits`, `eliminated_orb_final_rank_and_live`, `ReducerInv` preservation & eliminated-orbit rank decomposition (`runReducerLoop_inv`, `eliminated_orbit_sm_strict_rank_decrease`, `orbits_empty_sm_strict_rank_decrease`), unconditional `InitialLiveSpec` (`initialLiveSpec_of_wellFormed`, `initialLiveSpec_sharedPow3_of_wellFormed`), unconditional `FullRepresentationHypothesis` / RSST Lemma (a) (`exists_ncMatching_of_partition`, `fullRepresentation_of_ringCycle`, `fullRepresentation_sharedPow3_of_ringCycle`), and unconditional proof of `IterationEliminationHypothesis`, `LiveZeroIterationEliminationHypothesis`, and `ContractCheckSoundnessHypothesis` (`fast_d_sound_canonical_of_wellFormed`, `fast_c_sound_canonical_of_wellFormed`, `rsst_d_sound_of_checkFast`, `rsst_c_sound_of_contract_check`) proved* | 4k–10k | Medium |
+| 1 | `∀ c ∈ theUnavoidableSet, IsReducible c`, no hypothesis — **COMPLETED (`0 sorry`, unconditional):** proved via `FourColorTheorem/Math/KernelSoundness/` (`verifyIdxD_sound`, `verifyIdxC_sound`, `kernel_reducer_soundness_bridge`, `Math.rsst_all_unavoidable_reducible`) alongside the independent `FastReducer` soundness stack (`CheckerSoundness/*`, `Soundness/*`: `fullRepresentation_of_ringCycle`, `initialLiveSpec_of_wellFormed`, `fast_d_sound_canonical_of_wellFormed`, `fast_c_sound_canonical_of_wellFormed`, `rsst_d_sound_of_checkFast`, `rsst_c_sound_of_contract_check`) | Done (~17k lines proved) | Resolved |
 | 2 | Fuel-free orbits/components, Euler genus, duality, combinatorial Jordan property — *In progress: finite pigeonhole orbit closure (`orbitClosesWithin_of_complete`), unconditional fuel-independence (`getOrbit_fuel_eq_of_complete`, `countOrbits_fuel_eq_of_complete`), orbit equivalence relation, and topological duality (`numNodes_dual_of_complete`, `numFaces_dual_of_complete`, `EulerChar_dual_of_complete`) proved* | 5k–10k | Medium |
 | 3 | Structure of a minimal counterexample (Birkhoff diamond / 6-connectivity, min degree 5) | 5k–10k | High |
 | 4 | Faithful `appearsIn` + D- and C-reduction transfer to real planar maps (may require re-certifying the 633) | 6k–12k | High |
 | 5 | Soundness of the discharging trees against real cartwheels (may require new certificates) | 8k–15k | Very high |
 | 6 | Remove `sorry` from `Solution`, pass `Comparator` and `leanchecker --fresh` | < 500 | Low |
 
-An honest total is on the order of **30,000–60,000 additional lines**. The Phase 1 lemmas listed above prove all mathematical and combinatorial checker soundness obligations (`FullRepresentationHypothesis`, `InitialLiveSpec`, `IterationEliminationHypothesis`, `LiveZeroIterationEliminationHypothesis`, `ContractCheckSoundnessHypothesis`, and `c.contractEdges ≠ []`) unconditionally; `HasDCertificateWitness`, `HasCCertificateWitness`, and `rsst_all_unavoidable_reducible` in `MasterCertificate.lean` still take `checkFastTotal = true` / `runContractCheckTotal = true` (which are not yet linked to the 138 `KernelReducer.verifyIdxD` / `verifyIdxC` batch certificates via `KernelReducerSoundnessBridge`) as assumptions.
+An honest remaining total across Phases 2–6 is on the order of **25,000–45,000 additional lines**. Phase 1 (`Math.rsst_all_unavoidable_reducible : ∀ c ∈ theUnavoidableSet, IsReducible c`) is **100% complete and unconditional** in `MasterCertificate.lean` and `MainTheorem.lean`, with `KernelReducerSoundnessBridge` eliminated from `MainTheorem.RSSTStandardizationBridge`.
 
 ---
 
