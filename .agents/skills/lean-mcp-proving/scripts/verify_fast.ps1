@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 Set-Location "c:\Four Color Theorem"
 
 Write-Host "=== [1/3] Checking for 'sorry' across FourColorTheorem/Math ===" -ForegroundColor Cyan
-$sorries = Select-String -Path "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\Topology\*.lean" -Pattern "\bsorry\b" |
+$sorries = Select-String -Path "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\CheckerSoundness\*.lean", "FourColorTheorem\Math\Topology\*.lean" -Pattern "\bsorry\b" |
     Where-Object { $_.Line -notmatch "^\s*--" }
 
 if ($sorries) {
@@ -18,6 +18,7 @@ lake build `
     FourColorTheorem.Math.Soundness.Representation `
     FourColorTheorem.Math.Soundness.DReduce `
     FourColorTheorem.Math.Soundness.CReduce `
+    FourColorTheorem.Math.Soundness.ContractSoundness `
     FourColorTheorem.Math.Soundness.StructuralVerification `
     FourColorTheorem.Math.MasterCertificate `
     FourColorTheorem.Math.MainTheorem

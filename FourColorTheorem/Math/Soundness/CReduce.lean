@@ -100,57 +100,86 @@ theorem computeFinalState_ranks_eq (rc : RConf) (sms : Array SMData) (pow3 : Arr
     (computeFinalState rc sms pow3).ranks = computeEliminationRanks rc sms pow3 :=
   rfl
 
-/-- Total fuel-bounded check that NO proper coloring of the contracted configuration restricts to a trace in `live`. -/
-def checkContractExactTotal : Nat → Array (Array Nat) → Array Nat → Nat → Nat → Nat → Array Nat → Array Nat → ByteArray → Bool
-  | 0, _, _, _, r, _, col, pow3, live => Id.run do
-    let mut idx := 0
-    for i in [0:r] do
-      let nxt := if i + 1 == r then 0 else i + 1
-      let x := col[i]! ^^^ col[nxt]!
-      if x == 0 then return true
+/-- Structural leaf helper for `checkContractExactTotal`: accumulates `d_i * 3^i` over ring edges
+    `i = k, ..., k + rem - 1`, returning `true` vacuously if any ring edge is monochromatic (`x == 0`),
+    and checking `!(live.get! acc == 1)` at `rem = 0`. -/
+def contractLeafAux (r : Nat) (col : Array Nat) (pow3 : Array Nat) (live : ByteArray) :
+    Nat → Nat → Nat → Bool
+  | 0, _, acc => !(live.get! acc == 1)
+  | rem + 1, i, acc =>
+    let nxt := (i + 1) % r
+    let x := getCol col i ^^^ getCol col nxt
+    if x == 0 then true
+    else
       let d_i := x - 1
-      idx := idx + d_i * pow3[i]!
-    return !(live.get! idx == 1)
+      contractLeafAux r col pow3 live rem (i + 1) (acc + d_i * pow3.getD i 0)
+
+/-- Structural neighbor check for contracted coloring extension: returns `true` iff every earlier
+    neighbor `u ∈ nbrs` outside `v`'s contracted component (`getCol alias u != root_v`) has
+    color distinct from `c_val` (`getCol col u != c_val`). -/
+def contractColorFree (nbrs : Array Nat) (alias col : Array Nat) (root_v c_val : Nat) : Bool :=
+  nbrs.toList.all (fun u => getCol alias u == root_v || getCol col u != c_val)
+
+/-- Total fuel-bounded check that NO proper coloring of the contracted configuration restricts to a trace in `live`. -/
+def checkContractExactTotal :
+    Nat → Array (Array Nat) → Array Nat → Nat → Nat → Nat → Array Nat → Array Nat → ByteArray → Bool
+  | 0, _, _, _, r, _, col, pow3, live =>
+    contractLeafAux r col pow3 live r 0 0
   | fuel + 1, earlier, alias, n, r, v, col, pow3, live =>
     if v >= n then
-      checkContractExactTotal 0 earlier alias n r v col pow3 live
-    else Id.run do
-      let root_v := alias[v]!
+      contractLeafAux r col pow3 live r 0 0
+    else
+      let root_v := getCol alias v
+      let nbrs := earlier.getD v #[]
       if root_v < v then
-        let c := col[root_v]!
-        for u in earlier[v]! do
-          if alias[u]! != root_v && col[u]! == c then
-            return true
-        let col' := col.set! v c
-        return checkContractExactTotal fuel earlier alias n r (v + 1) col' pow3 live
+        let c_val := getCol col root_v
+        if contractColorFree nbrs alias col root_v c_val then
+          checkContractExactTotal fuel earlier alias n r (v + 1) (col.set! v c_val) pow3 live
+        else
+          true
       else
-        let mut used : Nat := 0
-        for u in earlier[v]! do
-          if alias[u]! != root_v then
-            used := used ||| (1 <<< col[u]!)
-        let mut col' := col
-        for c in [0:4] do
-          if (used >>> c) &&& 1 == 0 then
-            col' := col'.set! v c
-            if not (checkContractExactTotal fuel earlier alias n r (v + 1) col' pow3 live) then
-              return false
-        return true
+        let ok0 := if contractColorFree nbrs alias col root_v 0 then
+          checkContractExactTotal fuel earlier alias n r (v + 1) (col.set! v 0) pow3 live else true
+        let ok1 := if contractColorFree nbrs alias col root_v 1 then
+          checkContractExactTotal fuel earlier alias n r (v + 1) (col.set! v 1) pow3 live else true
+        let ok2 := if contractColorFree nbrs alias col root_v 2 then
+          checkContractExactTotal fuel earlier alias n r (v + 1) (col.set! v 2) pow3 live else true
+        let ok3 := if contractColorFree nbrs alias col root_v 3 then
+          checkContractExactTotal fuel earlier alias n r (v + 1) (col.set! v 3) pow3 live else true
+        ok0 && ok1 && ok2 && ok3
+
+/-- Relax a single contracted edge `(u, v)` on `al : Array Nat`. -/
+def relaxContractEdge (al : Array Nat) (uv : Nat × Nat) : Array Nat :=
+  let u := uv.1
+  let v := uv.2
+  let ru := getCol al u
+  let rv := getCol al v
+  let mn := min ru rv
+  (((al.set! u mn).set! v mn).set! ru mn).set! rv mn
+
+/-- Relax a list of contracted edges on `al : Array Nat`. -/
+def relaxContractEdgesList : List (Nat × Nat) → Array Nat → Array Nat
+  | [], al => al
+  | uv :: rest, al => relaxContractEdgesList rest (relaxContractEdge al uv)
+
+/-- Run `k` passes of `relaxContractEdgesList` to compute the transitive closure of `edges`. -/
+def computeContractAliasLoop : Nat → List (Nat × Nat) → Array Nat → Array Nat
+  | 0, _, al => al
+  | k + 1, edges, al => computeContractAliasLoop k edges (relaxContractEdgesList edges al)
+
+/-- Compute the contracted component root table `alias` for `c : RConf`. -/
+def computeContractAlias (c : RConf) : Array Nat :=
+  computeContractAliasLoop c.n c.contractEdges.toList (Array.range c.n)
+
+/-- Boolean check that every contracted edge `(u, v) ∈ edges` maps to the same component root in `alias`. -/
+def checkAliasClosed (edges : List (Nat × Nat)) (alias : Array Nat) : Bool :=
+  edges.all (fun uv => getCol alias uv.1 == getCol alias uv.2)
 
 /-- Total fuel-bounded test whether a configuration's contraction eliminates all remaining consistent live colorings. -/
-def runContractCheckTotal (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool := Id.run do
-  let mut alias := Array.replicate c.n 0
-  for i in [0:c.n] do alias := alias.set! i i
-  for _ in [0:c.n] do
-    for (u, v) in c.contractEdges do
-      let root_u := alias[u]!
-      let root_v := alias[v]!
-      let mn := min root_u root_v
-      alias := alias.set! u mn
-      alias := alias.set! v mn
-      alias := alias.set! root_u mn
-      alias := alias.set! root_v mn
-  let col : Array Nat := Array.replicate c.n 0
-  return checkContractExactTotal c.n c.earlier alias c.n c.r 1 col pow3 live
+def runContractCheckTotal (c : RConf) (pow3 : Array Nat) (live : ByteArray) : Bool :=
+  let alias := computeContractAlias c
+  checkAliasClosed c.contractEdges.toList alias &&
+  checkContractExactTotal c.n c.earlier alias c.n c.r 1 (Array.replicate c.n 0) pow3 live
 
 /-- Total fuel-bounded combined D-reduction fixed-point solver and C-reduction contract validator. -/
 def checkCFastTotal (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : Bool :=

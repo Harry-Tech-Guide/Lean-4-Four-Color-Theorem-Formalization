@@ -1,4 +1,5 @@
 import FourColorTheorem.Math.CheckerSoundness.InitialLive
+import FourColorTheorem.Math.Soundness.ContractSoundness
 
 namespace Math
 namespace CheckerSoundness
@@ -372,21 +373,34 @@ theorem fast_d_sound_of_initialLiveSpec (c : Configuration) (earlier : Array (Ar
   fast_d_sound'' c earlier sms pow3 h_check h_earlier h_irrefl h_rep
     (iterationElimination_of_checkFastTotal c earlier sms pow3 h_check h_earlier h_wf h_irrefl h_init)
 
-/-- C-reducibility theorem reducing `LiveZeroIterationEliminationHypothesis` to `InitialLiveSpec`. -/
+/-- C-reducibility theorem reducing `LiveZeroIterationEliminationHypothesis` and
+    `ContractCheckSoundnessHypothesis` to `InitialLiveSpec` and `IsRingCycle`. -/
 theorem fast_c_sound_of_initialLiveSpec (c : Configuration) (earlier : Array (Array Nat))
     (sms : Array SMData) (pow3 : Array Nat)
     (h_contract : c.contractEdges ≠ [])
+    (h_ring : IsRingCycle c)
     (h_earlier : IsSoundEarlier c earlier)
     (h_wf : IsWellFormedEarlier c earlier)
     (h_irrefl : IsIrreflexiveAdj c)
     (h_rep : FullRepresentationHypothesis c sms pow3)
     (h_init : InitialLiveSpec c earlier sms pow3)
-    (h_csound_chk : ContractCheckSoundnessHypothesis c earlier pow3
-      (computeFinalState (rconfOfConfig c earlier) sms pow3).live)
     (h_run : runContractCheckTotal (rconfOfConfig c earlier) pow3
       (computeFinalState (rconfOfConfig c earlier) sms pow3).live = true) :
-    IsCReducible c :=
-  fast_c_sound_of_live_zero c earlier sms pow3 h_contract h_earlier h_irrefl h_rep
+    IsCReducible c := by
+  let rc := rconfOfConfig c earlier
+  let N := pow3.getD rc.r 1
+  have h_final_bin : ByteArrayBinary (computeFinalState rc sms pow3).live :=
+    runReducerLoop_binary N ((initialLiveFast rc pow3).2.size + 1)
+      { live := (initialLiveFast rc pow3).1
+        orbits := (initialLiveFast rc pow3).2
+        activeSM := sms
+        ranks := Array.replicate N 0
+        iter := 0
+        changed := true }
+      h_init.live_binary
+  have h_csound_chk : ContractCheckSoundnessHypothesis c earlier pow3 (computeFinalState rc sms pow3).live :=
+    contractCheckSoundness_of_wellFormed c earlier pow3 (computeFinalState rc sms pow3).live h_ring h_wf h_final_bin
+  exact fast_c_sound_of_live_zero c earlier sms pow3 h_contract h_earlier h_irrefl h_rep
     (liveZeroIterationElimination_of_initialLiveSpec c earlier sms pow3 h_earlier h_wf h_irrefl h_init)
     h_csound_chk h_run
 
