@@ -20,6 +20,8 @@ lake build `
     FourColorTheorem.Math.Soundness.CReduce `
     FourColorTheorem.Math.Soundness.ContractSoundness `
     FourColorTheorem.Math.Soundness.StructuralVerification `
+    FourColorTheorem.Math.CheckerSoundness.InitialLiveProof `
+    FourColorTheorem.Math.CheckerSoundness.IterationElimination `
     FourColorTheorem.Math.MasterCertificate `
     FourColorTheorem.Math.MainTheorem
 

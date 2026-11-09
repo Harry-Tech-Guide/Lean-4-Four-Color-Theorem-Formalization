@@ -236,7 +236,7 @@ theorem exists_eliminating_round_decomp (N fuel : Nat) (st : ReducerState)
       ReducerInv N st_k ∧
       orb ∈ st_k.orbits.toList ∧
       (let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-       (cov.get! orb.j0 == 1 && cov.get! orb.j2 == 1 && cov.get! orb.j5 == 1) = false) ∧
+       orbitCovered cov orb = false) ∧
       (∀ sm ∈ st.activeSM.toList,
         sm ∈ st_k.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st_k.live.get! (smFitIndex sm t) == 1) = false) ∧
       (∀ j, (st.live.get! j == 1) = false → (st_k.live.get! j == 1) = false) := by
@@ -287,80 +287,6 @@ theorem eliminated_orbit_rank_eq (N fuel : Nat) (st : ReducerState)
   rw [h_loop_eq, hr1, hr2]
   exact ⟨rfl, by omega⟩
 
-/-- **Corollary 2 (Strict Final Rank Decrease for Eliminated Orbits):**
-    Under `ReducerInv N st`, if `orb ∈ st.orbits.toList` is not in `(runReducerLoop N fuel st).orbits.toList`,
-    then there exists an uncovered canonical pairing trace `j_θ ∈ {orb.j0, orb.j2, orb.j5}` such that
-    for every `sm ∈ st.activeSM.toList` fitting `j_θ` at `t = 0` (either directly or via `swapSM sm`),
-    there exists `t < 1 <<< sm.p` whose leaf `smFitIndex sm t` has strictly smaller final rank than
-    every member `j` of `orb` (`inOrbit6 orb j`). -/
-theorem eliminated_orbit_sm_strict_rank_decrease (N fuel : Nat) (st : ReducerState)
-    (h_inv : ReducerInv N st)
-    (orb : Orbit6) (horb : orb ∈ st.orbits.toList)
-    (h_not_mem : orb ∉ (runReducerLoop N fuel st).orbits.toList)
-    (j : Nat) (hj : inOrbit6 orb j) :
-    ∃ j_θ : Nat, (j_θ = orb.j0 ∨ j_θ = orb.j2 ∨ j_θ = orb.j5) ∧
-      ∀ sm ∈ st.activeSM.toList,
-        (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
-        ∃ t < 1 <<< sm.p,
-          (runReducerLoop N fuel st).ranks.getD (smFitIndex sm t) 0 <
-            (runReducerLoop N fuel st).ranks.getD j 0 := by
-  rcases exists_eliminating_round_decomp N fuel st h_inv orb horb h_not_mem with
-    ⟨st_k, rem, h_loop_eq, h_inv_k, horb_k, h_uncov_k, h_sm_k, _⟩
-  have h_bnd := h_inv_k.bounded orb horb_k
-  have hj_rank : (runReducerLoop N fuel st).ranks.getD j 0 = st_k.iter + 1 := by
-    rw [h_loop_eq]
-    exact (eliminated_orb_final_rank_and_live N rem st_k orb horb_k
-      h_inv_k.nodup h_inv_k.disjoint h_bnd.2 h_bnd.1 h_uncov_k j hj).1
-  have h_bnd_N : orbitBounded N orb := by
-    rw [← h_inv_k.liveSize]
-    exact h_bnd.1
-  let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-  have h_pair := uncovered_pairing_of_not_covered cov orb h_uncov_k
-  have h_helper : ∀ j_θ : Nat, j_θ < N → (cov.get! j_θ == 1) = false →
-      ∀ sm ∈ st.activeSM.toList, (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
-      ∃ t < 1 <<< sm.p,
-        (runReducerLoop N fuel st).ranks.getD (smFitIndex sm t) 0 <
-          (runReducerLoop N fuel st).ranks.getD j 0 := by
-    intro j_θ hj_lt hj_uncov sm hsm h_fit
-    have h_dead_ex : ∃ t < 1 <<< sm.p, (st_k.live.get! (smFitIndex sm t) == 1) = false := by
-      rcases h_sm_k sm hsm with h_active | ⟨t, ht, h_dead⟩
-      · rcases h_fit with h_fit0 | h_fit_dual
-        · exact exists_not_live_of_uncovered_in_round N st_k j_θ hj_lt hj_uncov sm (Or.inl h_active) h_fit0
-        · have h_tree_dual : smFitTree (swapSM sm) sm.p 0 0 0 = j_θ := by
-            have := smFitTree_eq_smFitIndex (swapSM sm) 0
-            dsimp [swapSM] at this ⊢
-            rw [this]
-            exact h_fit_dual
-          have hj_zeros : j_θ < (zeros N).size := by
-            rw [zeros_size]
-            exact hj_lt
-          rcases uncovered_of_stepSMList_swapSM st_k.live st_k.activeSM.toList (zeros N)
-              (Array.mkEmpty st_k.activeSM.size) j_θ hj_zeros hj_uncov sm h_active h_tree_dual with
-            ⟨t, ht, h_dead⟩
-          rw [smFitTree_eq_smFitIndex] at h_dead
-          exact ⟨t, ht, h_dead⟩
-      · exact ⟨t, ht, h_dead⟩
-    rcases h_dead_ex with ⟨t, ht, h_dead⟩
-    have h_dead_step : ((reducerStep N st_k).live.get! (smFitIndex sm t) == 1) = false :=
-      reducerStep_not_live_mono N st_k (smFitIndex sm t) h_dead
-    have h_not_in_k : ∀ orb' ∈ st_k.orbits.toList, ¬ inOrbit6 orb' (smFitIndex sm t) :=
-      fun orb' h_mem => not_inOrbit6_of_not_live st_k.live orb' (smFitIndex sm t) (h_inv_k.allLive orb' h_mem) h_dead
-    have h_not_in_step : ∀ orb' ∈ (reducerStep N st_k).orbits.toList, ¬ inOrbit6 orb' (smFitIndex sm t) :=
-      fun orb' h_mem => h_not_in_k orb' (reducerStep_orbits_sub N st_k orb' h_mem)
-    have h_rank_eq : (runReducerLoop N fuel st).ranks.getD (smFitIndex sm t) 0 =
-        st_k.ranks.getD (smFitIndex sm t) 0 := by
-      rw [h_loop_eq,
-          runReducerLoop_ranks_preserves_of_not_in_orbits N rem (reducerStep N st_k) (smFitIndex sm t) h_not_in_step,
-          reducerStep_ranks_preserves_of_not_in_orbits N st_k (smFitIndex sm t) h_not_in_k]
-    have h_le := h_inv_k.rankLe (smFitIndex sm t)
-    refine ⟨t, ht, ?_⟩
-    rw [h_rank_eq, hj_rank]
-    omega
-  rcases h_pair with h0 | h2 | h5
-  · exact ⟨orb.j0, Or.inl rfl, h_helper orb.j0 h_bnd_N.1 h0⟩
-  · exact ⟨orb.j2, Or.inr (Or.inl rfl), h_helper orb.j2 h_bnd_N.2.2.1 h2⟩
-  · exact ⟨orb.j5, Or.inr (Or.inr rfl), h_helper orb.j5 h_bnd_N.2.2.2.2.2 h5⟩
-
 /-- If `a.isEmpty = true`, then no element belongs to `a.toList`. -/
 theorem not_mem_toList_of_isEmpty {α : Type} (a : Array α) (h_empty : a.isEmpty = true) (x : α) :
     x ∉ a.toList := by
@@ -390,26 +316,6 @@ theorem rank_zero_of_not_in_orbits (N fuel : Nat) (st : ReducerState)
     (runReducerLoop N fuel st).ranks.getD j 0 = 0 := by
   rw [runReducerLoop_ranks_preserves_of_not_in_orbits N fuel st j h_not]
   exact h_zero j
-
-/-- When `(runReducerLoop N fuel st).orbits.isEmpty = true` and `ReducerInv N st`,
-    every member `j` of every initial orbit `orb ∈ st.orbits.toList` has an uncovered canonical
-    pairing trace `j_θ ∈ {orb.j0, orb.j2, orb.j5}` such that every `sm ∈ st.activeSM.toList`
-    fitting `j_θ` at `t = 0` (or via `swapSM sm`) has a leaf `smFitIndex sm t` with strictly
-    smaller final rank than `j`. -/
-theorem orbits_empty_sm_strict_rank_decrease (N fuel : Nat) (st : ReducerState)
-    (h_inv : ReducerInv N st)
-    (h_empty : (runReducerLoop N fuel st).orbits.isEmpty = true)
-    (orb : Orbit6) (horb : orb ∈ st.orbits.toList)
-    (j : Nat) (hj : inOrbit6 orb j) :
-    ∃ j_θ : Nat, (j_θ = orb.j0 ∨ j_θ = orb.j2 ∨ j_θ = orb.j5) ∧
-      ∀ sm ∈ st.activeSM.toList,
-        (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
-        ∃ t < 1 <<< sm.p,
-          (runReducerLoop N fuel st).ranks.getD (smFitIndex sm t) 0 <
-            (runReducerLoop N fuel st).ranks.getD j 0 :=
-  eliminated_orbit_sm_strict_rank_decrease N fuel st h_inv orb horb
-    (not_mem_toList_of_isEmpty (runReducerLoop N fuel st).orbits h_empty orb)
-    j hj
 
 end CheckerSoundness
 end Math

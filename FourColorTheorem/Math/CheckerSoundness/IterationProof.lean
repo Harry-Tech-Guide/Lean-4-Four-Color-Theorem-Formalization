@@ -396,23 +396,25 @@ theorem stepOrbitsList_live_mono (cover : ByteArray) (iter : Nat) (orbs : List O
     · exact ih (nextOrbits.push orb) live ranks hj
     · exact clearOrbitLive_mono live orb j (ih nextOrbits (clearOrbitLive live orb) (setOrbitRanks ranks orb iter) hj)
 
-/-- If an orbit `orb` is not covered across all three pairings (`j0`, `j2`, `j5`),
-    then at least one of its three canonical pairing traces is uncovered (`get! j != 1`). -/
+/-- If an orbit `orb` is not covered (`orbitCovered cover orb = false`),
+    then at least one of its three `(12)`-symmetric pairing pairs `(j0, j1)`, `(j2, j4)`, `(j5, j3)`
+    has both trace indices uncovered in `cover`. -/
 theorem uncovered_pairing_of_not_covered (cover : ByteArray) (orb : Orbit6)
-    (h_not_cov : (cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1) = false) :
-    (cover.get! orb.j0 == 1) = false ∨
-    (cover.get! orb.j2 == 1) = false ∨
-    (cover.get! orb.j5 == 1) = false := by
-  cases h0 : (cover.get! orb.j0 == 1) with
-  | false => exact Or.inl rfl
+    (h_not_cov : orbitCovered cover orb = false) :
+    ((cover.get! orb.j0 == 1) = false ∧ (cover.get! orb.j1 == 1) = false) ∨
+    ((cover.get! orb.j2 == 1) = false ∧ (cover.get! orb.j4 == 1) = false) ∨
+    ((cover.get! orb.j5 == 1) = false ∧ (cover.get! orb.j3 == 1) = false) := by
+  unfold orbitCovered at h_not_cov
+  cases h01 : (cover.get! orb.j0 == 1 || cover.get! orb.j1 == 1) with
+  | false => exact Or.inl (Bool.or_eq_false_iff.mp h01)
   | true =>
-    cases h2 : (cover.get! orb.j2 == 1) with
-    | false => exact Or.inr (Or.inl rfl)
+    cases h24 : (cover.get! orb.j2 == 1 || cover.get! orb.j4 == 1) with
+    | false => exact Or.inr (Or.inl (Bool.or_eq_false_iff.mp h24))
     | true =>
-      cases h5 : (cover.get! orb.j5 == 1) with
-      | false => exact Or.inr (Or.inr rfl)
+      cases h53 : (cover.get! orb.j5 == 1 || cover.get! orb.j3 == 1) with
+      | false => exact Or.inr (Or.inr (Bool.or_eq_false_iff.mp h53))
       | true =>
-        rw [h0, h2, h5] at h_not_cov
+        rw [h01, h24, h53] at h_not_cov
         contradiction
 
 theorem byteArray_get!_set!_preserves_zero (a : ByteArray) (i j : Nat)

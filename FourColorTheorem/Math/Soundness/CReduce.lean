@@ -84,7 +84,7 @@ theorem extendsToContracted_iff (c : Configuration) (b : BoundaryColoring c) :
 def computeFinalState (rc : RConf) (sms : Array SMData) (pow3 : Array Nat) : ReducerState :=
   let r := rc.r
   let N := pow3.getD r 1
-  let (live0, orbits0) := initialLiveFast rc pow3
+  let (live0, orbits0) := initialLiveTotal rc pow3
   let initSt : ReducerState := {
     live := live0,
     orbits := orbits0,

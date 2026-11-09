@@ -20,7 +20,7 @@ This module proves two structural invariants across all 633 RSST configurations:
    across all 633 configurations, closing Audit Gap G1.
 -/
 
-/--Every consecutive pair of ring vertices `(i, (i + 1) % c.ringSize)` is adjacent in `c`. -/
+/-- Every consecutive pair of ring vertices `(i, (i + 1) % c.ringSize)` is adjacent in `c`. -/
 def IsRingCycle (c : Configuration) : Prop :=
   c.ringSize ≥ 2 ∧ ∀ i < c.ringSize, c.adj i ((i + 1) % c.ringSize) = true
 
@@ -211,7 +211,7 @@ theorem ringCycle_of_checkRConf (rc : RConf) (h : checkRConfRingCycle rc = true)
 
 /-- Combined structural check on a parsed `RConf`. -/
 def checkRConfStructural (rc : RConf) : Bool :=
-  Nat.ble rc.r rc.n && checkRConfRingCycle rc && checkEarlierListLt rc.earlier.toList 0
+  Nat.ble rc.r rc.n && checkRConfRingCycle rc && checkEarlierListLt rc.earlier.toList 0 && Nat.ble rc.r 15
 
 /-- Single-pass structural check across a list of `RConf`s. -/
 def checkRConfListStructural : List RConf → Bool
@@ -259,7 +259,8 @@ theorem unavoidable_is_ring_cycle (idx : Nat) (h_lt : idx < 633) :
   rw [theUnavoidableSet_getElem! idx h_lt]
   have h_struct := sharedCfgs_structural_verified idx h_lt
   dsimp [checkRConfStructural] at h_struct
-  rcases Bool.and_eq_true_iff.mp h_struct with ⟨h12, _⟩
+  rcases Bool.and_eq_true_iff.mp h_struct with ⟨h123, _⟩
+  rcases Bool.and_eq_true_iff.mp h123 with ⟨h12, _⟩
   rcases Bool.and_eq_true_iff.mp h12 with ⟨_, h_ring⟩
   exact ringCycle_of_checkRConf sharedCfgs[idx]! h_ring
 
@@ -269,9 +270,23 @@ theorem unavoidable_is_well_formed_earlier (idx : Nat) (h_lt : idx < 633) :
   rw [theUnavoidableSet_getElem! idx h_lt]
   have h_struct := sharedCfgs_structural_verified idx h_lt
   dsimp [checkRConfStructural] at h_struct
-  rcases Bool.and_eq_true_iff.mp h_struct with ⟨h12, h_lt_ear⟩
+  rcases Bool.and_eq_true_iff.mp h_struct with ⟨h123, _⟩
+  rcases Bool.and_eq_true_iff.mp h123 with ⟨h12, h_lt_ear⟩
   rcases Bool.and_eq_true_iff.mp h12 with ⟨h_le, _⟩
   exact wellFormedEarlier_of_checkRConf sharedCfgs[idx]! (Nat.le_of_ble_eq_true h_le) h_lt_ear
+
+theorem ring_le_15_of_ble (rc : RConf) (h : Nat.ble rc.r 15 = true) :
+    (configOfRConf rc).ringSize ≤ 15 :=
+  Nat.le_of_ble_eq_true h
+
+/-- Every configuration `theUnavoidableSet[idx]!` (`idx < 633`) has ring size `≤ 15`. -/
+theorem unavoidable_ring_le_15 (idx : Nat) (h_lt : idx < 633) :
+    (theUnavoidableSet[idx]!).ringSize ≤ 15 := by
+  rw [theUnavoidableSet_getElem! idx h_lt]
+  have h_struct := sharedCfgs_structural_verified idx h_lt
+  dsimp [checkRConfStructural] at h_struct
+  rcases Bool.and_eq_true_iff.mp h_struct with ⟨_, h_r15⟩
+  exact ring_le_15_of_ble sharedCfgs[idx]! h_r15
 
 end CheckerSoundness
 end Math

@@ -53,15 +53,6 @@ theorem edge_digit_relabel (θ : ColorPairing) (col1 col2 : Color) (h_ne : col1 
   dsimp [relabelColor, relabelDigit]
   cases θ.a <;> cases θ.b <;> cases col1 <;> cases col2 <;> revert h_ne <;> decide
 
-/-- Structural trace accumulation with a digit permutation `p : Nat → Nat` applied to each edge digit `d_i`. -/
-def permTraceAux (p : Nat → Nat) (r : Nat) (b : Nat → Color) (pow3 : Array Nat) : Nat → Nat → Nat → Nat
-  | 0, _, acc => acc
-  | rem + 1, i, acc =>
-    let nxt := (i + 1) % r
-    let diff := (b i).toNat ^^^ (b nxt).toNat
-    let d_i := if diff > 0 then diff - 1 else 0
-    permTraceAux p r b pow3 rem (i + 1) (acc + p d_i * pow3.getD i 0)
-
 /-- At `p = id`, `permTraceAux` coincides with `boundaryTraceAux`. -/
 theorem permTraceAux_id (r : Nat) (b : Nat → Color) (pow3 : Array Nat) (rem i acc : Nat) :
     permTraceAux (fun d => d) r b pow3 rem i acc = boundaryTraceAux r b pow3 rem i acc := by
@@ -299,19 +290,18 @@ theorem mem_stepOrbitsList_of_mem_acc (cover : ByteArray) (iter : Nat)
       exact mem_push_data nextOrbits orb0 orb h_acc
     · exact ih nextOrbits (clearOrbitLive live orb0) (setOrbitRanks ranks orb0 iter) h_acc
 
-/-- Every `orb ∈ orbs` is either retained in `(stepOrbitsList ...).1` or has at least one uncovered
-    canonical pairing (`j0`, `j2`, or `j5`) in `cover`. -/
+/-- Every `orb ∈ orbs` is either retained in `(stepOrbitsList ...).1` or has `orbitCovered cover orb = false`. -/
 theorem stepOrbitsList_retained_or_uncovered (cover : ByteArray) (iter : Nat)
     (orbs : List Orbit6) (nextOrbits : Array Orbit6) (live : ByteArray) (ranks : Array Nat)
     (orb : Orbit6) (horb : orb ∈ orbs) :
     orb ∈ (stepOrbitsList cover iter orbs nextOrbits live ranks).1.toList ∨
-      (cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1) = false := by
+      orbitCovered cover orb = false := by
   induction orbs generalizing nextOrbits live ranks with
   | nil => contradiction
   | cons orb0 rest ih =>
     rcases List.mem_cons.mp horb with rfl | h_rest
     · dsimp [stepOrbitsList]
-      cases h_cov : (cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1) with
+      cases h_cov : orbitCovered cover orb with
       | true =>
         rw [if_pos rfl]
         left
@@ -336,7 +326,7 @@ theorem not_isEmpty_of_mem_toList {α : Type} (a : Array α) (x : α) (hx : x �
     If `orb ∈ st.orbits.toList` and `orb ∉ (runReducerLoop N fuel st).orbits.toList`,
     then there exists a round state `st_k` reached during `runReducerLoop` such that:
     1. `orb ∈ st_k.orbits.toList`,
-    2. `(cov_k.get! orb.j0 == 1 && cov_k.get! orb.j2 == 1 && cov_k.get! orb.j5 == 1) = false`,
+    2. `orbitCovered cov_k orb = false`,
     3. Every `sm ∈ st.activeSM.toList` satisfies the active-SM invariant at `st_k`,
     4. Liveness is monotone from `st` to `st_k`, and
     5. Liveness is monotone from `st_k` to `runReducerLoop N fuel st`. -/
@@ -346,7 +336,7 @@ theorem exists_eliminating_round_of_not_mem_orbits (N fuel : Nat) (st : ReducerS
     ∃ st_k : ReducerState,
       orb ∈ st_k.orbits.toList ∧
       (let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-       (cov.get! orb.j0 == 1 && cov.get! orb.j2 == 1 && cov.get! orb.j5 == 1) = false) ∧
+       orbitCovered cov orb = false) ∧
       (∀ sm ∈ st.activeSM.toList,
         sm ∈ st_k.activeSM.toList ∨ ∃ t < 1 <<< sm.p, (st_k.live.get! (smFitIndex sm t) == 1) = false) ∧
       (∀ j, (st.live.get! j == 1) = false → (st_k.live.get! j == 1) = false) ∧
@@ -385,60 +375,6 @@ theorem exists_eliminating_round_of_not_mem_orbits (N fuel : Nat) (st : ReducerS
           (reducerStep_not_live_mono N st j hj)
     · rw [if_neg h_cond] at h_not_mem
       exact False.elim (h_not_mem horb)
-
-/-- **Combined Eliminating Round + Signed-Matching Elimination Theorem:**
-    At any eliminating round `st_k` of an orbit `orb` during `runReducerLoop N fuel st`,
-    there exists an uncovered canonical pairing trace `j_θ ∈ {orb.j0, orb.j2, orb.j5}` such that
-    if `j_θ < N`, then for EVERY `sm ∈ st.activeSM.toList` fitting `j_θ` at `t = 0`
-    (or via its `(12)`-dual `swapSM sm`), there exists a parameter `t < 1 <<< sm.p` such that
-    `smFitIndex sm t` is already non-live at the start of round `st_k` (`(st_k.live.get! (smFitIndex sm t) == 1) = false`)
-    and remains non-live at the end of `runReducerLoop N fuel st`. -/
-theorem round_uncovered_sm_elimination (N fuel : Nat) (st : ReducerState)
-    (orb : Orbit6) (horb : orb ∈ st.orbits.toList)
-    (h_not_mem : orb ∉ (runReducerLoop N fuel st).orbits.toList)
-    (h0_lt : orb.j0 < N) (h2_lt : orb.j2 < N) (h5_lt : orb.j5 < N) :
-    ∃ st_k : ReducerState,
-      orb ∈ st_k.orbits.toList ∧
-      ∃ j_θ : Nat, (j_θ = orb.j0 ∨ j_θ = orb.j2 ∨ j_θ = orb.j5) ∧
-        ∀ sm ∈ st.activeSM.toList,
-          (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
-          ∃ t < 1 <<< sm.p,
-            (st_k.live.get! (smFitIndex sm t) == 1) = false ∧
-            ((runReducerLoop N fuel st).live.get! (smFitIndex sm t) == 1) = false := by
-  rcases exists_eliminating_round_of_not_mem_orbits N fuel st orb horb h_not_mem with
-    ⟨st_k, horb_k, h_uncov_k, h_sm_k, _, h_to_end⟩
-  let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-  have h_pair := uncovered_pairing_of_not_covered cov orb h_uncov_k
-  have h_helper : ∀ j_θ : Nat, j_θ < N → (cov.get! j_θ == 1) = false →
-      ∀ sm ∈ st.activeSM.toList, (smFitIndex sm 0 = j_θ ∨ smFitIndex (swapSM sm) 0 = j_θ) →
-      ∃ t < 1 <<< sm.p,
-        (st_k.live.get! (smFitIndex sm t) == 1) = false ∧
-        ((runReducerLoop N fuel st).live.get! (smFitIndex sm t) == 1) = false := by
-    intro j_θ hj_lt hj_uncov sm hsm h_fit
-    rcases h_sm_k sm hsm with h_active | ⟨t, ht, h_dead⟩
-    · rcases h_fit with h_fit0 | h_fit_dual
-      · rcases exists_not_live_of_uncovered_in_round N st_k j_θ hj_lt hj_uncov sm (Or.inl h_active) h_fit0 with
-          ⟨t, ht, h_dead⟩
-        exact ⟨t, ht, h_dead, h_to_end (smFitIndex sm t) h_dead⟩
-      · have h_tree_dual : smFitTree (swapSM sm) sm.p 0 0 0 = j_θ := by
-          have := smFitTree_eq_smFitIndex (swapSM sm) 0
-          dsimp [swapSM] at this ⊢
-          rw [this]
-          exact h_fit_dual
-        have hj_zeros : j_θ < (zeros N).size := by
-          rw [zeros_size]
-          exact hj_lt
-        rcases uncovered_of_stepSMList_swapSM st_k.live st_k.activeSM.toList (zeros N)
-            (Array.mkEmpty st_k.activeSM.size) j_θ hj_zeros hj_uncov sm h_active h_tree_dual with
-          ⟨t, ht, h_dead⟩
-        rw [smFitTree_eq_smFitIndex] at h_dead
-        exact ⟨t, ht, h_dead, h_to_end (smFitIndex sm t) h_dead⟩
-    · exact ⟨t, ht, h_dead, h_to_end (smFitIndex sm t) h_dead⟩
-  refine ⟨st_k, horb_k, ?_⟩
-  rcases h_pair with h0 | h2 | h5
-  · exact ⟨orb.j0, Or.inl rfl, h_helper orb.j0 h0_lt h0⟩
-  · exact ⟨orb.j2, Or.inr (Or.inl rfl), h_helper orb.j2 h2_lt h2⟩
-  · exact ⟨orb.j5, Or.inr (Or.inr rfl), h_helper orb.j5 h5_lt h5⟩
 
 /-!
 ### Part 4: Rank Bound and Rank Preservation Invariants Across `stepOrbitsList` and `runReducerLoop`
@@ -720,7 +656,7 @@ theorem stepOrbitsList_eliminated_orb_ranks_and_live (cover : ByteArray) (iter :
     (h_disj : ∀ orb1 ∈ orbs, ∀ orb2 ∈ orbs, orb1 ≠ orb2 → ∀ j, inOrbit6 orb1 j → ¬ inOrbit6 orb2 j)
     (h_bnd_r : orbitBounded ranks.size orb)
     (h_bnd_l : orbitBounded live.size orb)
-    (h_uncov : (cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1) = false)
+    (h_uncov : orbitCovered cover orb = false)
     (j : Nat) (hj : inOrbit6 orb j) :
     (stepOrbitsList cover iter orbs nextOrbits live ranks).2.2.getD j 0 = iter ∧
     (stepOrbitsList cover iter orbs nextOrbits live ranks).2.1.get! j = 0 := by
@@ -757,7 +693,7 @@ theorem stepOrbitsList_eliminated_orb_ranks_and_live (cover : ByteArray) (iter :
 theorem stepOrbitsList_not_mem_of_uncovered (cover : ByteArray) (iter : Nat)
     (orbs : List Orbit6) (nextOrbits : Array Orbit6) (live : ByteArray) (ranks : Array Nat)
     (orb : Orbit6) (h_not_acc : orb ∉ nextOrbits.toList) (h_nodup : orbs.Nodup)
-    (h_uncov : (cover.get! orb.j0 == 1 && cover.get! orb.j2 == 1 && cover.get! orb.j5 == 1) = false) :
+    (h_uncov : orbitCovered cover orb = false) :
     orb ∉ (stepOrbitsList cover iter orbs nextOrbits live ranks).1.toList := by
   induction orbs generalizing nextOrbits live ranks with
   | nil => exact h_not_acc
@@ -816,7 +752,7 @@ theorem eliminated_orb_final_rank_and_live (N rem : Nat) (st_k : ReducerState)
     (h_bnd_l : orbitBounded st_k.live.size orb)
     (h_uncov :
       (let cov := (stepSMList st_k.live st_k.activeSM.toList (zeros N) (Array.mkEmpty st_k.activeSM.size)).1
-       (cov.get! orb.j0 == 1 && cov.get! orb.j2 == 1 && cov.get! orb.j5 == 1) = false))
+       orbitCovered cov orb = false))
     (j : Nat) (hj : inOrbit6 orb j) :
     (runReducerLoop N rem (reducerStep N st_k)).ranks.getD j 0 = st_k.iter + 1 ∧
     (runReducerLoop N rem (reducerStep N st_k)).live.get! j = 0 := by

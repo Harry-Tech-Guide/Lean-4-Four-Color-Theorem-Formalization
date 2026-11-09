@@ -416,35 +416,38 @@ def canonicalSMData (c : Configuration) : Array SMData :=
   Batch.buildSMData c.ringSize Batch.sharedPow3
 
 /-- D-reducibility checker and soundness certificate package for configuration `c` at canonical index `idx`,
-    pinned explicitly to `canonicalSMData c` (`buildSMData c.ringSize sharedPow3`) and `sharedPow3`. -/
+    pinned explicitly to `canonicalSMData c` (`buildSMData c.ringSize sharedPow3`) and `sharedPow3`.
+    (`InitialLiveSpec` and `IterationEliminationHypothesis` are proved unconditionally via
+    `initialLiveSpec_sharedPow3_of_wellFormed` and `iterationElimination_of_checkFastTotal`.) -/
 def HasDCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
   KernelReducer.verifyIdxD idx = true ∧
   Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3 ∧
-  CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier (canonicalSMData c) Batch.sharedPow3 ∧
   Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
     (canonicalSMData c) Batch.sharedPow3 = true
 
 /-- C-reducibility checker and soundness certificate package for configuration `c` at canonical index `idx`,
     pinned explicitly to `canonicalSMData c` (`buildSMData c.ringSize sharedPow3`) and `sharedPow3`.
-    (`c.contractEdges ≠ []` and `ContractCheckSoundnessHypothesis` are proved unconditionally via
-    `c_contract_edges_nonempty` and `contractCheckSoundness_of_wellFormed`.) -/
+    (`c.contractEdges ≠ []`, `InitialLiveSpec`, `LiveZeroIterationEliminationHypothesis`, and
+    `ContractCheckSoundnessHypothesis` are proved unconditionally via `c_contract_edges_nonempty`,
+    `initialLiveSpec_sharedPow3_of_wellFormed`, `liveZeroIterationElimination_of_initialLiveSpec`,
+    and `contractCheckSoundness_of_wellFormed`.) -/
 def HasCCertificateWitness (c : Configuration) (idx : Nat) : Prop :=
   KernelReducer.verifyIdxC idx = true ∧
   Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3 ∧
-  CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier (canonicalSMData c) Batch.sharedPow3 ∧
   Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
     (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true
 
 /-- Kernel-to-Mathematical Certificate Soundness Bridge:
     Connects `KernelReducer.verifyIdxD idx = true` to `HasDCertificateWitness` and
     `idx ∈ certified_c_indices → KernelReducer.verifyIdxC idx = true` to `HasCCertificateWitness`.
-    NOTE (Stages K1–K3 & C2): `KernelReducer.buildRingColLoop` has been fixed to use the canonical
+    NOTE (Stages K1–K3, C2 & D4): `KernelReducer.buildRingColLoop` has been fixed to use the canonical
     $d_{r-2} = 0$ slice (geometric chord order $(0, 1, \dots, r-3, r-2, r-1)$), all 138
     `Batch/*` and `CBatch/*` modules are re-certified in-kernel (`249/249` D + `384/384` C =
-    `633/633` configurations, `0` false D-reducible configs), and `ContractCheckSoundnessHypothesis`
-    is proved unconditionally (`contractCheckSoundness_of_wellFormed`). Discharging this bridge requires
-    proving the slice refinement theorem (`verifyIdxD` / `verifyIdxC` → `checkFastTotal` /
-    `runContractCheckTotal`) together with `InitialLiveSpec` and `FullRepresentationHypothesis`. -/
+    `633/633` configurations, `0` false D-reducible configs), and `InitialLiveSpec`,
+    `IterationEliminationHypothesis`, `LiveZeroIterationEliminationHypothesis`, and
+    `ContractCheckSoundnessHypothesis` are all proved unconditionally. Discharging this bridge
+    requires proving the slice refinement theorem (`verifyIdxD` / `verifyIdxC` → `checkFastTotal` /
+    `runContractCheckTotal`) together with `FullRepresentationHypothesis`. -/
 def KernelReducerSoundnessBridge : Prop :=
   ∀ (idx : Nat) (h_lt : idx < 633),
     let c := theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt)
@@ -558,19 +561,20 @@ theorem batch_soundness_of_kernel_bridge (hK : KernelReducerSoundnessBridge) :
   | inr hc =>
     exact Or.inr ⟨hc.1, hKB.2 hc.1 hc.2⟩
 
-/-- **Stage D3 D-Reducibility Soundness Theorem (`rsst_d_sound_of_checkFast`):**
+/-- **Stage D4 D-Reducibility Soundness Theorem (`rsst_d_sound_of_checkFast`):**
     For any unavoidable configuration `c = theUnavoidableSet[idx]!` (`idx < 633`),
-    `IsSoundEarlier`, `IsWellFormedEarlier`, and `IsIrreflexiveAdj` are discharged by reflection,
-    and `IterationEliminationHypothesis` is reduced to `InitialLiveSpec`, `FullRepresentationHypothesis`,
-    and `checkFastTotal = true`. -/
+    `IsRingCycle`, `IsSoundEarlier`, `IsWellFormedEarlier`, `IsIrreflexiveAdj`, `c.ringSize ≤ 15`,
+    `InitialLiveSpec`, and `IterationEliminationHypothesis` are discharged, reducing `IsDReducible c`
+    solely to `FullRepresentationHypothesis` and `checkFastTotal = true`. -/
 theorem rsst_d_sound_of_checkFast (c : Configuration) (idx : Nat) (h_lt : idx < 633)
     (h_c_eq : c = theUnavoidableSet[idx]!)
     (h_check : Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
       (canonicalSMData c) Batch.sharedPow3 = true)
-    (h_rep : Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3)
-    (h_init : CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier
-      (canonicalSMData c) Batch.sharedPow3) :
+    (h_rep : Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3) :
     IsDReducible c := by
+  have h_ring : CheckerSoundness.IsRingCycle c := by
+    rw [h_c_eq]
+    exact CheckerSoundness.unavoidable_is_ring_cycle idx h_lt
   have h_irrefl : Soundness.IsIrreflexiveAdj c := by
     rw [h_c_eq]
     exact Soundness.unavoidable_is_irreflexive idx h_lt
@@ -580,20 +584,22 @@ theorem rsst_d_sound_of_checkFast (c : Configuration) (idx : Nat) (h_lt : idx < 
   have h_wf : Soundness.IsWellFormedEarlier c sharedCfgs[idx]!.earlier := by
     rw [h_c_eq]
     exact CheckerSoundness.unavoidable_is_well_formed_earlier idx h_lt
-  exact CheckerSoundness.fast_d_sound_of_initialLiveSpec c sharedCfgs[idx]!.earlier
-    (canonicalSMData c) Batch.sharedPow3 h_check h_earlier h_wf h_irrefl h_rep h_init
+  have hr_le : c.ringSize ≤ 15 := by
+    rw [h_c_eq]
+    exact CheckerSoundness.unavoidable_ring_le_15 idx h_lt
+  exact CheckerSoundness.fast_d_sound_of_wellFormed c sharedCfgs[idx]!.earlier
+    (canonicalSMData c) h_check h_ring h_earlier h_wf h_irrefl hr_le h_rep
 
-/-- **Stage D3 + C2 C-Reducibility Soundness Theorem (`rsst_c_sound_of_contract_check`):**
+/-- **Stage D4 + C2 C-Reducibility Soundness Theorem (`rsst_c_sound_of_contract_check`):**
     For any C-certified unavoidable configuration `c = theUnavoidableSet[idx]!` (`idx < 633`, `idx ∈ certified_c_indices`),
     `c.contractEdges ≠ []`, `IsRingCycle`, `IsSoundEarlier`, `IsWellFormedEarlier`, `IsIrreflexiveAdj`,
-    and `ContractCheckSoundnessHypothesis` are discharged, reducing `IsCReducible c` to
-    `InitialLiveSpec`, `FullRepresentationHypothesis`, and `runContractCheckTotal = true`. -/
+    `c.ringSize ≤ 15`, `InitialLiveSpec`, `LiveZeroIterationEliminationHypothesis`, and
+    `ContractCheckSoundnessHypothesis` are discharged, reducing `IsCReducible c` solely to
+    `FullRepresentationHypothesis` and `runContractCheckTotal = true`. -/
 theorem rsst_c_sound_of_contract_check (c : Configuration) (idx : Nat) (h_lt : idx < 633)
     (hc : idx ∈ certified_c_indices)
     (h_c_eq : c = theUnavoidableSet[idx]!)
     (h_rep : Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3)
-    (h_init : CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier
-      (canonicalSMData c) Batch.sharedPow3)
     (h_run : Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
       (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true) :
     IsCReducible c := by
@@ -612,37 +618,39 @@ theorem rsst_c_sound_of_contract_check (c : Configuration) (idx : Nat) (h_lt : i
   have h_wf : Soundness.IsWellFormedEarlier c sharedCfgs[idx]!.earlier := by
     rw [h_c_eq]
     exact CheckerSoundness.unavoidable_is_well_formed_earlier idx h_lt
-  exact CheckerSoundness.fast_c_sound_of_initialLiveSpec c sharedCfgs[idx]!.earlier
-    (canonicalSMData c) Batch.sharedPow3 h_contract h_ring h_earlier h_wf h_irrefl h_rep h_init h_run
+  have hr_le : c.ringSize ≤ 15 := by
+    rw [h_c_eq]
+    exact CheckerSoundness.unavoidable_ring_le_15 idx h_lt
+  exact CheckerSoundness.fast_c_sound_of_wellFormed c sharedCfgs[idx]!.earlier
+    (canonicalSMData c) h_contract h_ring h_earlier h_wf h_irrefl hr_le h_rep h_run
 
 /-- RSST D-Certificate Witness Theorem:
     Unpacks `isCertifiedDConfig c` into `verifyIdxD idx = true`, `FullRepresentationHypothesis`,
-    `InitialLiveSpec`, and `checkFastTotal = true`. -/
+    and `checkFastTotal = true`. -/
 theorem rsst_d_certificate_witness (c : Configuration) :
   isCertifiedDConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633),
       theUnavoidableSet[idx]'(by rw [unavoidable_size_eq]; exact h_lt) = c ∧
       KernelReducer.verifyIdxD idx = true ∧
       Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3 ∧
-      CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier (canonicalSMData c) Batch.sharedPow3 ∧
       Soundness.checkFastTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier)
         (canonicalSMData c) Batch.sharedPow3 = true := by
-  rintro ⟨_hMaster, idx, h_lt, h_eq, _hd, h_ver, h_rep, h_init, h_check⟩
-  exact ⟨idx, h_lt, h_eq, h_ver, h_rep, h_init, h_check⟩
+  rintro ⟨_hMaster, idx, h_lt, h_eq, _hd, h_ver, h_rep, h_check⟩
+  exact ⟨idx, h_lt, h_eq, h_ver, h_rep, h_check⟩
 
 /-- RSST D-Certificate Soundness Theorem:
     A configuration certified as D-reducible is mathematically D-reducible,
     proved directly via `rsst_d_sound_of_checkFast`. -/
 theorem rsst_d_certificate_soundness (c : Configuration) (h : isCertifiedDConfig c) :
     IsDReducible c := by
-  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, h_eq, _h_ver, h_rep, h_init, h_check⟩
+  rcases rsst_d_certificate_witness c h with ⟨idx, h_lt, h_eq, _h_ver, h_rep, h_check⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
-  exact rsst_d_sound_of_checkFast c idx h_lt h_c_eq h_check h_rep h_init
+  exact rsst_d_sound_of_checkFast c idx h_lt h_c_eq h_check h_rep
 
 /-- RSST C-Certificate Witness Theorem:
     Unpacks `isCertifiedCConfig c` into `idx ∈ certified_c_indices`, `verifyIdxC idx = true`,
-    `FullRepresentationHypothesis`, `InitialLiveSpec`, and `runContractCheckTotal = true`. -/
+    `FullRepresentationHypothesis`, and `runContractCheckTotal = true`. -/
 theorem rsst_c_certificate_witness (c : Configuration) :
   isCertifiedCConfig c →
     ∃ (idx : Nat) (h_lt : idx < 633),
@@ -650,21 +658,20 @@ theorem rsst_c_certificate_witness (c : Configuration) :
       idx ∈ certified_c_indices ∧
       KernelReducer.verifyIdxC idx = true ∧
       Soundness.FullRepresentationHypothesis c (canonicalSMData c) Batch.sharedPow3 ∧
-      CheckerSoundness.InitialLiveSpec c sharedCfgs[idx]!.earlier (canonicalSMData c) Batch.sharedPow3 ∧
       Soundness.runContractCheckTotal (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) Batch.sharedPow3
         (Soundness.computeFinalState (Soundness.rconfOfConfig c sharedCfgs[idx]!.earlier) (canonicalSMData c) Batch.sharedPow3).live = true := by
-  rintro ⟨_hMaster, idx, h_lt, h_eq, hc, h_ver, h_rep, h_init, h_run⟩
-  exact ⟨idx, h_lt, h_eq, hc, h_ver, h_rep, h_init, h_run⟩
+  rintro ⟨_hMaster, idx, h_lt, h_eq, hc, h_ver, h_rep, h_run⟩
+  exact ⟨idx, h_lt, h_eq, hc, h_ver, h_rep, h_run⟩
 
 /-- RSST C-Certificate Soundness Theorem:
     A configuration certified as C-reducible is mathematically C-reducible,
     proved directly via `rsst_c_sound_of_contract_check`. -/
 theorem rsst_c_certificate_soundness (c : Configuration) (h : isCertifiedCConfig c) :
     IsCReducible c := by
-  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, h_eq, hc, _h_ver, h_rep, h_init, h_run⟩
+  rcases rsst_c_certificate_witness c h with ⟨idx, h_lt, h_eq, hc, _h_ver, h_rep, h_run⟩
   have h_c_eq : c = theUnavoidableSet[idx]! := by
     rw [← h_eq, unavoidable_get_eq_getElem! idx h_lt]
-  exact rsst_c_sound_of_contract_check c idx h_lt hc h_c_eq h_rep h_init h_run
+  exact rsst_c_sound_of_contract_check c idx h_lt hc h_c_eq h_rep h_run
 
 /-- The RSST Certificate Soundness Principle:
     A configuration certified by the RSST in-kernel reflection suite across all 138 batch files
