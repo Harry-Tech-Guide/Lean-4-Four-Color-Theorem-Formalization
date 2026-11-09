@@ -20,20 +20,21 @@ def sameFace (d1 d2 : H.Dart) (fuel : Nat := 1000) : Bool :=
 def areAdjacentDarts (d1 d2 : H.Dart) (fuel : Nat := 1000) : Bool :=
   sameVertex H (H.edge.f d1) d2 fuel
 
+/-- Extract one canonical dart per node orbit from `remaining`, accumulating in reverse order into `acc`. -/
+def getCanonicalDarts (fuel : Nat) (remaining : List H.Dart) (visited : List H.Dart) (acc : List H.Dart) : List H.Dart :=
+  match remaining with
+  | [] => acc
+  | d :: ds =>
+    if visited.contains d then
+      getCanonicalDarts fuel ds visited acc
+    else
+      let orb := getOrbit H.node fuel d
+      getCanonicalDarts fuel ds (orb ++ visited) (d :: acc)
+
 /-- Extract a standard simple graph from a finite list of darts.
 Vertices are represented directly by darts (one canonical dart per node orbit). -/
 def extractGraph (darts : List H.Dart) (fuel : Nat := darts.length) : Graph H.Dart :=
-  let rec getCanonicalDarts (remaining : List H.Dart) (visited : List H.Dart) (acc : List H.Dart) : List H.Dart :=
-    match remaining with
-    | [] => acc
-    | d :: ds =>
-      if visited.contains d then
-        getCanonicalDarts ds visited acc
-      else
-        let orb := getOrbit H.node fuel d
-        getCanonicalDarts ds (orb ++ visited) (d :: acc)
-        
-  let canonicalDarts := getCanonicalDarts darts [] []
+  let canonicalDarts := getCanonicalDarts H fuel darts [] []
   
   { vertices := canonicalDarts,
     adj := fun d1 d2 => 

@@ -706,4 +706,582 @@ theorem dual_dual (H : Hypermap) : H.dual.dual = H := by
   cases H
   rfl
 
+/-!
+### Stage B.1: Orbit Equivalence, Duplicate-Freeness (`Nodup`), and Orbit Partition Counting
+-/
+
+/-- Exact equivalence of `getOrbit` membership for any two darts in the same closed orbit:
+    if `d1`'s orbit closes within `fuel` steps and `d2 ∈ getOrbit p fuel d1`,
+    then `x ∈ getOrbit p fuel d2 ↔ x ∈ getOrbit p fuel d1`. -/
+theorem mem_getOrbit_iff_of_mem (p : Perm D) (fuel : Nat) {d1 d2 : D}
+    (h_closes : orbitClosesWithin p d1 d1 fuel) (h12 : d2 ∈ getOrbit p fuel d1) (x : D) :
+    x ∈ getOrbit p fuel d2 ↔ x ∈ getOrbit p fuel d1 := by
+  have h_closes2 := orbitClosesWithin_of_mem_getOrbit p fuel h_closes h12
+  have h21 := mem_getOrbit_symm p fuel h_closes h12
+  constructor
+  · intro hx
+    exact mem_getOrbit_trans p fuel h_closes h12 hx
+  · intro hx
+    exact mem_getOrbit_trans p fuel h_closes2 h21 hx
+
+/-- Boolean `.contains` equality for `getOrbit` of two darts in the same closed orbit. -/
+theorem getOrbit_contains_eq_of_mem (p : Perm D) (fuel : Nat) {d1 d2 : D}
+    (h_closes : orbitClosesWithin p d1 d1 fuel) (h12 : d2 ∈ getOrbit p fuel d1) (x : D) :
+    (getOrbit p fuel d2).contains x = (getOrbit p fuel d1).contains x := by
+  by_cases hx : x ∈ getOrbit p fuel d1
+  · have hx2 : x ∈ getOrbit p fuel d2 := (mem_getOrbit_iff_of_mem p fuel h_closes h12 x).mpr hx
+    rw [List.contains_iff_mem.mpr hx, List.contains_iff_mem.mpr hx2]
+  · have hx2 : x ∉ getOrbit p fuel d2 :=
+      fun h => hx ((mem_getOrbit_iff_of_mem p fuel h_closes h12 x).mp h)
+    cases h1 : (getOrbit p fuel d2).contains x with
+    | true => exact False.elim (hx2 (List.contains_iff_mem.mp h1))
+    | false =>
+      cases h2 : (getOrbit p fuel d1).contains x with
+      | true => exact False.elim (hx (List.contains_iff_mem.mp h2))
+      | false => rfl
+
+/-- Auxiliary duplicate-freeness invariant for `getOrbitAux`:
+    if `(current :: acc).Nodup` and every element `y ∈ current :: acc` other than `start`
+    has a `p.f`-predecessor in `acc`, then `(getOrbitAux p start current acc fuel).Nodup`. -/
+theorem getOrbitAux_nodup (p : Perm D) (start current : D) (acc : List D) (fuel : Nat)
+    (h_nodup : (current :: acc).Nodup)
+    (h_pred : ∀ y ∈ current :: acc, y ≠ start → ∃ x ∈ acc, p.f x = y) :
+    (getOrbitAux p start current acc fuel).Nodup := by
+  induction fuel generalizing current acc with
+  | zero =>
+    dsimp [getOrbitAux]
+    exact h_nodup
+  | succ fuel ih =>
+    dsimp [getOrbitAux]
+    by_cases h_hit : p.f current = start
+    · have hbeq : (p.f current == start) = true := by
+        change (if p.f current = start then true else false) = true
+        rw [h_hit]; simp
+      rw [hbeq]
+      exact h_nodup
+    · have hbeq : (p.f current == start) = false := by
+        change (if p.f current = start then true else false) = false
+        rw [if_neg h_hit]
+      rw [hbeq]
+      dsimp
+      have h_not_in : p.f current ∉ current :: acc := by
+        intro h_in
+        rcases h_pred (p.f current) h_in h_hit with ⟨x, hx_acc, hx_eq⟩
+        have h_x_eq : x = current := by
+          have h_inv := congrArg p.inv hx_eq
+          rw [p.left_inv, p.left_inv] at h_inv
+          exact h_inv
+        subst h_x_eq
+        exact (List.nodup_cons.mp h_nodup).1 hx_acc
+      apply ih (p.f current) (current :: acc)
+      · exact List.nodup_cons.mpr ⟨h_not_in, h_nodup⟩
+      · intro y hy_mem hy_ne
+        rcases List.mem_cons.mp hy_mem with rfl | hy_tail
+        · exact ⟨current, List.Mem.head acc, rfl⟩
+        · rcases h_pred y hy_tail hy_ne with ⟨x, hx_acc, hx_eq⟩
+          exact ⟨x, List.Mem.tail current hx_acc, hx_eq⟩
+
+/-- Every orbit list `getOrbit p fuel d` is unconditionally duplicate-free (`Nodup`). -/
+theorem getOrbit_nodup (p : Perm D) (fuel : Nat) (d : D) :
+    (getOrbit p fuel d).Nodup := by
+  apply getOrbitAux_nodup p d d [] fuel
+  · simp [List.Nodup]
+  · intro y hy hy_ne
+    rcases List.mem_cons.mp hy with rfl | h_nil
+    · exact False.elim (hy_ne rfl)
+    · contradiction
+
+/-- Two duplicate-free lists with identical membership have the exact same length. -/
+theorem nodup_length_eq_of_iff_mem {l1 l2 : List D}
+    (hl1 : l1.Nodup) (hl2 : l2.Nodup) (h_iff : ∀ x, x ∈ l1 ↔ x ∈ l2) :
+    l1.length = l2.length := by
+  have h12 := nodup_length_le_of_subset l1 l2 hl1 (fun x hx => (h_iff x).mp hx)
+  have h21 := nodup_length_le_of_subset l2 l1 hl2 (fun x hx => (h_iff x).mpr hx)
+  omega
+
+/-- Any two darts in the same closed orbit have `getOrbit` lists of identical length. -/
+theorem getOrbit_length_eq_of_mem (p : Perm D) (fuel : Nat) {d1 d2 : D}
+    (h_closes : orbitClosesWithin p d1 d1 fuel) (h12 : d2 ∈ getOrbit p fuel d1) :
+    (getOrbit p fuel d2).length = (getOrbit p fuel d1).length :=
+  nodup_length_eq_of_iff_mem (getOrbit_nodup p fuel d2) (getOrbit_nodup p fuel d1)
+    (mem_getOrbit_iff_of_mem p fuel h_closes h12)
+
+/-- For any closed orbit, `getOrbit p.symm fuel d` and `getOrbit p fuel d` have identical length. -/
+theorem getOrbit_symm_length_eq (p : Perm D) (fuel : Nat) (d : D)
+    (h_closes : orbitClosesWithin p d d fuel) :
+    (getOrbit p.symm fuel d).length = (getOrbit p fuel d).length :=
+  nodup_length_eq_of_iff_mem (getOrbit_nodup p.symm fuel d) (getOrbit_nodup p fuel d)
+    (mem_getOrbit_symm_perm_iff p fuel d · h_closes)
+
+/-- Filtering a list by a Boolean predicate `P` and its negation `!P` partitions its length. -/
+theorem length_eq_filter_add_filter_not (P : D → Bool) (l : List D) :
+    l.length = (l.filter P).length + (l.filter (fun x => !(P x))).length := by
+  induction l with
+  | nil => rfl
+  | cons d ds ih =>
+    dsimp [List.filter]
+    cases hP : P d <;> simp <;> omega
+
+/-- Filtering a duplicate-free list preserves `Nodup`. -/
+theorem nodup_filter (P : D → Bool) {l : List D} (hl : l.Nodup) :
+    (l.filter P).Nodup := by
+  induction l with
+  | nil => exact hl
+  | cons d ds ih =>
+    have hd_not : d ∉ ds := (List.nodup_cons.mp hl).1
+    have hds_nodup : ds.Nodup := (List.nodup_cons.mp hl).2
+    dsimp [List.filter]
+    cases hP : P d
+    · dsimp
+      exact ih hds_nodup
+    · dsimp
+      apply List.nodup_cons.mpr
+      refine ⟨?_, ih hds_nodup⟩
+      intro h_mem
+      exact hd_not (List.mem_filter.mp h_mem).1
+
+/-- When `l.Nodup`, `orb.Nodup`, and `orb ⊆ l`, filtering out `orb` reduces `l.length` by `orb.length`. -/
+theorem length_eq_orb_add_filter_not_contains {l orb : List D}
+    (hl : l.Nodup) (horb : orb.Nodup) (h_sub : ∀ x ∈ orb, x ∈ l) :
+    l.length = orb.length + (l.filter (fun x => !(orb.contains x))).length := by
+  have h_part := length_eq_filter_add_filter_not (fun x => orb.contains x) l
+  have h_eq_orb : (l.filter (fun x => orb.contains x)).length = orb.length := by
+    apply nodup_length_eq_of_iff_mem (nodup_filter _ hl) horb
+    intro x
+    rw [List.mem_filter, List.contains_iff_mem]
+    constructor
+    · exact fun h => h.2
+    · exact fun hx => ⟨h_sub x hx, hx⟩
+  omega
+
+/-- Auxiliary theorem for uniform orbit lengths:
+    if `l.Nodup`, `l.length ≤ steps`, every `d ∈ l` has a closed orbit of length `k` contained in `l`,
+    then `l.length = k * countOrbitsAux p fuel steps l`. -/
+theorem length_eq_mul_countOrbitsAux_of_uniform (p : Perm D) (fuel k steps : Nat) (l : List D)
+    (h_steps : l.length ≤ steps)
+    (hl_nodup : l.Nodup)
+    (h_closes : ∀ d ∈ l, orbitClosesWithin p d d fuel)
+    (h_sub : ∀ d ∈ l, ∀ x ∈ getOrbit p fuel d, x ∈ l)
+    (h_unif : ∀ d ∈ l, (getOrbit p fuel d).length = k) :
+    l.length = k * countOrbitsAux p fuel steps l := by
+  induction steps generalizing l with
+  | zero =>
+    cases l with
+    | nil =>
+      rfl
+    | cons d ds =>
+      dsimp at h_steps
+      omega
+  | succ steps ih =>
+    cases l with
+    | nil =>
+      rfl
+    | cons d ds =>
+      dsimp [countOrbitsAux]
+      have hd_mem : d ∈ d :: ds := List.Mem.head ds
+      have hd_closes : orbitClosesWithin p d d fuel := h_closes d hd_mem
+      have hd_len : (getOrbit p fuel d).length = k := h_unif d hd_mem
+      have hd_sub : ∀ x ∈ getOrbit p fuel d, x ∈ d :: ds := h_sub d hd_mem
+      have h_part := length_eq_orb_add_filter_not_contains hl_nodup (getOrbit_nodup p fuel d) hd_sub
+      have hd_in_orb : (getOrbit p fuel d).contains d = true :=
+        List.contains_iff_mem.mpr (mem_getOrbit_self p fuel d)
+      have h_filter_cons :
+          (d :: ds).filter (fun x => !((getOrbit p fuel d).contains x)) =
+            ds.filter (fun x => !((getOrbit p fuel d).contains x)) := by
+        dsimp [List.filter]
+        rw [hd_in_orb]
+        rfl
+      rw [h_filter_cons] at h_part
+      let rest := ds.filter (fun x => !((getOrbit p fuel d).contains x))
+      have h_rest_steps : rest.length ≤ steps := by
+        have h_pos : (getOrbit p fuel d).length ≥ 1 :=
+          List.length_pos_of_mem (mem_getOrbit_self p fuel d)
+        dsimp [rest]
+        dsimp at h_steps h_part
+        omega
+      have h_rest_nodup : rest.Nodup :=
+        nodup_filter _ (List.nodup_cons.mp hl_nodup).2
+      have h_rest_closes : ∀ y ∈ rest, orbitClosesWithin p y y fuel := by
+        intro y hy
+        exact h_closes y (List.Mem.tail d (List.mem_filter.mp hy).1)
+      have h_rest_sub : ∀ y ∈ rest, ∀ x ∈ getOrbit p fuel y, x ∈ rest := by
+        intro y hy x hx
+        have hy_ds : y ∈ ds := (List.mem_filter.mp hy).1
+        have hy_not_orb := (List.mem_filter.mp hy).2
+        have hx_in_all : x ∈ d :: ds := h_sub y (List.Mem.tail d hy_ds) x hx
+        have hx_not_in_orb : x ∉ getOrbit p fuel d := by
+          intro hx_orb
+          have hy_orb : y ∈ getOrbit p fuel d := by
+            have hy_in_x : y ∈ getOrbit p fuel x :=
+              mem_getOrbit_symm p fuel (h_closes y (List.Mem.tail d hy_ds)) hx
+            exact mem_getOrbit_trans p fuel hd_closes hx_orb hy_in_x
+          have h_true : (getOrbit p fuel d).contains y = true :=
+            List.contains_iff_mem.mpr hy_orb
+          rw [h_true] at hy_not_orb
+          contradiction
+        have hx_ne_d : x ≠ d := by
+          intro h_eq
+          subst h_eq
+          exact hx_not_in_orb (mem_getOrbit_self p fuel x)
+        have hx_ds : x ∈ ds := by
+          rcases List.mem_cons.mp hx_in_all with rfl | hx_tail
+          · exact False.elim (hx_ne_d rfl)
+          · exact hx_tail
+        apply List.mem_filter.mpr
+        refine ⟨hx_ds, ?_⟩
+        cases h_c : (getOrbit p fuel d).contains x with
+        | false => rfl
+        | true => exact False.elim (hx_not_in_orb (List.contains_iff_mem.mp h_c))
+      have h_rest_unif : ∀ y ∈ rest, (getOrbit p fuel y).length = k := by
+        intro y hy
+        exact h_unif y (List.Mem.tail d (List.mem_filter.mp hy).1)
+      have h_ih := ih rest h_rest_steps h_rest_nodup h_rest_closes h_rest_sub h_rest_unif
+      rw [hd_len] at h_part
+      change (d :: ds).length = k + rest.length at h_part
+      rw [h_ih] at h_part
+      rw [Nat.mul_add, Nat.mul_one]
+      dsimp at h_part
+      omega
+
+/-- Uniform Orbit Length Theorem:
+    if `l.Nodup` and every `d ∈ l` has a closed orbit of length `k` contained in `l`,
+    then `l.length = k * countOrbits p fuel l`. -/
+theorem length_eq_mul_countOrbits_of_uniform (p : Perm D) (fuel k : Nat) (l : List D)
+    (hl_nodup : l.Nodup)
+    (h_closes : ∀ d ∈ l, orbitClosesWithin p d d fuel)
+    (h_sub : ∀ d ∈ l, ∀ x ∈ getOrbit p fuel d, x ∈ l)
+    (h_unif : ∀ d ∈ l, (getOrbit p fuel d).length = k) :
+    l.length = k * countOrbits p fuel l :=
+  length_eq_mul_countOrbitsAux_of_uniform p fuel k l.length l
+    (Nat.le_refl _) hl_nodup h_closes h_sub h_unif
+
+/-- Special case of `length_eq_mul_countOrbits_of_uniform` on a complete dart list (`darts.Nodup` and `∀ d, d ∈ darts`):
+    if every dart `d ∈ darts` has `(getOrbit p fuel d).length = k` for `fuel ≥ darts.length`,
+    then `darts.length = k * countOrbits p fuel darts`. -/
+theorem length_eq_mul_countOrbits_of_complete (p : Perm D) (darts : List D) (k : Nat)
+    (h_nodup : darts.Nodup) (h_all : ∀ x : D, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_unif : ∀ d ∈ darts, (getOrbit p fuel d).length = k) :
+    darts.length = k * countOrbits p fuel darts := by
+  apply length_eq_mul_countOrbits_of_uniform p fuel k darts h_nodup
+  · intro d _
+    exact orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le
+  · intro d _ x _
+    exact h_all x
+  · exact h_unif
+
+/-- For any involution `p` (`∀ x, p.f (p.f x) = x`) and any non-fixed point `d` (`p.f d ≠ d`),
+    `getOrbit p fuel d = [p.f d, d]` for all `fuel ≥ 1`. -/
+theorem getOrbit_involution_of_ne (p : Perm D) (he : ∀ x, p.f (p.f x) = x) (d : D)
+    (hne : p.f d ≠ d) {fuel : Nat} (h_pos : 1 ≤ fuel) :
+    getOrbit p fuel d = [p.f d, d] := by
+  cases fuel with
+  | zero => omega
+  | succ f =>
+    dsimp [getOrbit, getOrbitAux]
+    have hbeq1 : (p.f d == d) = false := by
+      change (if p.f d = d then true else false) = false
+      rw [if_neg hne]
+    rw [hbeq1]
+    dsimp
+    cases f with
+    | zero => rfl
+    | succ f' =>
+      dsimp [getOrbitAux]
+      have hbeq2 : (p.f (p.f d) == d) = true := by
+        change (if p.f (p.f d) = d then true else false) = true
+        rw [he d]
+        simp
+      rw [hbeq2]
+      rfl
+
+/-- For any involution `p` and any non-fixed point `d` (`p.f d ≠ d`),
+    `(getOrbit p fuel d).length = 2` for all `fuel ≥ 1`. -/
+theorem getOrbit_involution_length_two (p : Perm D) (he : ∀ x, p.f (p.f x) = x) (d : D)
+    (hne : p.f d ≠ d) {fuel : Nat} (h_pos : 1 ≤ fuel) :
+    (getOrbit p fuel d).length = 2 := by
+  rw [getOrbit_involution_of_ne p he d hne h_pos]
+  rfl
+
+/-- For any fixed-point-free involution `p` on a complete dart list `darts`,
+    `darts.length = 2 * countOrbits p fuel darts` for all `fuel ≥ darts.length`. -/
+theorem length_eq_two_mul_countOrbits_of_involution (p : Perm D) (he : ∀ x, p.f (p.f x) = x)
+    (darts : List D) (h_nodup : darts.Nodup) (h_all : ∀ x : D, x ∈ darts)
+    (h_free : ∀ d ∈ darts, p.f d ≠ d) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    darts.length = 2 * countOrbits p fuel darts := by
+  cases h_darts : darts with
+  | nil =>
+    rfl
+  | cons d0 ds =>
+    subst h_darts
+    have h_pos : 1 ≤ fuel := by
+      dsimp at h_le
+      omega
+    apply length_eq_mul_countOrbits_of_complete p (d0 :: ds) 2 h_nodup h_all h_le
+    intro d hd
+    exact getOrbit_involution_length_two p he d (h_free d hd) h_pos
+
+/-- Canonical list of orbit representatives extracted in the same order as `countOrbitsAux`. -/
+def canonicalOrbitsAux (p : Perm D) (fuel : Nat) : Nat → List D → List D
+  | 0, _ => []
+  | _ + 1, [] => []
+  | steps + 1, d :: ds =>
+    let orb := getOrbit p fuel d
+    d :: canonicalOrbitsAux p fuel steps (ds.filter (fun x => !(orb.contains x)))
+
+/-- Canonical list of orbit representatives for `l`. -/
+def canonicalOrbits (p : Perm D) (fuel : Nat) (l : List D) : List D :=
+  canonicalOrbitsAux p fuel l.length l
+
+/-- The length of `canonicalOrbitsAux` is identically `countOrbitsAux`. -/
+theorem canonicalOrbitsAux_length (p : Perm D) (fuel steps : Nat) (l : List D) :
+    (canonicalOrbitsAux p fuel steps l).length = countOrbitsAux p fuel steps l := by
+  induction steps generalizing l with
+  | zero => rfl
+  | succ steps ih =>
+    cases l with
+    | nil => rfl
+    | cons d ds =>
+      dsimp [canonicalOrbitsAux, countOrbitsAux]
+      rw [ih]
+      omega
+
+/-- The length of `canonicalOrbits` is identically `countOrbits`. -/
+theorem canonicalOrbits_length (p : Perm D) (fuel : Nat) (l : List D) :
+    (canonicalOrbits p fuel l).length = countOrbits p fuel l :=
+  canonicalOrbitsAux_length p fuel l.length l
+
+/-- Sum of `(getOrbit p fuel v).length` over a list of representatives `vs`. -/
+def sumOrbitLengths (p : Perm D) (fuel : Nat) : List D → Nat
+  | [] => 0
+  | v :: vs => (getOrbit p fuel v).length + sumOrbitLengths p fuel vs
+
+theorem sumOrbitLengths_append (p : Perm D) (fuel : Nat) (l1 l2 : List D) :
+    sumOrbitLengths p fuel (l1 ++ l2) = sumOrbitLengths p fuel l1 + sumOrbitLengths p fuel l2 := by
+  induction l1 with
+  | nil =>
+    dsimp [sumOrbitLengths]
+    omega
+  | cons v vs ih =>
+    dsimp [sumOrbitLengths]
+    rw [ih]
+    omega
+
+theorem sumOrbitLengths_reverse (p : Perm D) (fuel : Nat) (l : List D) :
+    sumOrbitLengths p fuel l.reverse = sumOrbitLengths p fuel l := by
+  induction l with
+  | nil => rfl
+  | cons v vs ih =>
+    rw [List.reverse_cons, sumOrbitLengths_append]
+    dsimp [sumOrbitLengths]
+    rw [ih]
+    omega
+
+/-- Handshaking / Orbit Partition Sum Theorem for `canonicalOrbitsAux`:
+    if `l.Nodup`, `l.length ≤ steps`, and every `d ∈ l` has a closed orbit contained in `l`,
+    then summing `(getOrbit p fuel v).length` over `canonicalOrbitsAux p fuel steps l` equals `l.length`. -/
+theorem sumOrbitLengths_canonicalOrbitsAux_eq_length (p : Perm D) (fuel steps : Nat) (l : List D)
+    (h_steps : l.length ≤ steps)
+    (hl_nodup : l.Nodup)
+    (h_closes : ∀ d ∈ l, orbitClosesWithin p d d fuel)
+    (h_sub : ∀ d ∈ l, ∀ x ∈ getOrbit p fuel d, x ∈ l) :
+    sumOrbitLengths p fuel (canonicalOrbitsAux p fuel steps l) = l.length := by
+  induction steps generalizing l with
+  | zero =>
+    cases l with
+    | nil => rfl
+    | cons d ds =>
+      dsimp at h_steps
+      omega
+  | succ steps ih =>
+    cases l with
+    | nil => rfl
+    | cons d ds =>
+      dsimp [canonicalOrbitsAux, sumOrbitLengths]
+      have hd_mem : d ∈ d :: ds := List.Mem.head ds
+      have hd_closes : orbitClosesWithin p d d fuel := h_closes d hd_mem
+      have hd_sub : ∀ x ∈ getOrbit p fuel d, x ∈ d :: ds := h_sub d hd_mem
+      have h_part := length_eq_orb_add_filter_not_contains hl_nodup (getOrbit_nodup p fuel d) hd_sub
+      have hd_in_orb : (getOrbit p fuel d).contains d = true :=
+        List.contains_iff_mem.mpr (mem_getOrbit_self p fuel d)
+      have h_filter_cons :
+          (d :: ds).filter (fun x => !((getOrbit p fuel d).contains x)) =
+            ds.filter (fun x => !((getOrbit p fuel d).contains x)) := by
+        dsimp [List.filter]
+        rw [hd_in_orb]
+        rfl
+      rw [h_filter_cons] at h_part
+      let rest := ds.filter (fun x => !((getOrbit p fuel d).contains x))
+      have h_rest_steps : rest.length ≤ steps := by
+        have h_pos : (getOrbit p fuel d).length ≥ 1 :=
+          List.length_pos_of_mem (mem_getOrbit_self p fuel d)
+        dsimp [rest]
+        dsimp at h_steps h_part
+        omega
+      have h_rest_nodup : rest.Nodup :=
+        nodup_filter _ (List.nodup_cons.mp hl_nodup).2
+      have h_rest_closes : ∀ y ∈ rest, orbitClosesWithin p y y fuel := by
+        intro y hy
+        exact h_closes y (List.Mem.tail d (List.mem_filter.mp hy).1)
+      have h_rest_sub : ∀ y ∈ rest, ∀ x ∈ getOrbit p fuel y, x ∈ rest := by
+        intro y hy x hx
+        have hy_ds : y ∈ ds := (List.mem_filter.mp hy).1
+        have hy_not_orb := (List.mem_filter.mp hy).2
+        have hx_in_all : x ∈ d :: ds := h_sub y (List.Mem.tail d hy_ds) x hx
+        have hx_not_in_orb : x ∉ getOrbit p fuel d := by
+          intro hx_orb
+          have hy_orb : y ∈ getOrbit p fuel d := by
+            have hy_in_x : y ∈ getOrbit p fuel x :=
+              mem_getOrbit_symm p fuel (h_closes y (List.Mem.tail d hy_ds)) hx
+            exact mem_getOrbit_trans p fuel hd_closes hx_orb hy_in_x
+          have h_true : (getOrbit p fuel d).contains y = true :=
+            List.contains_iff_mem.mpr hy_orb
+          rw [h_true] at hy_not_orb
+          contradiction
+        have hx_ne_d : x ≠ d := by
+          intro h_eq
+          subst h_eq
+          exact hx_not_in_orb (mem_getOrbit_self p fuel x)
+        have hx_ds : x ∈ ds := by
+          rcases List.mem_cons.mp hx_in_all with rfl | hx_tail
+          · exact False.elim (hx_ne_d rfl)
+          · exact hx_tail
+        apply List.mem_filter.mpr
+        refine ⟨hx_ds, ?_⟩
+        cases h_c : (getOrbit p fuel d).contains x with
+        | false => rfl
+        | true => exact False.elim (hx_not_in_orb (List.contains_iff_mem.mp h_c))
+      have h_ih := ih rest h_rest_steps h_rest_nodup h_rest_closes h_rest_sub
+      change (d :: ds).length = (getOrbit p fuel d).length + rest.length at h_part
+      rw [← h_ih] at h_part
+      exact h_part.symm
+
+/-- Handshaking / Orbit Partition Sum Theorem for `canonicalOrbits`:
+    if `l.Nodup` and every `d ∈ l` has a closed orbit contained in `l`,
+    then `sumOrbitLengths p fuel (canonicalOrbits p fuel l) = l.length`. -/
+theorem sumOrbitLengths_canonicalOrbits_eq_length (p : Perm D) (fuel : Nat) (l : List D)
+    (hl_nodup : l.Nodup)
+    (h_closes : ∀ d ∈ l, orbitClosesWithin p d d fuel)
+    (h_sub : ∀ d ∈ l, ∀ x ∈ getOrbit p fuel d, x ∈ l) :
+    sumOrbitLengths p fuel (canonicalOrbits p fuel l) = l.length :=
+  sumOrbitLengths_canonicalOrbitsAux_eq_length p fuel l.length l
+    (Nat.le_refl _) hl_nodup h_closes h_sub
+
+/-- Handshaking / Orbit Partition Sum Theorem on a complete dart list (`darts.Nodup` and `∀ x, x ∈ darts`):
+    for all `fuel ≥ darts.length`, `sumOrbitLengths p fuel (canonicalOrbits p fuel darts) = darts.length`. -/
+theorem sumOrbitLengths_canonicalOrbits_of_complete (p : Perm D) (darts : List D)
+    (h_nodup : darts.Nodup) (h_all : ∀ x : D, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    sumOrbitLengths p fuel (canonicalOrbits p fuel darts) = darts.length := by
+  apply sumOrbitLengths_canonicalOrbits_eq_length p fuel darts h_nodup
+  · intro d _
+    exact orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le
+  · intro d _ x _
+    exact h_all x
+
+theorem filter_length_le (P : D → Bool) (l : List D) :
+    (l.filter P).length ≤ l.length := by
+  have h := length_eq_filter_add_filter_not P l
+  omega
+
+/-- Once `steps ≥ l.length`, `canonicalOrbitsAux p fuel steps l` is independent of `steps`. -/
+theorem canonicalOrbitsAux_steps_eq (p : Perm D) (fuel : Nat) {steps1 steps2 : Nat} (l : List D)
+    (h1 : l.length ≤ steps1) (h2 : l.length ≤ steps2) :
+    canonicalOrbitsAux p fuel steps1 l = canonicalOrbitsAux p fuel steps2 l := by
+  induction steps1 generalizing steps2 l with
+  | zero =>
+    cases l with
+    | nil =>
+      cases steps2 <;> rfl
+    | cons d ds =>
+      dsimp at h1
+      omega
+  | succ s1 ih =>
+    cases l with
+    | nil =>
+      cases steps2 <;> rfl
+    | cons d ds =>
+      cases steps2 with
+      | zero =>
+        dsimp at h2
+        omega
+      | succ s2 =>
+        dsimp [canonicalOrbitsAux]
+        congr 1
+        have h_flt : (ds.filter (fun x => !((getOrbit p fuel d).contains x))).length ≤ ds.length :=
+          filter_length_le _ ds
+        dsimp at h1 h2
+        exact ih _ (by omega) (by omega)
+
+/-- Step equation for `canonicalOrbits` on `d :: ds`. -/
+theorem canonicalOrbits_cons (p : Perm D) (fuel : Nat) (d : D) (ds : List D) :
+    canonicalOrbits p fuel (d :: ds) =
+      d :: canonicalOrbits p fuel (ds.filter (fun x => !((getOrbit p fuel d).contains x))) := by
+  dsimp [canonicalOrbits, canonicalOrbitsAux]
+  congr 1
+  have h_flt : (ds.filter (fun x => !((getOrbit p fuel d).contains x))).length ≤ ds.length :=
+    filter_length_le _ ds
+  exact canonicalOrbitsAux_steps_eq p fuel _ h_flt (Nat.le_refl _)
+
+theorem not_contains_append_eq (orb visited : List D) (x : D) :
+    (!(orb ++ visited).contains x) = ((!orb.contains x) && (!visited.contains x)) := by
+  by_cases h1 : x ∈ orb
+  · have hc1 : orb.contains x = true := List.contains_iff_mem.mpr h1
+    have hc_app : (orb ++ visited).contains x = true :=
+      List.contains_iff_mem.mpr (List.mem_append_left visited h1)
+    rw [hc1, hc_app]
+    rfl
+  · by_cases h2 : x ∈ visited
+    · have hc2 : visited.contains x = true := List.contains_iff_mem.mpr h2
+      have hc_app : (orb ++ visited).contains x = true :=
+        List.contains_iff_mem.mpr (List.mem_append_right orb h2)
+      cases hc1 : orb.contains x with
+      | true => exact False.elim (h1 (List.contains_iff_mem.mp hc1))
+      | false =>
+        rw [hc2, hc_app]
+        rfl
+    · have hc1 : orb.contains x = false := by
+        cases h : orb.contains x with
+        | false => rfl
+        | true => exact False.elim (h1 (List.contains_iff_mem.mp h))
+      have hc2 : visited.contains x = false := by
+        cases h : visited.contains x with
+        | false => rfl
+        | true => exact False.elim (h2 (List.contains_iff_mem.mp h))
+      have hc_app : (orb ++ visited).contains x = false := by
+        cases h : (orb ++ visited).contains x with
+        | false => rfl
+        | true =>
+          rcases List.mem_append.mp (List.contains_iff_mem.mp h) with ha | hb
+          · exact False.elim (h1 ha)
+          · exact False.elim (h2 hb)
+      rw [hc1, hc2, hc_app]
+      rfl
+
+theorem filter_not_contains_append (ds orb visited : List D) :
+    ds.filter (fun x => !(orb ++ visited).contains x) =
+      (ds.filter (fun x => !visited.contains x)).filter (fun x => !orb.contains x) := by
+  induction ds with
+  | nil => rfl
+  | cons a as ih =>
+    dsimp [List.filter]
+    rw [not_contains_append_eq orb visited a]
+    cases hv : visited.contains a <;> cases ho : orb.contains a
+    · change a :: as.filter (fun x => !(orb ++ visited).contains x) =
+        (a :: as.filter (fun x => !visited.contains x)).filter (fun x => !orb.contains x)
+      dsimp [List.filter]
+      rw [ho, ih]
+      rfl
+    · change as.filter (fun x => !(orb ++ visited).contains x) =
+        (a :: as.filter (fun x => !visited.contains x)).filter (fun x => !orb.contains x)
+      dsimp [List.filter]
+      rw [ho]
+      exact ih
+    · exact ih
+    · exact ih
+
+theorem filter_not_contains_nil (l : List D) :
+    l.filter (fun x => !([] : List D).contains x) = l := by
+  simp
+
 end Hypermap

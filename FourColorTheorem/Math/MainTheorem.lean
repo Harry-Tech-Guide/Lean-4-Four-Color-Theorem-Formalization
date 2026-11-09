@@ -152,8 +152,10 @@ def HasDiskExcisionSurgery (H : Hypermap) [DecidableEq H.Dart] (darts : List H.D
               boundaryKempeSwap c (Hypermap.configBoundaryColoring (Hypermap.exciseFixed H c f) c f col) θ S)
 
 /-- Explicit topological standardization bridge for minimal planar counterexamples:
-    1. Minimal counterexample triangulation Euler equations (`V - E + F = 2`, `2E = 3F`, `∑ deg = 2E`).
-    2. Cartwheel discharging elimination under the genuine 32-rule `Discharging.rsstChargeShift H`
+    1. Minimal counterexample connectedness and triangulation structure (`numComponents = 1` and `faceDegree = 3`),
+       from which Euler's formula `V - E + F = 2`, triangulation `2E = 3F`, and Handshaking `∑ deg = 2E`
+       are proved unconditionally by `Discharging.triangulation_euler_equations_of_complete`.
+    2. Cartwheel discharging elimination under the genuine 32-rule `Discharging.rsstChargeShift H darts.length`
        given `Discharging.DischargingTreesVerified theUnavoidableSet.toList`.
     3. Disk excision surgery (`HasDiskExcisionSurgery`) for embedded configurations with positive interior.
     (Phase 1 computational & mathematical reducibility of all 633 configurations in `theUnavoidableSet`
@@ -165,14 +167,12 @@ def RSSTStandardizationBridge : Prop :=
     Hypermap.isBridgeless H darts →
     (MapColoring H → False) →
     AllSmallerColorable darts.length →
-    (∃ (E F : Int),
-      Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
-      ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
-      2 * E = 3 * F) ∧
+    (Hypermap.numComponents H darts.length darts = 1 ∧
+      ∀ d ∈ darts, Hypermap.faceDegree H d darts.length = 3) ∧
     (Discharging.DischargingTreesVerified theUnavoidableSet.toList →
       ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
       ∀ v ∈ (Hypermap.extractGraph H darts).vertices,
-        Discharging.finalCharge H (Discharging.rsstChargeShift H) darts v ≤ 0) ∧
+        Discharging.finalCharge H (Discharging.rsstChargeShift H darts.length) darts v ≤ 0) ∧
     (∀ (c : Configuration), c.interiorSize > 0 → appearsIn c H darts → HasDiskExcisionSurgery H darts c)
 
 def IsCounterexampleOfSize (n : Nat) : Prop :=
@@ -446,7 +446,7 @@ structure PlanarDischargingWitness (H : Hypermap) [DecidableEq H.Dart] (darts : 
     The final charge sum = 120 is automatically derived via the master charge conservation theorem. -/
 def planar_discharging_witness_of_initial_120 (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (rule : Discharging.ChargeShift H.Dart)
-    (hInitial : Discharging.sumCharges (Discharging.initialCharge H) (Hypermap.extractGraph H darts).vertices = 120)
+    (hInitial : Discharging.sumCharges (fun v => Discharging.initialCharge H v darts.length) (Hypermap.extractGraph H darts).vertices = 120)
     (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
       ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0) :
     PlanarDischargingWitness H darts :=
@@ -459,14 +459,14 @@ def planar_discharging_witness_of_initial_120 (H : Hypermap) [DecidableEq H.Dart
 def planar_discharging_witness_of_triangulation (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (rule : Discharging.ChargeShift H.Dart)
     (E F : Int)
-    (hDegSum : Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E)
+    (hDegSum : Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v darts.length : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E)
     (hEuler : ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2)
     (hTriang : 2 * E = 3 * F)
     (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
       ∀ v ∈ (Hypermap.extractGraph H darts).vertices, Discharging.finalCharge H rule darts v ≤ 0) :
     PlanarDischargingWitness H darts :=
-  let hInit : Discharging.sumCharges (Discharging.initialCharge H) (Hypermap.extractGraph H darts).vertices = 120 :=
-    Discharging.initial_charge_sum_eq_120_of_triangulation H (Hypermap.extractGraph H darts).vertices 1000 E F hDegSum hEuler hTriang
+  let hInit : Discharging.sumCharges (fun v => Discharging.initialCharge H v darts.length) (Hypermap.extractGraph H darts).vertices = 120 :=
+    Discharging.initial_charge_sum_eq_120_of_triangulation H (Hypermap.extractGraph H darts).vertices darts.length E F hDegSum hEuler hTriang
   { rule := rule,
     charge_sum_120 := Discharging.sumCharges_finalCharge_eq_120 H rule darts hInit,
     discharging_elimination := hElim }
@@ -499,7 +499,7 @@ def rsst_from_discharging_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (
 def rsst_from_triangulation_and_reducibility (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (rule : Discharging.ChargeShift H.Dart)
     (E F : Int)
-    (hDegSum : Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E)
+    (hDegSum : Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v darts.length : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E)
     (hEuler : ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2)
     (hTriang : 2 * E = 3 * F)
     (hElim : ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) → 
@@ -518,20 +518,22 @@ theorem rsst_discharging_computationally_verified :
 
 /-- The RSST Triangulation Euler Property:
     Every minimal counterexample to the Four Color Theorem is a maximal planar triangulation,
-    satisfying V - E + F = 2, 2E = 3F, and degree sum = 2E. -/
+    satisfying V - E + F = 2, 2E = 3F, and degree sum = 2E (proved via `Discharging.triangulation_euler_equations_of_complete`). -/
 theorem rsst_mc_triangulation_euler (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_rsst : RSSTStandardizationBridge)
   (mc : MinimalCounterexample H darts) :
   ∃ (E F : Int),
-    Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v 1000 : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
+    Discharging.sumDegrees (fun v => (Hypermap.nodeDegree H v darts.length : Int)) (Hypermap.extractGraph H darts).vertices = 2 * E ∧
     ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
     2 * E = 3 * F := by
   have hStd := h_rsst H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
-  exact hStd.1
+  exact Discharging.triangulation_euler_equations_of_complete H darts
+    mc.complete.1 mc.complete.2.1 mc.is_bridgeless
+    (Nat.le_refl _) (Nat.le_refl _) mc.is_planar hStd.1.1 hStd.1.2
 
 /-- The RSST Discharging Elimination Property:
     In any minimal counterexample where no unavoidable configuration appears,
-    all final vertex charges under the canonical 32-rule `Discharging.rsstChargeShift H` are non-positive (≤ 0),
+    all final vertex charges under the canonical 32-rule `Discharging.rsstChargeShift H darts.length` are non-positive (≤ 0),
     as witnessed by the verified cartwheel discharging trees. -/
 theorem rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_rsst : RSSTStandardizationBridge)
@@ -539,12 +541,12 @@ theorem rsst_mc_discharging_elimination (H : Hypermap) [DecidableEq H.Dart] (dar
   (h_trees : Discharging.DischargingTreesVerified theUnavoidableSet.toList) :
   ¬ (∃ c, c ∈ theUnavoidableSet ∧ appearsIn c H darts) →
     ∀ v ∈ (Hypermap.extractGraph H darts).vertices,
-      Discharging.finalCharge H (Discharging.rsstChargeShift H) darts v ≤ 0 := by
+      Discharging.finalCharge H (Discharging.rsstChargeShift H darts.length) darts v ≤ 0 := by
   have hStd := h_rsst H darts mc.complete mc.is_planar mc.is_bridgeless mc.not_colorable mc.all_smaller_colorable
   exact hStd.2.1 h_trees
 
 /-- The RSST Discharging Witness Theorem:
-    Constructed directly from the triangulation Euler conditions, the canonical 32-rule `Discharging.rsstChargeShift H`,
+    Constructed directly from the triangulation Euler conditions, the canonical 32-rule `Discharging.rsstChargeShift H darts.length`,
     and the verified cartwheel discharging trees. -/
 noncomputable def rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_rsst : RSSTStandardizationBridge)
@@ -555,7 +557,7 @@ noncomputable def rsst_discharging_witness (H : Hypermap) [DecidableEq H.Dart] (
   have hFEx := Classical.choose_spec hEulerEx
   let F := Classical.choose hFEx
   have ⟨hDegSum, hEuler, hTriang⟩ := Classical.choose_spec hFEx
-  let rule := Discharging.rsstChargeShift H
+  let rule := Discharging.rsstChargeShift H darts.length
   have hElim := rsst_mc_discharging_elimination H darts h_rsst mc rsst_discharging_computationally_verified
   exact planar_discharging_witness_of_triangulation H darts rule E F hDegSum hEuler hTriang hElim
 

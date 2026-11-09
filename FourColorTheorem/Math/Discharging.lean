@@ -176,10 +176,10 @@ theorem totalShifts_self_zero {D : Type} (rule : ChargeShift D) (vs : List D) :
     rfl
 
 /-- The final charge of a vertex after applying a set of discharging rules.
-    Defined as the initial charge plus all net shifts received from adjacent vertices. -/
+    Defined as the initial charge (with fuel `darts.length`) plus all net shifts received from adjacent vertices. -/
 def finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (v : H.Dart) : Int :=
   let G := Hypermap.extractGraph H darts
-  initialCharge H v + sumShiftsTo rule v G.vertices
+  initialCharge H v darts.length + sumShiftsTo rule v G.vertices
 
 def sumCharges {D : Type} (f : D → Int) : List D → Int
   | [] => 0
@@ -188,7 +188,7 @@ def sumCharges {D : Type} (f : D → Int) : List D → Int
 /-- The sum of final charges over any vertex list is the sum of initial charges plus total shifts. -/
 theorem sumCharges_finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart) (vs : List H.Dart) :
     sumCharges (finalCharge H rule darts) vs =
-      sumCharges (initialCharge H) vs + totalShifts rule vs (Hypermap.extractGraph H darts).vertices := by
+      sumCharges (fun v => initialCharge H v darts.length) vs + totalShifts rule vs (Hypermap.extractGraph H darts).vertices := by
   induction vs with
   | nil => rfl
   | cons v rest ih =>
@@ -200,7 +200,7 @@ theorem sumCharges_finalCharge (rule : ChargeShift H.Dart) (darts : List H.Dart)
     Proved from the global charge conservation theorem `totalShifts_self_zero`. -/
 theorem sumCharges_finalCharge_all (rule : ChargeShift H.Dart) (darts : List H.Dart) :
     sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices =
-      sumCharges (initialCharge H) (Hypermap.extractGraph H darts).vertices := by
+      sumCharges (fun v => initialCharge H v darts.length) (Hypermap.extractGraph H darts).vertices := by
   have h := sumCharges_finalCharge H rule darts (Hypermap.extractGraph H darts).vertices
   rw [totalShifts_self_zero] at h
   omega
@@ -208,7 +208,7 @@ theorem sumCharges_finalCharge_all (rule : ChargeShift H.Dart) (darts : List H.D
 /-- Total Final Charge Conservation from Euler Characteristic:
     If the initial Euler charge sums to 120, then the sum of final charges is unconditionally 120! -/
 theorem sumCharges_finalCharge_eq_120 (rule : ChargeShift H.Dart) (darts : List H.Dart)
-    (hInitial : sumCharges (initialCharge H) (Hypermap.extractGraph H darts).vertices = 120) :
+    (hInitial : sumCharges (fun v => initialCharge H v darts.length) (Hypermap.extractGraph H darts).vertices = 120) :
     sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120 := by
   rw [sumCharges_finalCharge_all]
   exact hInitial
@@ -281,6 +281,193 @@ theorem unavoidable_set_exists_of_sum_120 (rule : ChargeShift H.Dart) (darts : L
     (hSum : sumCharges (finalCharge H rule darts) (Hypermap.extractGraph H darts).vertices = 120) :
     UnavoidableSetExists H rule darts :=
   fun hNonpos => positive_charge_contradiction (finalCharge H rule darts) _ hSum hNonpos
+
+/-!
+### Stage B.3: Fuel-Independence of Discharging & Unconditional Triangulation Euler-Handshaking Synthesis
+-/
+
+/-- Fuel-independence of `Hypermap.nodeDegree` on any complete dart list (`∀ d, d ∈ darts`). -/
+theorem nodeDegree_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    Hypermap.nodeDegree H v fuel = Hypermap.nodeDegree H v darts.length := by
+  dsimp [Hypermap.nodeDegree]
+  rw [Hypermap.getOrbit_fuel_eq_of_complete H.node darts h_all v h_le]
+
+/-- Fuel-independence of `Hypermap.faceDegree` on any complete dart list (`∀ d, d ∈ darts`). -/
+theorem faceDegree_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    Hypermap.faceDegree H v fuel = Hypermap.faceDegree H v darts.length := by
+  dsimp [Hypermap.faceDegree]
+  rw [Hypermap.getOrbit_fuel_eq_of_complete H.face darts h_all v h_le]
+
+/-- Fuel-independence of `Hypermap.sameVertex` on any complete dart list. -/
+theorem sameVertex_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (u v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    Hypermap.sameVertex H u v fuel = Hypermap.sameVertex H u v darts.length := by
+  dsimp [Hypermap.sameVertex]
+  rw [Hypermap.getOrbit_fuel_eq_of_complete H.node darts h_all u h_le]
+
+/-- Fuel-independence of `initialCharge` on any complete dart list. -/
+theorem initialCharge_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    initialCharge H v fuel = initialCharge H v darts.length := by
+  dsimp [initialCharge]
+  rw [nodeDegree_fuel_eq_of_complete H darts h_all v h_le]
+
+/-- Fuel-independence of `matchesRawRule` on any complete dart list. -/
+theorem matchesRawRule_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (inv : Bool) (d : H.Dart) (r : RawRule) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    matchesRawRule H fuel inv d r = matchesRawRule H darts.length inv d r := by
+  dsimp [matchesRawRule]
+  rw [nodeDegree_fuel_eq_of_complete H darts h_all (ruleVertexDart H inv d 0) h_le,
+      nodeDegree_fuel_eq_of_complete H darts h_all (ruleVertexDart H inv d 1) h_le]
+  have h_all_eq :
+      (fun p : Nat × (Nat × Nat) => degMatchesBound (Hypermap.nodeDegree H (ruleVertexDart H inv d p.1) fuel) p.2) =
+      (fun p : Nat × (Nat × Nat) => degMatchesBound (Hypermap.nodeDegree H (ruleVertexDart H inv d p.1) darts.length) p.2) := by
+    funext p
+    rw [nodeDegree_fuel_eq_of_complete H darts h_all (ruleVertexDart H inv d p.1) h_le]
+  rw [h_all_eq]
+
+/-- Fuel-independence of `rawRuleOutflow` on any complete dart list. -/
+theorem rawRuleOutflow_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (d : H.Dart) (r : RawRule) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    rawRuleOutflow H fuel d r = rawRuleOutflow H darts.length d r := by
+  dsimp [rawRuleOutflow]
+  rw [matchesRawRule_fuel_eq_of_complete H darts h_all false d r h_le,
+      matchesRawRule_fuel_eq_of_complete H darts h_all true d r h_le]
+
+/-- Fuel-independence of `dartRuleOutflow` on any complete dart list. -/
+theorem dartRuleOutflow_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (d : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    dartRuleOutflow H fuel d = dartRuleOutflow H darts.length d := by
+  dsimp [dartRuleOutflow]
+  have h_fn :
+      (fun (acc : Int) (r : RawRule) => acc + rawRuleOutflow H fuel d r) =
+      (fun (acc : Int) (r : RawRule) => acc + rawRuleOutflow H darts.length d r) := by
+    funext acc r
+    rw [rawRuleOutflow_fuel_eq_of_complete H darts h_all d r h_le]
+  rw [h_fn]
+
+/-- Fuel-independence of `vertexRuleOutflow` on any complete dart list. -/
+theorem vertexRuleOutflow_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (u v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    vertexRuleOutflow H fuel u v = vertexRuleOutflow H darts.length u v := by
+  dsimp [vertexRuleOutflow]
+  rw [sameVertex_fuel_eq_of_complete H darts h_all u v h_le,
+      Hypermap.getOrbit_fuel_eq_of_complete H.node darts h_all u h_le]
+  have h_flt :
+      (fun d => Hypermap.sameVertex H (H.edge.f d) v fuel) =
+      (fun d => Hypermap.sameVertex H (H.edge.f d) v darts.length) := by
+    funext d
+    exact sameVertex_fuel_eq_of_complete H darts h_all (H.edge.f d) v h_le
+  have h_fold :
+      (fun (acc : Int) (d : H.Dart) => acc + dartRuleOutflow H fuel d) =
+      (fun (acc : Int) (d : H.Dart) => acc + dartRuleOutflow H darts.length d) := by
+    funext acc d
+    rw [dartRuleOutflow_fuel_eq_of_complete H darts h_all d h_le]
+  rw [h_flt, h_fold]
+
+/-- Fuel-independence of `rsstShift` on any complete dart list. -/
+theorem rsstShift_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (u v : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    rsstShift H fuel u v = rsstShift H darts.length u v := by
+  dsimp [rsstShift]
+  rw [vertexRuleOutflow_fuel_eq_of_complete H darts h_all v u h_le,
+      vertexRuleOutflow_fuel_eq_of_complete H darts h_all u v h_le]
+
+/-- Fuel-independence of `sumDegrees` on any complete dart list. -/
+theorem sumDegrees_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (vs : List H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    sumDegrees (fun v => (Hypermap.nodeDegree H v fuel : Int)) vs =
+      sumDegrees (fun v => (Hypermap.nodeDegree H v darts.length : Int)) vs := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    dsimp [sumDegrees]
+    rw [nodeDegree_fuel_eq_of_complete H darts h_all v h_le, ih]
+
+/-- Equivalence between `sumDegrees` of `nodeDegree` and `Hypermap.sumOrbitLengths H.node`. -/
+theorem sumDegrees_nodeDegree_eq_sumOrbitLengths (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (vs : List H.Dart) :
+    sumDegrees (fun v => (Hypermap.nodeDegree H v fuel : Int)) vs =
+      (Hypermap.sumOrbitLengths H.node fuel vs : Int) := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    dsimp [sumDegrees, Hypermap.sumOrbitLengths]
+    rw [ih]
+    dsimp [Hypermap.nodeDegree]
+
+/-- Handshaking Lemma for `extractGraph`:
+    the sum of vertex degrees over `(extractGraph H darts).vertices` equals `darts.length`
+    for any `fuel ≥ darts.length`. -/
+theorem sumDegrees_extractGraph_eq_length (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    sumDegrees (fun v => (Hypermap.nodeDegree H v fuel : Int))
+      (Hypermap.extractGraph H darts).vertices = (darts.length : Int) := by
+  rw [sumDegrees_fuel_eq_of_complete H darts h_all _ h_le]
+  rw [sumDegrees_nodeDegree_eq_sumOrbitLengths H darts.length]
+  rw [Hypermap.extractGraph_vertices_eq_canonicalOrbits_reverse H darts darts.length]
+  rw [Hypermap.sumOrbitLengths_reverse]
+  rw [Hypermap.sumOrbitLengths_canonicalOrbits_of_complete H.node darts h_nodup h_all (Nat.le_refl _)]
+
+/-- Handshaking Lemma (`sumDegrees = 2 * E`) for `extractGraph` on any complete, bridgeless hypermap. -/
+theorem sumDegrees_extractGraph_eq_two_mul_numEdges (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b : Nat} (h_bridge : Hypermap.isBridgeless H darts fuel_b)
+    {fuel_deg fuel : Nat} (h_deg_le : darts.length ≤ fuel_deg) (h_le : darts.length ≤ fuel) :
+    sumDegrees (fun v => (Hypermap.nodeDegree H v fuel_deg : Int))
+      (Hypermap.extractGraph H darts).vertices = 2 * (Hypermap.numEdges H fuel darts : Int) := by
+  rw [sumDegrees_extractGraph_eq_length H darts h_nodup h_all h_deg_le]
+  have hE := Hypermap.darts_length_eq_two_mul_numEdges H darts h_nodup h_all h_bridge h_le
+  omega
+
+/-- Master Triangulation Euler & Handshaking Package:
+    for any complete, bridgeless, connected planar triangulation `(H, darts)`,
+    `E = numEdges H fuel darts` and `F = numFaces H fuel darts` satisfy:
+    1. `sumDegrees = 2 * E`
+    2. `V - E + F = 2`
+    3. `2 * E = 3 * F` -/
+theorem triangulation_euler_equations_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b : Nat} (h_bridge : Hypermap.isBridgeless H darts fuel_b)
+    {fuel_deg fuel : Nat} (h_deg_le : darts.length ≤ fuel_deg) (h_le : darts.length ≤ fuel)
+    (h_planar : Hypermap.isPlanar H fuel darts = true)
+    (h_conn : Hypermap.numComponents H fuel darts = 1)
+    (h_tri : ∀ d ∈ darts, Hypermap.faceDegree H d fuel = 3) :
+    ∃ (E F : Int),
+      sumDegrees (fun v => (Hypermap.nodeDegree H v fuel_deg : Int))
+        (Hypermap.extractGraph H darts).vertices = 2 * E ∧
+      ((Hypermap.extractGraph H darts).vertices.length : Int) - E + F = 2 ∧
+      2 * E = 3 * F := by
+  refine ⟨(Hypermap.numEdges H fuel darts : Int), (Hypermap.numFaces H fuel darts : Int), ?_, ?_, ?_⟩
+  · exact sumDegrees_extractGraph_eq_two_mul_numEdges H darts h_nodup h_all h_bridge h_deg_le h_le
+  · exact Hypermap.extractGraph_euler_eq_two_of_isPlanar_connected H darts h_all h_le h_planar h_conn
+  · exact Hypermap.two_mul_numEdges_eq_three_mul_numFaces_of_triangulation H darts h_nodup h_all h_bridge h_le h_tri
+
+/-- Unconditional Initial Charge Sum = 120 for any complete, bridgeless, connected planar triangulation. -/
+theorem initial_charge_sum_eq_120_of_complete_triangulation (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (h_bridge : Hypermap.isBridgeless H darts)
+    (h_planar : Hypermap.isPlanar H darts.length darts = true)
+    (h_conn : Hypermap.numComponents H darts.length darts = 1)
+    (h_tri : ∀ d ∈ darts, Hypermap.faceDegree H d darts.length = 3) :
+    sumCharges (fun v => initialCharge H v darts.length) (Hypermap.extractGraph H darts).vertices = 120 := by
+  rcases triangulation_euler_equations_of_complete H darts h_nodup h_all h_bridge
+    (Nat.le_refl _) (Nat.le_refl _) h_planar h_conn h_tri with ⟨E, F, hDegSum, hEuler, hTriang⟩
+  exact initial_charge_sum_eq_120_of_triangulation H (Hypermap.extractGraph H darts).vertices
+    darts.length E F hDegSum hEuler hTriang
 
 end Discharging
 end Math

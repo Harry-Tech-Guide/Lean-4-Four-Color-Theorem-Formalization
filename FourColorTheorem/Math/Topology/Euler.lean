@@ -1,5 +1,6 @@
 import FourColorTheorem.Math.Topology.Surgery
 import FourColorTheorem.Math.Topology.OrbitLemmas
+import FourColorTheorem.Math.HypermapGraph
 
 namespace Hypermap
 
@@ -118,5 +119,113 @@ theorem EulerChar_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart] (darts
   rw [countOrbits_fuel_eq_of_complete H.node darts l h_all h_le,
       countOrbits_fuel_eq_of_complete H.edge darts l h_all h_le,
       countOrbits_fuel_eq_of_complete H.face darts l h_all h_le]
+
+/-!
+### Stage B.2: Involution Edge Counting, Triangulation Face Counting, and `extractGraph` Canonical Vertex Bridge
+-/
+
+/-- In any bridgeless hypermap (`isBridgeless H darts fuel_b`), the edge permutation `H.edge`
+    has no fixed points (`H.edge.f d ≠ d`) on `darts`. -/
+theorem bridgeless_edge_ne_self (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (fuel_b : Nat) (h_bridge : Math.Hypermap.isBridgeless H darts fuel_b) :
+    ∀ d ∈ darts, H.edge.f d ≠ d := by
+  intro d hd h_eq
+  have h_false : Math.Hypermap.isBridge H d fuel_b = false := h_bridge d hd
+  dsimp [Math.Hypermap.isBridge, Math.Hypermap.sameFace] at h_false
+  rw [h_eq] at h_false
+  have h_true : (getOrbit H.face fuel_b d).contains d = true :=
+    List.contains_iff_mem.mpr (mem_getOrbit_self H.face fuel_b d)
+  rw [h_true] at h_false
+  contradiction
+
+/-- In any complete, bridgeless hypermap `(H, darts)`, the total number of darts is twice
+    the number of edges (`darts.length = 2 * numEdges H fuel darts`) for all `fuel ≥ darts.length`. -/
+theorem darts_length_eq_two_mul_numEdges (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b : Nat} (h_bridge : Math.Hypermap.isBridgeless H darts fuel_b)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    darts.length = 2 * numEdges H fuel darts :=
+  length_eq_two_mul_countOrbits_of_involution H.edge H.edge_involution darts h_nodup h_all
+    (bridgeless_edge_ne_self H darts fuel_b h_bridge) h_le
+
+/-- In any complete triangulation (where every face orbit has length 3),
+    `darts.length = 3 * numFaces H fuel darts` for all `fuel ≥ darts.length`. -/
+theorem darts_length_eq_three_mul_numFaces_of_triangulation (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri : ∀ d ∈ darts, (getOrbit H.face fuel d).length = 3) :
+    darts.length = 3 * numFaces H fuel darts :=
+  length_eq_mul_countOrbits_of_complete H.face darts 3 h_nodup h_all h_le h_tri
+
+/-- In any complete, bridgeless triangulation, `2 * E = 3 * F` holds unconditionally. -/
+theorem two_mul_numEdges_eq_three_mul_numFaces_of_triangulation (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_nodup : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b : Nat} (h_bridge : Math.Hypermap.isBridgeless H darts fuel_b)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri : ∀ d ∈ darts, (getOrbit H.face fuel d).length = 3) :
+    2 * (numEdges H fuel darts : Int) = 3 * (numFaces H fuel darts : Int) := by
+  have hE := darts_length_eq_two_mul_numEdges H darts h_nodup h_all h_bridge h_le
+  have hF := darts_length_eq_three_mul_numFaces_of_triangulation H darts h_nodup h_all h_le h_tri
+  omega
+
+/-- Exact structural characterization of `Math.Hypermap.getCanonicalDarts` in terms of `canonicalOrbits`. -/
+theorem getCanonicalDarts_eq_canonicalOrbits_reverse (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (remaining visited acc : List H.Dart) :
+    Math.Hypermap.getCanonicalDarts H fuel remaining visited acc =
+      (canonicalOrbits H.node fuel (remaining.filter (fun x => !visited.contains x))).reverse ++ acc := by
+  induction remaining generalizing visited acc with
+  | nil =>
+    rfl
+  | cons d ds ih =>
+    dsimp [Math.Hypermap.getCanonicalDarts, List.filter]
+    cases hv : visited.contains d
+    · change Math.Hypermap.getCanonicalDarts H fuel ds (getOrbit H.node fuel d ++ visited) (d :: acc) =
+        (canonicalOrbits H.node fuel (d :: ds.filter (fun x => !visited.contains x))).reverse ++ acc
+      rw [ih (getOrbit H.node fuel d ++ visited) (d :: acc)]
+      rw [filter_not_contains_append ds (getOrbit H.node fuel d) visited]
+      rw [canonicalOrbits_cons H.node fuel d (ds.filter (fun x => !visited.contains x))]
+      rw [List.reverse_cons, List.append_assoc]
+      rfl
+    · exact ih visited acc
+
+/-- The vertex list of `extractGraph H darts fuel` is identically `(canonicalOrbits H.node fuel darts).reverse`. -/
+theorem extractGraph_vertices_eq_canonicalOrbits_reverse (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (fuel : Nat := darts.length) :
+    (Math.Hypermap.extractGraph H darts fuel).vertices =
+      (canonicalOrbits H.node fuel darts).reverse := by
+  dsimp [Math.Hypermap.extractGraph]
+  rw [getCanonicalDarts_eq_canonicalOrbits_reverse H fuel darts [] []]
+  rw [filter_not_contains_nil darts, List.append_nil]
+
+/-- The number of vertices in `extractGraph H darts fuel` is identically `numNodes H fuel darts`. -/
+theorem extractGraph_vertices_length_eq_numNodes (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (fuel : Nat := darts.length) :
+    (Math.Hypermap.extractGraph H darts fuel).vertices.length = numNodes H fuel darts := by
+  rw [extractGraph_vertices_eq_canonicalOrbits_reverse H darts fuel]
+  rw [List.length_reverse, canonicalOrbits_length]
+  rfl
+
+/-- Converse of `isPlanar_of_euler_char_eq`: `isPlanar H fuel l = true` implies `EulerChar H fuel l = 2 * numComponents H fuel l`. -/
+theorem euler_char_eq_of_isPlanar (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (l : List H.Dart) (h_planar : isPlanar H fuel l = true) :
+    EulerChar H fuel l = 2 * (numComponents H fuel l : Int) := by
+  dsimp [isPlanar, EulerChar, numNodes, numEdges, numFaces, numComponents] at *
+  exact eq_of_beq h_planar
+
+/-- On a connected planar hypermap (`isPlanar H fuel darts = true` and `numComponents H fuel darts = 1`),
+    Euler's formula `(extractGraph H darts).vertices.length - E + F = 2` holds for all `fuel ≥ darts.length`. -/
+theorem extractGraph_euler_eq_two_of_isPlanar_connected (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_planar : isPlanar H fuel darts = true)
+    (h_conn : numComponents H fuel darts = 1) :
+    ((Math.Hypermap.extractGraph H darts).vertices.length : Int) -
+      (numEdges H fuel darts : Int) + (numFaces H fuel darts : Int) = 2 := by
+  have h_euler := euler_char_eq_of_isPlanar H fuel darts h_planar
+  dsimp [EulerChar] at h_euler
+  rw [extractGraph_vertices_length_eq_numNodes H darts darts.length]
+  have h_nodes : numNodes H fuel darts = numNodes H darts.length darts :=
+    countOrbits_fuel_eq_of_complete H.node darts darts h_all h_le
+  omega
 
 end Hypermap
