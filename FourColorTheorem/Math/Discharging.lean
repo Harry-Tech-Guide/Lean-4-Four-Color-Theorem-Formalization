@@ -2,6 +2,7 @@ import FourColorTheorem.Math.HypermapGraph
 import FourColorTheorem.Math.Topology.Euler
 import FourColorTheorem.Math.Rules
 import FourColorTheorem.Math.Coloring
+import FourColorTheorem.Math.TestDischarging
 
 namespace Math
 
@@ -3929,6 +3930,344 @@ theorem dual_finalCharge_le_zero_of_deg_ge_8_of_isBridgeless_of_neighbors_deg_ge
     dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
   exact finalCharge_le_zero_of_deg_ge_8_of_neighbors_deg_ge_6_of_flanking_spoke_ge_7
     H.dual darts h_all h_le u h_loopless h_deg8 h_nb6 h_flank7
+
+/-!
+### Stage I.1: SWAR Cartwheel Bitmask Semantics (`degBitIdx`, `MatchesCartState`) & `testBit` Algebra
+-/
+
+/-- Maps a vertex degree `d` to its 5-bit lane index `0..4`:
+    `0` for `d ≤ 5`, `1` for `d = 6`, `2` for `d = 7`, `3` for `d = 8`, `4` for `d ≥ 9`. -/
+def degBitIdx (d : Nat) : Nat :=
+  if d ≤ 5 then 0
+  else if d == 6 then 1
+  else if d == 7 then 2
+  else if d == 8 then 3
+  else 4
+
+theorem degBitIdx_lt_5 (d : Nat) : degBitIdx d < 5 := by
+  dsimp [degBitIdx]
+  split <;> try omega
+  split <;> try omega
+  split <;> try omega
+  split <;> omega
+
+theorem degBitIdx_lt_6 (d : Nat) : degBitIdx d < 6 := by
+  have := degBitIdx_lt_5 d; omega
+
+theorem testBit_31_of_lt_5 {i : Nat} (hi : i < 5) : (31 : Nat).testBit i = true := by
+  match i with
+  | 0 | 1 | 2 | 3 | 4 => decide
+
+theorem testBit_63_of_lt_6 {i : Nat} (hi : i < 6) : (63 : Nat).testBit i = true := by
+  match i with
+  | 0 | 1 | 2 | 3 | 4 | 5 => decide
+
+theorem testBit_31_degBitIdx (d : Nat) : (31 : Nat).testBit (degBitIdx d) = true :=
+  testBit_31_of_lt_5 (degBitIdx_lt_5 d)
+
+theorem testBit_63_degBitIdx (d : Nat) : (63 : Nat).testBit (degBitIdx d) = true :=
+  testBit_63_of_lt_6 (degBitIdx_lt_6 d)
+
+/-- Exact `testBit` characterization of `getLaneNat st p` for bit indices `i < 6`. -/
+theorem testBit_getLaneNat (st p : Nat) {i : Nat} (hi : i < 6) :
+    (getLaneNat st p).testBit i = st.testBit (p * 6 + i) := by
+  dsimp [getLaneNat]
+  change ((st >>> (p * 6)) &&& 63).testBit i = st.testBit (p * 6 + i)
+  rw [Nat.testBit_and, Nat.testBit_shiftRight, testBit_63_of_lt_6 hi, Bool.and_true]
+
+set_option exponentiation.threshold 512 in
+theorem testBit_all63Nat_of_lt {k : Nat} (hk : k < 360) : all63Nat.testBit k = true := by
+  have h_eq : all63Nat = 2 ^ 360 - 1 := by decide
+  rw [h_eq, Nat.testBit_two_pow_sub_one]
+  exact decide_eq_true hk
+
+theorem testBit_63_of_ge_6 {k : Nat} (hk : 6 ≤ k) : (63 : Nat).testBit k = false := by
+  have h_eq : (63 : Nat) = 2 ^ 6 - 1 := rfl
+  rw [h_eq, Nat.testBit_two_pow_sub_one]
+  exact decide_eq_false (by omega)
+
+/-- Exact `testBit` characterization of `setLaneNat st v val` at lane `v` (`v < 60`) for `i < 6`. -/
+theorem testBit_getLaneNat_setLaneNat_self (st v val : Nat) (hv : v < 60) {i : Nat} (hi : i < 6) :
+    (getLaneNat (setLaneNat st v val) v).testBit i = val.testBit i := by
+  rw [testBit_getLaneNat _ v hi]
+  dsimp [setLaneNat]
+  change (((st &&& (all63Nat ^^^ (63 <<< (v * 6)))) ||| ((val &&& 63) <<< (v * 6)))).testBit (v * 6 + i) = val.testBit i
+  rw [Nat.testBit_or, Nat.testBit_and, Nat.testBit_xor, Nat.testBit_shiftLeft, Nat.testBit_shiftLeft, Nat.testBit_and]
+  have hv_lt : v * 6 + i < 360 := by omega
+  have h_ge : decide (v * 6 ≤ v * 6 + i) = true := decide_eq_true (by omega)
+  have h_sub : v * 6 + i - v * 6 = i := by omega
+  rw [testBit_all63Nat_of_lt hv_lt, h_ge, h_sub, testBit_63_of_lt_6 hi]
+  simp
+
+/-- Exact `testBit` characterization of `setLaneNat st v val` at lane `p ≠ v` (`p < 60`) for `i < 6`. -/
+theorem testBit_getLaneNat_setLaneNat_ne (st v val p : Nat) (hp : p < 60) (hne : p ≠ v) {i : Nat} (hi : i < 6) :
+    (getLaneNat (setLaneNat st v val) p).testBit i = (getLaneNat st p).testBit i := by
+  rw [testBit_getLaneNat _ p hi, testBit_getLaneNat st p hi]
+  dsimp [setLaneNat]
+  change (((st &&& (all63Nat ^^^ (63 <<< (v * 6)))) ||| ((val &&& 63) <<< (v * 6)))).testBit (p * 6 + i) = st.testBit (p * 6 + i)
+  rw [Nat.testBit_or, Nat.testBit_and, Nat.testBit_xor, Nat.testBit_shiftLeft, Nat.testBit_shiftLeft, Nat.testBit_and]
+  have hp_lt : p * 6 + i < 360 := by omega
+  rw [testBit_all63Nat_of_lt hp_lt]
+  by_cases hge : v * 6 ≤ p * 6 + i
+  · have h_dec : decide (v * 6 ≤ p * 6 + i) = true := decide_eq_true hge
+    have hge6 : 6 ≤ p * 6 + i - v * 6 := by omega
+    rw [h_dec, testBit_63_of_ge_6 hge6]
+    simp
+  · have h_dec : decide (v * 6 ≤ p * 6 + i) = false := decide_eq_false hge
+    rw [h_dec]
+    simp
+
+/-- A cartwheel degree assignment `cartDeg : Nat → Nat` matches SWAR state `st : Nat`
+    at hub degree `deg` if for every cartwheel position `1 ≤ p ≤ 5 * deg`,
+    the bit `degBitIdx (cartDeg p)` is set in lane `p`. -/
+def MatchesCartState (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) : Prop :=
+  ∀ p, 1 ≤ p → p ≤ 5 * deg → (getLaneNat st p).testBit (degBitIdx (cartDeg p)) = true
+
+/-- Partition soundness for `ProofTree.cond`:
+    for any cartwheel degree assignment `cartDeg` matching `st` (`deg ≤ 11`), and any condition `(v, m)`,
+    `cartDeg` matches either the true-branch state `stTrue` or the false-branch state `stFalse`. -/
+theorem matchesCartState_cond_split (deg : Nat) (cartDeg : Nat → Nat) (st v : Nat) (m : Int)
+    (h_deg : deg ≤ 11)
+    (h_match : MatchesCartState deg cartDeg st) :
+    let maskTrue := condMaskNat m
+    let maskFalse := Nat.xor 31 maskTrue
+    let curLane := getLaneNat st v
+    MatchesCartState deg cartDeg (setLaneNat st v (Nat.land curLane maskTrue)) ∨
+    MatchesCartState deg cartDeg (setLaneNat st v (Nat.land curLane maskFalse)) := by
+  dsimp only
+  by_cases hv : 1 ≤ v ∧ v ≤ 5 * deg
+  · have hv60 : v < 60 := by omega
+    have h_cur : (getLaneNat st v).testBit (degBitIdx (cartDeg v)) = true := h_match v hv.1 hv.2
+    by_cases hm : (condMaskNat m).testBit (degBitIdx (cartDeg v)) = true
+    · left
+      intro p hp1 hp2
+      have hp60 : p < 60 := by omega
+      by_cases hpv : p = v
+      · subst hpv
+        rw [testBit_getLaneNat_setLaneNat_self _ _ _ hv60 (degBitIdx_lt_6 _)]
+        change ((getLaneNat st p) &&& (condMaskNat m)).testBit (degBitIdx (cartDeg p)) = true
+        rw [Nat.testBit_and, h_cur, hm]; rfl
+      · rw [testBit_getLaneNat_setLaneNat_ne _ _ _ p hp60 hpv (degBitIdx_lt_6 _)]
+        exact h_match p hp1 hp2
+    · right
+      intro p hp1 hp2
+      have hp60 : p < 60 := by omega
+      by_cases hpv : p = v
+      · subst hpv
+        rw [testBit_getLaneNat_setLaneNat_self _ _ _ hv60 (degBitIdx_lt_6 _)]
+        change ((getLaneNat st p) &&& (31 ^^^ condMaskNat m)).testBit (degBitIdx (cartDeg p)) = true
+        rw [Nat.testBit_and, Nat.testBit_xor, h_cur, testBit_31_degBitIdx]
+        cases h_bit : (condMaskNat m).testBit (degBitIdx (cartDeg p))
+        · rfl
+        · contradiction
+      · rw [testBit_getLaneNat_setLaneNat_ne _ _ _ p hp60 hpv (degBitIdx_lt_6 _)]
+        exact h_match p hp1 hp2
+  · left
+    intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    have hpv : p ≠ v := by omega
+    rw [testBit_getLaneNat_setLaneNat_ne _ _ _ p hp60 hpv (degBitIdx_lt_6 _)]
+    exact h_match p hp1 hp2
+
+/-!
+### Stage I.2: `narrowSWAR` & `outletForcedSWAR` Bitwise Characterization
+-/
+
+/-- Exact `testBit` characterization of `narrowSWAR st po` (`Nat.land st po.keep`) for `i < 6`. -/
+theorem testBit_getLaneNat_narrowSWAR (st : Nat) (po : FastPosOut) (p : Nat) {i : Nat} (hi : i < 6) :
+    (getLaneNat (narrowSWAR st po) p).testBit i =
+      ((getLaneNat st p).testBit i && (getLaneNat po.keep p).testBit i) := by
+  rw [testBit_getLaneNat _ p hi, testBit_getLaneNat st p hi, testBit_getLaneNat po.keep p hi]
+  dsimp [narrowSWAR]
+  change (st &&& po.keep).testBit (p * 6 + i) = (st.testBit (p * 6 + i) && po.keep.testBit (p * 6 + i))
+  rw [Nat.testBit_and]
+
+/-- If `MatchesCartState deg cartDeg st` and `cartDeg` satisfies the keep-mask of `po` at every lane `1 ≤ p ≤ 5 * deg`,
+    then `MatchesCartState deg cartDeg (narrowSWAR st po)`. -/
+theorem matchesCartState_narrowSWAR (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_keep : ∀ p, 1 ≤ p → p ≤ 5 * deg → (getLaneNat po.keep p).testBit (degBitIdx (cartDeg p)) = true) :
+    MatchesCartState deg cartDeg (narrowSWAR st po) := by
+  intro p hp1 hp2
+  rw [testBit_getLaneNat_narrowSWAR st po p (degBitIdx_lt_6 _), h_match p hp1 hp2, h_keep p hp1 hp2]
+  rfl
+
+/-- If `outletForcedSWAR st po = true` (`Nat.land st po.forbid = 0`) and `MatchesCartState deg cartDeg st`,
+    then no forbidden degree bit of `po.forbid` is set for `cartDeg` at any lane `1 ≤ p ≤ 5 * deg`. -/
+theorem testBit_forbid_eq_false_of_outletForcedSWAR (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_forced : outletForcedSWAR st po = true) :
+    ∀ p, 1 ≤ p → p ≤ 5 * deg → (getLaneNat po.forbid p).testBit (degBitIdx (cartDeg p)) = false := by
+  intro p hp1 hp2
+  have h_zero : st &&& po.forbid = 0 := Nat.beq_eq.mp h_forced
+  have h_tb : (st &&& po.forbid).testBit (p * 6 + degBitIdx (cartDeg p)) = false := by
+    rw [h_zero, Nat.zero_testBit]
+  rw [Nat.testBit_and, ← testBit_getLaneNat st p (degBitIdx_lt_6 _),
+      ← testBit_getLaneNat po.forbid p (degBitIdx_lt_6 _), h_match p hp1 hp2, Bool.true_and] at h_tb
+  exact h_tb
+
+/-!
+### Stage I.3: Inductive Leaf Extraction Theorem for `verifyTreePureRec`
+-/
+
+/-- Predicate characterizing that a SWAR state `st_leaf` reached at a leaf of `verifyTreePureRec`
+    is verified by one of the three RSST leaf rules (`reduce`, `hubcap`, or `sym`). -/
+def VerifiedCartLeaf (deg : Nat) (shiftedTable : List (List FastPosOut)) (st_leaf : Nat) : Prop :=
+  (∃ hs_leaf, (reduceAxleRec deg 64 [st_leaf] hs_leaf).1 = true) ∨
+  (∃ members hs_leaf, (verifyHubcapMembersRec deg st_leaf shiftedTable members hs_leaf).1 = true) ∨
+  (∃ (k eps : Nat) (found : SymOutlet), (!Nat.ble deg k && Nat.ble eps 1) = true ∧
+    symForcedRec st_leaf (Nat.add k 1) deg (!Nat.beq eps 0) found.conds = true)
+
+/-- Fundamental Inductive Soundness of `verifyTreePureRec`:
+    for any proof tree `t : ProofTree` and any cartwheel degree assignment `cartDeg : Nat → Nat`
+    matching the current SWAR state `st`, if `(verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true`,
+    then there exists a leaf state `st_leaf` matching `cartDeg` (`MatchesCartState deg cartDeg st_leaf`)
+    that satisfies `VerifiedCartLeaf deg shiftedTable st_leaf`. -/
+theorem exists_verifiedCartLeaf_of_verifyTreePureRec (deg : Nat) (shiftedTable : List (List FastPosOut))
+    (t : ProofTree) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11) :
+    ∀ (st lineno lev condV condM : Nat) (syms : List SymOutlet) (hs : HintStream),
+      MatchesCartState deg cartDeg st →
+      (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true →
+      ∃ st_leaf : Nat, MatchesCartState deg cartDeg st_leaf ∧ VerifiedCartLeaf deg shiftedTable st_leaf := by
+  induction t with
+  | cond v m tTrue tFalse ihTrue ihFalse =>
+    intro st lineno lev condV condM syms hs h_match h_ok
+    rw [verifyTreePureRec_cond_eq] at h_ok
+    simp only [strictNat_eq] at h_ok
+    let maskTrue := condMaskNat m
+    let maskFalse := Nat.xor 31 maskTrue
+    let curLane := getLaneNat st v
+    let stTrue := setLaneNat st v (Nat.land curLane maskTrue)
+    let stFalse := setLaneNat st v (Nat.land curLane maskFalse)
+    let lev1 := Nat.add lev 1
+    let lineno1 := Nat.add lineno 1
+    let syms' :=
+      match extractCondsRec deg condV condM lev with
+      | none => syms
+      | some conds => { number := lineno, nolines := lev1, conds := conds } :: syms
+    let condV' := setLaneNat (setLaneNat condV lev v) lev1 0
+    let condM' := setLaneNat (setLaneNat condM lev maskTrue) lev1 0
+    let resTrue := verifyTreePureRec deg shiftedTable tTrue stTrue lineno1 lev1 condV' condM' syms' hs
+    change (@Bool.rec (fun _ => Bool × Nat × HintStream) (false, resTrue.2.fst, resTrue.2.snd)
+      (verifyTreePureRec deg shiftedTable tFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd)
+      resTrue.fst).fst = true at h_ok
+    cases h_b : resTrue.fst with
+    | false =>
+      rw [h_b] at h_ok
+      dsimp at h_ok
+      contradiction
+    | true =>
+      rw [h_b] at h_ok
+      dsimp at h_ok
+      rcases matchesCartState_cond_split deg cartDeg st v m h_deg h_match with h_mTrue | h_mFalse
+      · exact ihTrue stTrue lineno1 lev1 condV' condM' syms' hs h_mTrue h_b
+      · exact ihFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd h_mFalse h_ok
+  | reduce =>
+    intro st lineno lev condV condM syms hs h_match h_ok
+    change (let (ok, hs') := reduceAxleRec deg 64 [st] hs
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    exact ⟨st, h_match, Or.inl ⟨hs, h_ok⟩⟩
+  | hubcap members =>
+    intro st lineno lev condV condM syms hs h_match h_ok
+    change (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    exact ⟨st, h_match, Or.inr (Or.inl ⟨members, hs, h_ok⟩)⟩
+  | sym k eps lev_in line =>
+    intro st lineno lev condV condM syms hs h_match h_ok
+    change (let ok :=
+              Bool.rec false
+                (match findSymOutletRec line syms with
+                 | none => false
+                 | some found =>
+                   Bool.rec false
+                     (symForcedRec st (Nat.add k 1) deg (!Nat.beq eps 0) found.conds)
+                     (Nat.beq found.nolines (Nat.add lev_in 1)))
+                (!Nat.ble deg k && Nat.ble eps 1)
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs)).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    cases h_ke : (!Nat.ble deg k && Nat.ble eps 1) with
+    | false =>
+      rw [h_ke] at h_ok; dsimp at h_ok; contradiction
+    | true =>
+      rw [h_ke] at h_ok; dsimp at h_ok
+      cases h_find : findSymOutletRec line syms with
+      | none =>
+        rw [h_find] at h_ok; contradiction
+      | some found =>
+        rw [h_find] at h_ok; dsimp at h_ok
+        cases h_nl : Nat.beq found.nolines (Nat.add lev_in 1) with
+        | false =>
+          rw [h_nl] at h_ok; dsimp at h_ok; contradiction
+        | true =>
+          rw [h_nl] at h_ok; dsimp at h_ok
+          exact ⟨st, h_match, Or.inr (Or.inr ⟨k, eps, found, h_ke, h_ok⟩)⟩
+
+/-!
+### Stage I.4: Top-Level `verifyTree` & `DischargingTreesVerified` Leaf Extraction
+-/
+
+theorem getLaneNat_initStateForDeg_eq_31 (deg : Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
+    {p : Nat} (hp1 : 1 ≤ p) (hp2 : p ≤ 5 * deg) :
+    getLaneNat (getInitStateForDeg deg) p = 31 := by
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · have h_all : (List.range' 1 35).all (fun k => getLaneNat (getInitStateForDeg 7) k == 31) = true := by decide
+    have h_mem : p ∈ List.range' 1 35 := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+    exact beq_iff_eq.mp (List.all_eq_true.mp h_all p h_mem)
+  · have h_all : (List.range' 1 40).all (fun k => getLaneNat (getInitStateForDeg 8) k == 31) = true := by decide
+    have h_mem : p ∈ List.range' 1 40 := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+    exact beq_iff_eq.mp (List.all_eq_true.mp h_all p h_mem)
+  · have h_all : (List.range' 1 45).all (fun k => getLaneNat (getInitStateForDeg 9) k == 31) = true := by decide
+    have h_mem : p ∈ List.range' 1 45 := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+    exact beq_iff_eq.mp (List.all_eq_true.mp h_all p h_mem)
+  · have h_all : (List.range' 1 50).all (fun k => getLaneNat (getInitStateForDeg 10) k == 31) = true := by decide
+    have h_mem : p ∈ List.range' 1 50 := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+    exact beq_iff_eq.mp (List.all_eq_true.mp h_all p h_mem)
+  · have h_all : (List.range' 1 55).all (fun k => getLaneNat (getInitStateForDeg 11) k == 31) = true := by decide
+    have h_mem : p ∈ List.range' 1 55 := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+    exact beq_iff_eq.mp (List.all_eq_true.mp h_all p h_mem)
+
+/-- Every cartwheel degree assignment `cartDeg : Nat → Nat` matches the initial SWAR state
+    `getInitStateForDeg deg` for `deg ∈ {7, 8, 9, 10, 11}`. -/
+theorem matchesCartState_getInitStateForDeg (deg : Nat) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    MatchesCartState deg cartDeg (getInitStateForDeg deg) := by
+  intro p hp1 hp2
+  rw [getLaneNat_initStateForDeg_eq_31 deg h_deg hp1 hp2]
+  exact testBit_31_degBitIdx (cartDeg p)
+
+/-- Top-level leaf extraction theorem for `verifyTree`:
+    whenever `verifyTree configs deg A_low A_upp t outs = true` for `deg ∈ {7, 8, 9, 10, 11}`,
+    every cartwheel degree assignment `cartDeg : Nat → Nat` matches a verified leaf `st_leaf` of `t`. -/
+theorem exists_verifiedCartLeaf_of_verifyTree (configs : List Configuration) (deg : Nat)
+    (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
+    (h_ver : verifyTree configs deg A_low A_upp t outs = true) :
+    ∃ st_leaf : Nat, MatchesCartState deg cartDeg st_leaf ∧
+      VerifiedCartLeaf deg (getShiftedTableForDeg deg) st_leaf := by
+  have h_le11 : deg ≤ 11 := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
+  exact exists_verifiedCartLeaf_of_verifyTreePureRec deg (getShiftedTableForDeg deg) t cartDeg h_le11
+    (getInitStateForDeg deg) 2 0 0 0 [] ([], getHintsForDeg deg)
+    (matchesCartState_getInitStateForDeg deg cartDeg h_deg) h_ver
+
+/-- Master Leaf Extraction Theorem from `DischargingTreesVerified`:
+    Given `DischargingTreesVerified configs`, for every hub degree `deg ∈ {7, 8, 9, 10, 11}`
+    and every cartwheel degree assignment `cartDeg : Nat → Nat`, there exists a leaf state `st_leaf`
+    matching `cartDeg` that satisfies `VerifiedCartLeaf deg (getShiftedTableForDeg deg) st_leaf`. -/
+theorem exists_verifiedCartLeaf_of_dischargingTreesVerified (configs : List Configuration)
+    (h_trees : DischargingTreesVerified configs) (deg : Nat) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    ∃ st_leaf : Nat, MatchesCartState deg cartDeg st_leaf ∧
+      VerifiedCartLeaf deg (getShiftedTableForDeg deg) st_leaf := by
+  rcases h_trees with ⟨h7, h8, h9, h10, h11⟩
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · exact exists_verifiedCartLeaf_of_verifyTree configs 7 (trivial_A_low 7) (trivial_A_upp 7) (present7 ()) (readOutlets 7 theRules) cartDeg (Or.inl rfl) h7
+  · exact exists_verifiedCartLeaf_of_verifyTree configs 8 (trivial_A_low 8) (trivial_A_upp 8) (present8 ()) (readOutlets 8 theRules) cartDeg (Or.inr (Or.inl rfl)) h8
+  · exact exists_verifiedCartLeaf_of_verifyTree configs 9 (trivial_A_low 9) (trivial_A_upp 9) (present9 ()) (readOutlets 9 theRules) cartDeg (Or.inr (Or.inr (Or.inl rfl))) h9
+  · exact exists_verifiedCartLeaf_of_verifyTree configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) h10
+  · exact exists_verifiedCartLeaf_of_verifyTree configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) h11
 
 end Discharging
 end Math
