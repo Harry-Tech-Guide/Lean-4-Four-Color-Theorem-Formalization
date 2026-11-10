@@ -1517,4 +1517,34 @@ theorem filter_canonicalOrbits_reverse_length_eq_one (p : Perm D)
   rw [hv₀]
   rfl
 
+/-- When `orbitClosesWithin p d d fuel` holds, `getOrbit p fuel d` is closed under `p.inv`. -/
+theorem getOrbit_closed_under_inv (p : Perm D) (fuel : Nat) (d : D)
+    (h_closes : orbitClosesWithin p d d fuel) :
+    ∀ x ∈ getOrbit p fuel d, p.inv x ∈ getOrbit p fuel d := by
+  intro x hx
+  have h_closes_symm := orbitClosesWithin_symm_perm p fuel d h_closes
+  have hx_symm : x ∈ getOrbit p.symm fuel d :=
+    (mem_getOrbit_symm_perm_iff p fuel d x h_closes).mpr hx
+  have hinv_symm : p.symm.f x ∈ getOrbit p.symm fuel d :=
+    getOrbit_closed_under_f p.symm fuel d h_closes_symm x hx_symm
+  exact (mem_getOrbit_symm_perm_iff p fuel d (p.inv x) h_closes).mp hinv_symm
+
+/-- On a complete dart list (`darts.length ≤ fuel`), `getOrbit p fuel d` is closed under `p.f`. -/
+theorem getOrbit_closed_under_f_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {d x : D}
+    (hx : x ∈ getOrbit p fuel d) :
+    p.f x ∈ getOrbit p fuel d :=
+  getOrbit_closed_under_f p fuel d
+    (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le) x hx
+
+/-- On a complete dart list (`darts.length ≤ fuel`), `getOrbit p fuel d` is closed under `p.inv`. -/
+theorem getOrbit_closed_under_inv_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {d x : D}
+    (hx : x ∈ getOrbit p fuel d) :
+    p.inv x ∈ getOrbit p fuel d :=
+  getOrbit_closed_under_inv p fuel d
+    (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le) x hx
+
 end Hypermap
