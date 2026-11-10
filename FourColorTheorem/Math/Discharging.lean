@@ -5349,5 +5349,1078 @@ theorem validFastPosOut_getShiftedTableForDeg (deg : Nat)
   · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_10 row hrow) po hpo
   · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_11 row hrow) po hpo
 
+/-!
+### Stage K.1: `pushRefinementsRec`, `initIsoVertsRec`, and `reduceAxleRec` Inductive Soundness
+-/
+
+/-- Pure 5-bit lane upper degree decoder matching `getUppStrict deg st p` for `1 ≤ p`. -/
+def laneUpp (m : Nat) : Nat :=
+  if Nat.ble 16 m then 12
+  else if Nat.ble 8 m then 8
+  else if Nat.ble 4 m then 7
+  else if Nat.ble 2 m then 6
+  else 5
+
+/-- Pure 5-bit lane highest-bit mask matching `highBit` in `pushRefinementsRec`. -/
+def laneHighBit (m : Nat) : Nat :=
+  if Nat.ble 16 m then 16
+  else if Nat.ble 8 m then 8
+  else if Nat.ble 4 m then 4
+  else 2
+
+theorem getUppStrict_eq_laneUpp (deg st p : Nat) (hp : 1 ≤ p) :
+    getUppStrict deg st p = laneUpp (getLaneNat st p) := by
+  unfold getUppStrict laneUpp
+  have h0 : Nat.beq p 0 = false := by cases p <;> first | omega | rfl
+  rw [h0]
+  dsimp only
+  rw [strictNat_eq]
+  cases Nat.ble 16 (getLaneNat st p) <;>
+  cases Nat.ble 8 (getLaneNat st p) <;>
+  cases Nat.ble 4 (getLaneNat st p) <;>
+  cases Nat.ble 2 (getLaneNat st p) <;> rfl
+
+theorem getUppStrict_zero (deg st : Nat) :
+    getUppStrict deg st 0 = deg := rfl
+
+theorem laneUpp_highBit_spec_aux :
+    (List.range 32).all (fun m =>
+      (Nat.xor m (laneHighBit m) ≤ 31) &&
+      (List.range 5).all (fun b =>
+        !(m.testBit b) ||
+        (b == degBitIdx (laneUpp m)) ||
+        ((!Nat.beq (Nat.land m (Nat.sub m 1)) 0) &&
+         (Nat.xor m (laneHighBit m)).testBit b))) = true := by decide
+
+theorem laneXor_le_31 {m : Nat} (hm : m ≤ 31) :
+    Nat.xor m (laneHighBit m) ≤ 31 := by
+  have h_mem : m ∈ List.range 32 := List.mem_range.mpr (by omega)
+  have h_row := Bool.and_eq_true_iff.mp (List.all_eq_true.mp laneUpp_highBit_spec_aux m h_mem)
+  exact of_decide_eq_true h_row.1
+
+theorem laneUpp_highBit_cases {m b : Nat} (hm : m ≤ 31) (hb : b < 5) (htb : m.testBit b = true) :
+    b = degBitIdx (laneUpp m) ∨
+    ((!Nat.beq (Nat.land m (Nat.sub m 1)) 0) = true ∧
+     (Nat.xor m (laneHighBit m)).testBit b = true) := by
+  have h_mem : m ∈ List.range 32 := List.mem_range.mpr (by omega)
+  have h_bmem : b ∈ List.range 5 := List.mem_range.mpr hb
+  have h_row := Bool.and_eq_true_iff.mp (List.all_eq_true.mp laneUpp_highBit_spec_aux m h_mem)
+  have h_cell := List.all_eq_true.mp h_row.2 b h_bmem
+  rw [htb] at h_cell
+  dsimp at h_cell
+  rcases Bool.or_eq_true_iff.mp h_cell with h_eq | h_ref
+  · exact Or.inl (beq_iff_eq.mp h_eq)
+  · exact Or.inr (Bool.and_eq_true_iff.mp h_ref)
+
+/-- Bounded SWAR cartwheel state predicate: `MatchesCartState` plus 5-bit lane bound `≤ 31` on `1 ≤ p ≤ 5 * deg`. -/
+def MatchesCartState31 (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) : Prop :=
+  MatchesCartState deg cartDeg st ∧ ∀ p, 1 ≤ p → p ≤ 5 * deg → getLaneNat st p ≤ 31
+
+theorem eq_of_lt_64_of_testBit_eq {a b : Nat} (ha : a < 64) (hb : b < 64)
+    (h : ∀ i < 6, a.testBit i = b.testBit i) : a = b := by
+  apply Nat.eq_of_testBit_eq
+  intro i
+  by_cases hi : i < 6
+  · exact h i hi
+  · have h2 : 64 ≤ 2 ^ i := by
+      have : 6 ≤ i := by omega
+      calc 64 = 2 ^ 6 := rfl
+        _ ≤ 2 ^ i := Nat.pow_le_pow_right (by omega) this
+    rw [Nat.testBit_lt_two_pow (Nat.lt_of_lt_of_le ha h2),
+        Nat.testBit_lt_two_pow (Nat.lt_of_lt_of_le hb h2)]
+
+theorem getLaneNat_setLaneNat_self (st v val : Nat) (hv : v < 60) (hval : val < 64) :
+    getLaneNat (setLaneNat st v val) v = val := by
+  apply eq_of_lt_64_of_testBit_eq (getLaneNat_lt_64 _ _) hval
+  intro i hi
+  exact testBit_getLaneNat_setLaneNat_self st v val hv hi
+
+theorem getLaneNat_setLaneNat_ne (st v val p : Nat) (hp : p < 60) (hne : p ≠ v) :
+    getLaneNat (setLaneNat st v val) p = getLaneNat st p := by
+  apply eq_of_lt_64_of_testBit_eq (getLaneNat_lt_64 _ _) (getLaneNat_lt_64 _ _)
+  intro i hi
+  exact testBit_getLaneNat_setLaneNat_ne st v val p hp hne hi
+
+theorem getLaneNat_setLaneNat_le_31 (st v val p : Nat) (hp : p < 60)
+    (h_st : getLaneNat st p ≤ 31) (h_val : val ≤ 31) :
+    getLaneNat (setLaneNat st v val) p ≤ 31 := by
+  by_cases hpv : p = v
+  · subst hpv
+    rw [getLaneNat_setLaneNat_self st p val hp (by omega)]
+    exact h_val
+  · rw [getLaneNat_setLaneNat_ne st v val p hp hpv]
+    exact h_st
+
+theorem matchesCartState31_getInitStateForDeg (deg : Nat) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    MatchesCartState31 deg cartDeg (getInitStateForDeg deg) := by
+  refine ⟨matchesCartState_getInitStateForDeg deg cartDeg h_deg, ?_⟩
+  intro p hp1 hp2
+  rw [getLaneNat_initStateForDeg_eq_31 deg h_deg hp1 hp2]
+  exact Nat.le_refl 31
+
+theorem matchesCartState31_cond_split (deg : Nat) (cartDeg : Nat → Nat) (st v : Nat) (m : Int)
+    (h_deg : deg ≤ 11) (h_match31 : MatchesCartState31 deg cartDeg st) :
+    let maskTrue := condMaskNat m
+    let maskFalse := Nat.xor 31 maskTrue
+    let curLane := getLaneNat st v
+    MatchesCartState31 deg cartDeg (setLaneNat st v (Nat.land curLane maskTrue)) ∨
+    MatchesCartState31 deg cartDeg (setLaneNat st v (Nat.land curLane maskFalse)) := by
+  intro maskTrue maskFalse curLane
+  have h_bound (mask : Nat) :
+      ∀ p, 1 ≤ p → p ≤ 5 * deg → getLaneNat (setLaneNat st v (curLane &&& mask)) p ≤ 31 := by
+    intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    by_cases hpv : p = v
+    · subst hpv
+      have h_le : getLaneNat st p &&& mask ≤ 31 :=
+        Nat.le_trans Nat.and_le_left (h_match31.2 p hp1 hp2)
+      rw [getLaneNat_setLaneNat_self st p (getLaneNat st p &&& mask) hp60 (by omega)]
+      exact h_le
+    · rw [getLaneNat_setLaneNat_ne st v (curLane &&& mask) p hp60 hpv]
+      exact h_match31.2 p hp1 hp2
+  rcases matchesCartState_cond_split deg cartDeg st v m h_deg h_match31.1 with hT | hF
+  · exact Or.inl ⟨hT, h_bound maskTrue⟩
+  · exact Or.inr ⟨hF, h_bound maskFalse⟩
+
+/-- Step equation for `pushRefinementsRec` on `iv :: ivs`. -/
+theorem pushRefinementsRec_cons_eq (cur img : Nat) (iv : IntVert) (ivs : List IntVert) (stack : List Nat) :
+    pushRefinementsRec cur img (iv :: ivs) stack =
+      (let v := getImgNat img iv.u
+       if Nat.ble 1 v then
+         let m := getLaneNat cur v
+         if !Nat.beq (Nat.land m (Nat.sub m 1)) 0 then
+           pushRefinementsRec cur img ivs (setLaneNat cur v (Nat.xor m (laneHighBit m)) :: stack)
+         else
+           pushRefinementsRec cur img ivs stack
+       else
+         pushRefinementsRec cur img ivs stack) := by
+  cases iv with
+  | mk ivu ivd ivw ivcyc =>
+    unfold pushRefinementsRec laneHighBit
+    dsimp only
+    simp only [strictNat_eq]
+    cases Nat.ble 1 (getImgNat img ivu) with
+    | false => rfl
+    | true =>
+      dsimp only
+      cases (!Nat.beq (Nat.land (getLaneNat cur (getImgNat img ivu)) (Nat.sub (getLaneNat cur (getImgNat img ivu)) 1)) 0) with
+      | false => rfl
+      | true =>
+        dsimp only
+        cases Nat.ble 16 (getLaneNat cur (getImgNat img ivu)) <;>
+        cases Nat.ble 8 (getLaneNat cur (getImgNat img ivu)) <;>
+        cases Nat.ble 4 (getLaneNat cur (getImgNat img ivu)) <;> rfl
+
+/-- Monotonicity of `pushRefinementsRec`: every state already in `stack` remains in `pushRefinementsRec cur img ivs stack`. -/
+theorem mem_pushRefinementsRec_of_mem (cur img : Nat) (ivs : List IntVert) :
+    ∀ (stack : List Nat) {s : Nat}, s ∈ stack → s ∈ pushRefinementsRec cur img ivs stack := by
+  induction ivs with
+  | nil =>
+    intro stack s hs
+    exact hs
+  | cons iv ivs ih =>
+    intro stack s hs
+    rw [pushRefinementsRec_cons_eq]
+    dsimp only
+    split
+    · split
+      · exact ih _ (List.mem_cons_of_mem _ hs)
+      · exact ih _ hs
+    · exact ih _ hs
+
+/-- Partition Lemma for `pushRefinementsRec`:
+    Given `MatchesCartState31 deg cartDeg cur` and `∀ iv ∈ ivs, getImgNat img iv.u ≤ 5 * deg`,
+    either every interior vertex `iv ∈ ivs` with `1 ≤ getImgNat img iv.u` already has
+    `degBitIdx (cartDeg (getImgNat img iv.u)) = degBitIdx (getUppStrict deg cur (getImgNat img iv.u))`,
+    or `pushRefinementsRec cur img ivs stack` contains a refined state `nextSt` satisfying `MatchesCartState31 deg cartDeg nextSt`. -/
+theorem matchesCartState31_pushRefinementsRec_or_exact (deg : Nat) (cartDeg : Nat → Nat)
+    (cur img : Nat) (ivs : List IntVert) (h_deg : deg ≤ 11)
+    (h_cur : MatchesCartState31 deg cartDeg cur)
+    (h_ivs_le : ∀ iv ∈ ivs, getImgNat img iv.u ≤ 5 * deg) :
+    ∀ (stack : List Nat),
+      (∀ iv ∈ ivs, 1 ≤ getImgNat img iv.u →
+        degBitIdx (cartDeg (getImgNat img iv.u)) = degBitIdx (getUppStrict deg cur (getImgNat img iv.u))) ∨
+      (∃ nextSt ∈ pushRefinementsRec cur img ivs stack, MatchesCartState31 deg cartDeg nextSt) := by
+  induction ivs with
+  | nil =>
+    intro _
+    left
+    intro _ h_mem
+    cases h_mem
+  | cons iv ivs ih =>
+    intro stack
+    rw [pushRefinementsRec_cons_eq]
+    dsimp only
+    let v := getImgNat img iv.u
+    have hv_le : v ≤ 5 * deg := h_ivs_le iv List.mem_cons_self
+    have h_ivs_tail : ∀ iv' ∈ ivs, getImgNat img iv'.u ≤ 5 * deg :=
+      fun iv' hm => h_ivs_le iv' (List.mem_cons_of_mem _ hm)
+    cases hv1 : Nat.ble 1 v with
+    | false =>
+      have hv_not : ¬(1 ≤ v) := fun h => by
+        rw [Nat.ble_eq_true_of_le h] at hv1; contradiction
+      rcases ih h_ivs_tail stack with h_all | h_ex
+      · left
+        intro iv' hm hv'
+        rcases List.mem_cons.mp hm with rfl | hm_tail
+        · exact False.elim (hv_not hv')
+        · exact h_all iv' hm_tail hv'
+      · exact Or.inr h_ex
+    | true =>
+      have hv_ge1 : 1 ≤ v := Nat.le_of_ble_eq_true hv1
+      let m := getLaneNat cur v
+      have hm_le : m ≤ 31 := h_cur.2 v hv_ge1 hv_le
+      have h_tb : m.testBit (degBitIdx (cartDeg v)) = true := h_cur.1 v hv_ge1 hv_le
+      have h_upp : getUppStrict deg cur v = laneUpp m := getUppStrict_eq_laneUpp deg cur v hv_ge1
+      rcases laneUpp_highBit_cases hm_le (degBitIdx_lt_5 (cartDeg v)) h_tb with h_eq_idx | ⟨h_multi, h_xor_tb⟩
+      · -- Head vertex `iv` already has exact degree bit index!
+        cases h_cond : (!Nat.beq (Nat.land m (Nat.sub m 1)) 0) with
+        | false =>
+          rcases ih h_ivs_tail stack with h_all | h_ex
+          · left
+            intro iv' hm hv'
+            rcases List.mem_cons.mp hm with rfl | hm_tail
+            · rw [h_upp]; exact h_eq_idx
+            · exact h_all iv' hm_tail hv'
+          · right
+            simpa [h_cond] using h_ex
+        | true =>
+          rcases ih h_ivs_tail (setLaneNat cur v (Nat.xor m (laneHighBit m)) :: stack) with h_all | h_ex
+          · left
+            intro iv' hm hv'
+            rcases List.mem_cons.mp hm with rfl | hm_tail
+            · rw [h_upp]; exact h_eq_idx
+            · exact h_all iv' hm_tail hv'
+          · right
+            simpa [h_cond] using h_ex
+      · -- Head vertex `iv` pushes a valid refinement `nextSt` onto the stack!
+        right
+        let nextSt := setLaneNat cur v (Nat.xor m (laneHighBit m))
+        have h_next_match : MatchesCartState deg cartDeg nextSt := by
+          intro p hp1 hp2
+          have hv60 : v < 60 := by omega
+          have hp60 : p < 60 := by omega
+          by_cases hpv : p = v
+          · subst hpv
+            rw [testBit_getLaneNat_setLaneNat_self cur v _ hv60 (degBitIdx_lt_6 _)]
+            exact h_xor_tb
+          · rw [testBit_getLaneNat_setLaneNat_ne cur v _ p hp60 hpv (degBitIdx_lt_6 _)]
+            exact h_cur.1 p hp1 hp2
+        have h_next_le31 : ∀ p, 1 ≤ p → p ≤ 5 * deg → getLaneNat nextSt p ≤ 31 := by
+          intro p hp1 hp2
+          exact getLaneNat_setLaneNat_le_31 cur v (Nat.xor m (laneHighBit m)) p (by omega)
+            (h_cur.2 p hp1 hp2) (laneXor_le_31 hm_le)
+        refine ⟨nextSt, ?_, ⟨h_next_match, h_next_le31⟩⟩
+        change nextSt ∈ (if (!Nat.beq (Nat.land m (Nat.sub m 1)) 0) = true then
+          pushRefinementsRec cur img ivs (nextSt :: stack) else pushRefinementsRec cur img ivs stack)
+        rw [if_pos h_multi]
+        exact mem_pushRefinementsRec_of_mem cur img ivs (nextSt :: stack) List.mem_cons_self
+
+/-- Inner loop helper for `initIsoVertsRec` to prove vertex degree & range invariants by induction on `ivs`. -/
+noncomputable def initIsoVertsLoop (deg ring : Nat) (st : Nat) (img : Nat) (ivs : List IntVert) (invMap usedMask : Nat) : Option (Nat × Nat) :=
+  List.rec
+    (motive := fun _ => Nat → Nat → Option (Nat × Nat))
+    (fun invMap usedMask => some (invMap, usedMask))
+    (fun iv _ ih invMap usedMask =>
+      match iv with
+      | IntVert.mk ivu ivd _ _ =>
+        strictNat (getImgNat img ivu) fun fu =>
+        Bool.rec
+          none
+          (Bool.rec
+            (Bool.rec
+              none
+              (let okFan :=
+                 Bool.rec
+                   (let i := Nat.add (Nat.mod (Nat.sub fu 1) deg) 1
+                    strictNat (getExactDegStrict deg st i) fun ex =>
+                    !Nat.beq ex 0 && Nat.ble (Nat.add (Nat.div (Nat.sub fu 1) deg) 4) ex)
+                   true
+                   (Nat.ble fu (Nat.mul 2 deg))
+               Bool.rec
+                 none
+                 (strictNat (Nat.lor usedMask (Nat.shiftLeft 1 fu)) fun usedMask' =>
+                  strictNat (setLaneNat invMap fu (Nat.sub ivu (Nat.add ring 1))) fun invMap' =>
+                  ih invMap' usedMask')
+                 okFan)
+              (Nat.beq ivd (getUppStrict deg st fu)))
+            none
+            (!Nat.beq (Nat.land (Nat.shiftRight usedMask fu) 1) 0))
+          (Nat.ble fu (Nat.mul 5 deg)))
+    ivs invMap usedMask
+
+theorem initIsoVertsRec_eq_loop (deg ring st img : Nat) (ivs : List IntVert) :
+    initIsoVertsRec deg ring st img ivs = initIsoVertsLoop deg ring st img ivs 0 0 := rfl
+
+noncomputable def okFanBool (deg st fu : Nat) : Bool :=
+  Bool.rec
+    (let i := Nat.add (Nat.mod (Nat.sub fu 1) deg) 1
+     strictNat (getExactDegStrict deg st i) fun ex =>
+     !Nat.beq ex 0 && Nat.ble (Nat.add (Nat.div (Nat.sub fu 1) deg) 4) ex)
+    true
+    (Nat.ble fu (Nat.mul 2 deg))
+
+theorem initIsoVertsLoop_cons_eq (deg ring st img : Nat) (iv : IntVert) (ivs : List IntVert) (invMap usedMask : Nat) :
+    initIsoVertsLoop deg ring st img (iv :: ivs) invMap usedMask =
+      (let fu := getImgNat img iv.u
+       if Nat.ble fu (Nat.mul 5 deg) then
+         if !Nat.beq (Nat.land (Nat.shiftRight usedMask fu) 1) 0 then
+           none
+         else if Nat.beq iv.d (getUppStrict deg st fu) then
+           if okFanBool deg st fu then
+             initIsoVertsLoop deg ring st img ivs
+               (setLaneNat invMap fu (Nat.sub iv.u (Nat.add ring 1)))
+               (Nat.lor usedMask (Nat.shiftLeft 1 fu))
+           else
+             none
+         else
+           none
+       else
+         none) := by
+  cases iv with
+  | mk ivu ivd ivw ivcyc =>
+    unfold initIsoVertsLoop
+    dsimp only
+    rw [strictNat_eq]
+    cases Nat.ble (getImgNat img ivu) (Nat.mul 5 deg) with
+    | false => rfl
+    | true =>
+      dsimp only
+      cases (!Nat.beq (Nat.land (Nat.shiftRight usedMask (getImgNat img ivu)) 1) 0) with
+      | true => rfl
+      | false =>
+        dsimp only
+        cases Nat.beq ivd (getUppStrict deg st (getImgNat img ivu)) with
+        | false => rfl
+        | true =>
+          dsimp only
+          change @Bool.rec (fun _ => Option (Nat × Nat)) none
+            (strictNat (Nat.lor usedMask (Nat.shiftLeft 1 (getImgNat img ivu))) fun usedMask' =>
+             strictNat (setLaneNat invMap (getImgNat img ivu) (Nat.sub ivu (Nat.add ring 1))) fun invMap' =>
+             initIsoVertsLoop deg ring st img ivs invMap' usedMask')
+            (okFanBool deg st (getImgNat img ivu)) = _
+          cases okFanBool deg st (getImgNat img ivu) with
+          | false => rfl
+          | true =>
+            dsimp only
+            rw [strictNat_eq, strictNat_eq]
+            rfl
+
+theorem initIsoVertsLoop_sound (deg ring st img : Nat) (ivs : List IntVert) :
+    ∀ (invMap usedMask : Nat) {res : Nat × Nat},
+      initIsoVertsLoop deg ring st img ivs invMap usedMask = some res →
+      ∀ iv ∈ ivs, getImgNat img iv.u ≤ 5 * deg ∧ iv.d = getUppStrict deg st (getImgNat img iv.u) := by
+  induction ivs with
+  | nil =>
+    intro _ _ _ _ iv h_mem
+    cases h_mem
+  | cons iv ivs ih =>
+    intro invMap usedMask res h_some iv' h_mem
+    rw [initIsoVertsLoop_cons_eq] at h_some
+    dsimp only at h_some
+    let fu := getImgNat img iv.u
+    cases h_ble : Nat.ble fu (Nat.mul 5 deg) with
+    | false =>
+      rw [h_ble] at h_some; contradiction
+    | true =>
+      rw [h_ble] at h_some
+      cases h_used : (!Nat.beq (Nat.land (Nat.shiftRight usedMask fu) 1) 0) with
+      | true =>
+        rw [h_used] at h_some; contradiction
+      | false =>
+        rw [h_used] at h_some
+        cases h_upp : Nat.beq iv.d (getUppStrict deg st fu) with
+        | false =>
+          rw [h_upp] at h_some; contradiction
+        | true =>
+          rw [h_upp] at h_some
+          cases h_fan : okFanBool deg st fu with
+          | false =>
+            rw [h_fan] at h_some; contradiction
+          | true =>
+            rw [h_fan] at h_some
+            simp only [ite_true] at h_some
+            rcases List.mem_cons.mp h_mem with rfl | h_tail
+            · exact ⟨Nat.le_of_ble_eq_true h_ble, Nat.beq_eq.mp h_upp⟩
+            · exact ih _ _ h_some iv' h_tail
+
+theorem checkIsoRec_intVerts_sound (ring adjMat : Nat) (intVerts : List IntVert) (deg st img : Nat)
+    (h_iso : checkIsoRec ring adjMat intVerts deg st img = true) :
+    ∀ iv ∈ intVerts, getImgNat img iv.u ≤ 5 * deg ∧ iv.d = getUppStrict deg st (getImgNat img iv.u) := by
+  unfold checkIsoRec at h_iso
+  rw [initIsoVertsRec_eq_loop] at h_iso
+  cases h_init : initIsoVertsLoop deg ring st img intVerts 0 0 with
+  | none =>
+    rw [h_init] at h_iso; contradiction
+  | some p =>
+    exact initIsoVertsLoop_sound deg ring st img intVerts 0 0 h_init
+
+/-- Predicate characterizing that a cartwheel degree assignment `cartDeg` has a verified
+    reducible configuration embedding (`rootedSubConfRec` + `checkIsoRec`) whose interior vertex
+    degrees `iv.d` match `cartDeg` at every cartwheel vertex `1 ≤ v ≤ 5 * deg`. -/
+def HasExactReducedAxle (deg : Nat) (cartDeg : Nat → Nat) : Prop :=
+  ∃ (cur h x y : Nat) (cw : Bool) (img : Nat),
+    MatchesCartState31 deg cartDeg cur ∧
+    let fc := lookupFastConfRec h
+    rootedSubConfRec deg cur fc.z0 fc.z1 fc.qSteps x y cw = some img ∧
+    checkIsoRec fc.ring fc.adjMat fc.intVerts deg cur img = true ∧
+    ∀ iv ∈ fc.intVerts,
+      getImgNat img iv.u ≤ 5 * deg ∧
+      iv.d = getUppStrict deg cur (getImgNat img iv.u) ∧
+      (1 ≤ getImgNat img iv.u → degBitIdx (cartDeg (getImgNat img iv.u)) = degBitIdx iv.d)
+
+theorem reduceAxleRec_succ_eq (deg fuel : Nat) (cur : Nat) (rest : List Nat) (hs : HintStream) :
+    reduceAxleRec deg (fuel + 1) (cur :: rest) hs =
+      (match popHintRec hs with
+       | none => (false, hs)
+       | some (p, hs') =>
+         let h := Nat.shiftRight p 13
+         let x := Nat.land (Nat.shiftRight p 7) 63
+         let y := Nat.land (Nat.shiftRight p 1) 63
+         let cw := Nat.beq (Nat.land p 1) 1
+         let fc := lookupFastConfRec h
+         match rootedSubConfRec deg cur fc.z0 fc.z1 fc.qSteps x y cw with
+         | none => (false, hs')
+         | some img =>
+           Bool.rec
+             (false, hs')
+             (reduceAxleRec deg fuel (pushRefinementsRec cur img fc.intVerts rest) hs')
+             (checkIsoRec fc.ring fc.adjMat fc.intVerts deg cur img)) := by
+  unfold reduceAxleRec
+  dsimp only
+  cases popHintRec hs with
+  | none => rfl
+  | some phs =>
+    rcases phs with ⟨p, hs'⟩
+    dsimp only
+    simp only [strictNat_eq]
+    cases lookupFastConfRec (Nat.shiftRight p 13) with
+    | mk idx ring z0 z1 adjMat qSteps intVerts =>
+      dsimp only
+      rfl
+
+/-- Inductive Soundness of `reduceAxleRec`:
+    if `(reduceAxleRec deg fuel stack hs).1 = true` and `stack` contains at least one state `st`
+    satisfying `MatchesCartState31 deg cartDeg st`, then `HasExactReducedAxle deg cartDeg` holds. -/
+theorem reduceAxleRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11) :
+    ∀ (fuel : Nat) (stack : List Nat) (hs : HintStream),
+      (∃ st ∈ stack, MatchesCartState31 deg cartDeg st) →
+      (reduceAxleRec deg fuel stack hs).1 = true →
+      HasExactReducedAxle deg cartDeg := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    intro stack hs ⟨st, h_mem, _⟩ h_ok
+    cases stack with
+    | nil => cases h_mem
+    | cons cur rest =>
+      change (false : Bool) = true at h_ok
+      contradiction
+  | succ fuel ih =>
+    intro stack hs ⟨st, h_mem, h_st⟩ h_ok
+    cases stack with
+    | nil => cases h_mem
+    | cons cur rest =>
+      rw [reduceAxleRec_succ_eq] at h_ok
+      dsimp only at h_ok
+      cases h_pop : popHintRec hs with
+      | none =>
+        rw [h_pop] at h_ok; contradiction
+      | some phs =>
+        rcases phs with ⟨p, hs'⟩
+        rw [h_pop] at h_ok
+        dsimp only at h_ok
+        let h := Nat.shiftRight p 13
+        let x := Nat.land (Nat.shiftRight p 7) 63
+        let y := Nat.land (Nat.shiftRight p 1) 63
+        let cw := Nat.beq (Nat.land p 1) 1
+        let fc := lookupFastConfRec h
+        cases h_sub : rootedSubConfRec deg cur fc.z0 fc.z1 fc.qSteps x y cw with
+        | none =>
+          rw [h_sub] at h_ok; contradiction
+        | some img =>
+          rw [h_sub] at h_ok
+          dsimp only at h_ok
+          cases h_iso : checkIsoRec fc.ring fc.adjMat fc.intVerts deg cur img with
+          | false =>
+            rw [h_iso] at h_ok; dsimp at h_ok; contradiction
+          | true =>
+            rw [h_iso] at h_ok
+            dsimp only at h_ok
+            rcases List.mem_cons.mp h_mem with rfl | h_in_rest
+            · -- `st = cur`
+              have h_ivs := checkIsoRec_intVerts_sound fc.ring fc.adjMat fc.intVerts deg st img h_iso
+              have h_ivs_le : ∀ iv ∈ fc.intVerts, getImgNat img iv.u ≤ 5 * deg :=
+                fun iv hm => (h_ivs iv hm).1
+              rcases matchesCartState31_pushRefinementsRec_or_exact deg cartDeg st img fc.intVerts h_deg h_st h_ivs_le rest with h_exact | h_next
+              · refine ⟨st, h, x, y, cw, img, h_st, h_sub, h_iso, ?_⟩
+                intro iv hm
+                have ⟨hle, hd⟩ := h_ivs iv hm
+                refine ⟨hle, hd, ?_⟩
+                intro hv1
+                rw [hd]
+                exact h_exact iv hm hv1
+              · exact ih (pushRefinementsRec st img fc.intVerts rest) hs' h_next h_ok
+            · -- `st ∈ rest`
+              exact ih (pushRefinementsRec cur img fc.intVerts rest) hs'
+                ⟨st, mem_pushRefinementsRec_of_mem cur img fc.intVerts rest h_in_rest, h_st⟩ h_ok
+
+/-!
+### Stage K.2: `symForcedRec`, `extractCondsRec`, and Full Semantic Soundness of `verifyTree`
+-/
+
+/-- Rotational shift of a cartwheel position `p0` by `x_shift` (`0 ≤ x_shift < deg`) within its `deg`-ring. -/
+def shiftCartPos (deg x_shift p0 : Nat) : Nat :=
+  if !Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg)) then
+    Nat.add p0 x_shift
+  else
+    Nat.sub (Nat.add p0 x_shift) deg
+
+/-- Reflection of a cartwheel position `1 ≤ p ≤ 2 * deg` across spoke 1. -/
+def reflCartPos (deg p : Nat) : Nat :=
+  if Nat.ble p deg then
+    Nat.add (Nat.sub deg p) 1
+  else if !Nat.ble (Nat.mul 2 deg) p then
+    Nat.sub (Nat.mul 3 deg) p
+  else
+    Nat.mul 2 deg
+
+/-- Combined rotational/reflectional image of cartwheel position `p0`. -/
+def symCartPos (deg x_shift : Nat) (refl : Bool) (p0 : Nat) : Nat :=
+  if refl then reflCartPos deg (shiftCartPos deg x_shift p0)
+  else shiftCartPos deg x_shift p0
+
+/-- Rotated/reflected cartwheel degree assignment induced by `(x_shift, refl)`. -/
+def symCartDeg (deg x_shift : Nat) (refl : Bool) (cartDeg : Nat → Nat) : Nat → Nat :=
+  fun p0 => cartDeg (symCartPos deg x_shift refl p0)
+
+theorem shiftCartPos_bounds {deg x_shift p0 : Nat} (h_deg : 1 ≤ deg) (h_shift : x_shift < deg)
+    (hp1 : 1 ≤ p0) (hp2 : p0 ≤ 2 * deg) :
+    1 ≤ shiftCartPos deg x_shift p0 ∧ shiftCartPos deg x_shift p0 ≤ 2 * deg := by
+  unfold shiftCartPos
+  have h_div_mod := Nat.div_add_mod (p0 - 1) deg
+  have h_mod_lt : (p0 - 1) % deg < deg := Nat.mod_lt (p0 - 1) (by omega)
+  have h_div_le : (p0 - 1) / deg ≤ 1 := by
+    have h_lt : p0 - 1 < 2 * deg := by omega
+    have h_div_lt : (p0 - 1) / deg < 2 := (Nat.div_lt_iff_lt_mul (by omega)).mpr h_lt
+    omega
+  have h_prod_le : deg * ((p0 - 1) / deg) ≤ deg := by
+    have := Nat.mul_le_mul_left deg h_div_le
+    omega
+  cases h_cond : Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg)) with
+  | false =>
+    have h_lt_deg : x_shift + (p0 - 1) % deg < deg :=
+      Classical.byContradiction fun h_ge => by
+        have h_le : deg ≤ Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg) := by
+          change deg ≤ x_shift + (p0 - 1) % deg
+          omega
+        rw [Nat.ble_eq_true_of_le h_le] at h_cond
+        contradiction
+    simp only [Bool.not_false, ite_true]
+    change 1 ≤ p0 + x_shift ∧ p0 + x_shift ≤ 2 * deg
+    omega
+  | true =>
+    have h_ge_deg : deg ≤ x_shift + (p0 - 1) % deg := Nat.le_of_ble_eq_true h_cond
+    simp only [Bool.not_true]
+    change 1 ≤ p0 + x_shift - deg ∧ p0 + x_shift - deg ≤ 2 * deg
+    omega
+
+theorem reflCartPos_bounds {deg p : Nat} (h_deg : 1 ≤ deg) (hp1 : 1 ≤ p) (hp2 : p ≤ 2 * deg) :
+    1 ≤ reflCartPos deg p ∧ reflCartPos deg p ≤ 2 * deg := by
+  unfold reflCartPos
+  cases h1 : Nat.ble p deg with
+  | true =>
+    have hp_le : p ≤ deg := Nat.le_of_ble_eq_true h1
+    simp only [ite_true]
+    change 1 ≤ deg - p + 1 ∧ deg - p + 1 ≤ 2 * deg
+    omega
+  | false =>
+    have hp_gt : deg < p :=
+      Classical.byContradiction fun h_le => by
+        rw [Nat.ble_eq_true_of_le (by omega)] at h1; contradiction
+    cases h2 : Nat.ble (Nat.mul 2 deg) p with
+    | false =>
+      have hp_lt : p < 2 * deg :=
+        Classical.byContradiction fun h_ge => by
+          have h_le : Nat.mul 2 deg ≤ p := by change 2 * deg ≤ p; omega
+          rw [Nat.ble_eq_true_of_le h_le] at h2; contradiction
+      simp only [Bool.not_false, ite_true]
+      change 1 ≤ 3 * deg - p ∧ 3 * deg - p ≤ 2 * deg
+      omega
+    | true =>
+      simp only [Bool.not_true]
+      change 1 ≤ 2 * deg ∧ 2 * deg ≤ 2 * deg
+      omega
+
+theorem symCartPos_bounds {deg x_shift p0 : Nat} (refl : Bool)
+    (h_deg : 1 ≤ deg) (h_shift : x_shift < deg) (hp1 : 1 ≤ p0) (hp2 : p0 ≤ 2 * deg) :
+    1 ≤ symCartPos deg x_shift refl p0 ∧ symCartPos deg x_shift refl p0 ≤ 2 * deg := by
+  unfold symCartPos
+  have ⟨hs1, hs2⟩ := shiftCartPos_bounds h_deg h_shift hp1 hp2
+  cases refl with
+  | false => exact ⟨hs1, hs2⟩
+  | true => exact reflCartPos_bounds h_deg hs1 hs2
+
+/-- Inner loop helper for `symForcedRec` to prove condition forcing by structural induction on `conds`. -/
+noncomputable def symForcedLoop (st x_shift deg : Nat) (refl : Bool) (conds : List (Nat × Nat)) : Bool :=
+  List.rec
+    (motive := fun _ => Bool)
+    true
+    (fun c _ ih =>
+      let (p0, bm) := c
+      strictNat
+        (Bool.rec
+          (Nat.sub (Nat.add p0 x_shift) deg)
+          (Nat.add p0 x_shift)
+          (!Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg))))
+        fun p =>
+      Bool.rec
+        (Bool.rec
+          ih
+          false
+          (!Nat.beq (Nat.land (getLaneNat st p) (Nat.xor 31 bm)) 0))
+        (Bool.rec
+          false
+          (let q :=
+             Bool.rec
+               (Bool.rec
+                 (Nat.mul 2 deg)
+                 (Nat.sub (Nat.mul 3 deg) p)
+                 (!Nat.ble (Nat.mul 2 deg) p))
+               (Nat.add (Nat.sub deg p) 1)
+               (Nat.ble p deg)
+           Bool.rec
+             ih
+             false
+             (!Nat.beq (Nat.land (getLaneNat st q) (Nat.xor 31 bm)) 0))
+          (Nat.ble 1 p && Nat.ble p (Nat.mul 2 deg)))
+        refl)
+    conds
+
+theorem symForcedRec_eq_loop (st x deg : Nat) (refl : Bool) (conds : List (Nat × Nat)) :
+    symForcedRec st x deg refl conds = symForcedLoop st (Nat.sub x 1) deg refl conds := by
+  unfold symForcedRec
+  rw [strictNat_eq]
+  rfl
+
+theorem symForcedLoop_cons_eq (st x_shift deg : Nat) (refl : Bool) (c : Nat × Nat) (conds : List (Nat × Nat)) :
+    symForcedLoop st x_shift deg refl (c :: conds) =
+      (let p := shiftCartPos deg x_shift c.1
+       if refl then
+         if Nat.ble 1 p && Nat.ble p (Nat.mul 2 deg) then
+           let q := reflCartPos deg p
+           if !Nat.beq (Nat.land (getLaneNat st q) (Nat.xor 31 c.2)) 0 then
+             false
+           else
+             symForcedLoop st x_shift deg refl conds
+         else
+           false
+       else
+         if !Nat.beq (Nat.land (getLaneNat st p) (Nat.xor 31 c.2)) 0 then
+           false
+         else
+           symForcedLoop st x_shift deg refl conds) := by
+  rcases c with ⟨p0, bm⟩
+  unfold symForcedLoop shiftCartPos reflCartPos
+  dsimp only
+  have h_p :
+      (@Bool.rec (fun _ => Nat) (Nat.sub (Nat.add p0 x_shift) deg) (Nat.add p0 x_shift)
+        (!Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg)))) =
+      (if (!Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg))) = true then
+        Nat.add p0 x_shift else Nat.sub (Nat.add p0 x_shift) deg) := by
+    cases (!Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg))) <;> rfl
+  rw [strictNat_eq, h_p]
+  let p := if (!Nat.ble deg (Nat.add x_shift (Nat.mod (Nat.sub p0 1) deg))) = true then
+    Nat.add p0 x_shift else Nat.sub (Nat.add p0 x_shift) deg
+  cases refl with
+  | false =>
+    dsimp only
+    cases (!Nat.beq (Nat.land (getLaneNat st p) (Nat.xor 31 bm)) 0) <;> rfl
+  | true =>
+    dsimp only
+    cases (Nat.ble 1 p && Nat.ble p (Nat.mul 2 deg)) with
+    | false => rfl
+    | true =>
+      dsimp only
+      have h_q :
+          (@Bool.rec (fun _ => Nat)
+            (@Bool.rec (fun _ => Nat) (Nat.mul 2 deg) (Nat.sub (Nat.mul 3 deg) p) (!Nat.ble (Nat.mul 2 deg) p))
+            (Nat.add (Nat.sub deg p) 1) (Nat.ble p deg)) =
+          (if Nat.ble p deg = true then Nat.add (Nat.sub deg p) 1
+           else if (!Nat.ble (Nat.mul 2 deg) p) = true then Nat.sub (Nat.mul 3 deg) p
+           else Nat.mul 2 deg) := by
+        cases Nat.ble p deg <;> cases (!Nat.ble (Nat.mul 2 deg) p) <;> rfl
+      rw [h_q]
+      let q := if Nat.ble p deg = true then Nat.add (Nat.sub deg p) 1
+               else if (!Nat.ble (Nat.mul 2 deg) p) = true then Nat.sub (Nat.mul 3 deg) p
+               else Nat.mul 2 deg
+      cases (!Nat.beq (Nat.land (getLaneNat st q) (Nat.xor 31 bm)) 0) <;> rfl
+
+theorem testBit_of_land_xor_31_eq_zero {lane bm d : Nat}
+    (h_tb : lane.testBit (degBitIdx d) = true)
+    (h_zero : (!Nat.beq (Nat.land lane (Nat.xor 31 bm)) 0) = false) :
+    bm.testBit (degBitIdx d) = true := by
+  have h_eq : lane &&& (31 ^^^ bm) = 0 := by
+    cases h_b : Nat.beq (Nat.land lane (Nat.xor 31 bm)) 0 with
+    | true => exact Nat.beq_eq.mp h_b
+    | false => rw [h_b] at h_zero; contradiction
+  have h_bit : (lane &&& (31 ^^^ bm)).testBit (degBitIdx d) = false := by
+    rw [h_eq, Nat.zero_testBit]
+  rw [Nat.testBit_and, Nat.testBit_xor, h_tb, testBit_31_degBitIdx d, Bool.true_and] at h_bit
+  cases h_bm : bm.testBit (degBitIdx d) with
+  | true => rfl
+  | false => rw [h_bm] at h_bit; contradiction
+
+/-- Soundness of `symForcedRec`:
+    if `MatchesCartState deg cartDeg st`, every `(p0, bm) ∈ conds` has `1 ≤ p0 ≤ 2 * deg`,
+    and `symForcedRec st x deg refl conds = true` (with `1 ≤ deg` and `x - 1 < deg`),
+    then for every `(p0, bm) ∈ conds`, the rotated/reflected degree assignment
+    `symCartDeg deg (x - 1) refl cartDeg` satisfies `bm.testBit (degBitIdx (symCartDeg deg (x - 1) refl cartDeg p0)) = true`. -/
+theorem symForcedRec_sound (deg : Nat) (cartDeg : Nat → Nat) (st x : Nat) (refl : Bool)
+    (conds : List (Nat × Nat)) (h_deg : 1 ≤ deg) (h_shift : x - 1 < deg)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_conds : ∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg)
+    (h_ok : symForcedRec st x deg refl conds = true) :
+    ∀ c ∈ conds, c.2.testBit (degBitIdx (symCartDeg deg (x - 1) refl cartDeg c.1)) = true := by
+  rw [symForcedRec_eq_loop] at h_ok
+  have h_loop :
+      ∀ (cs : List (Nat × Nat)),
+        (∀ c ∈ cs, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
+        symForcedLoop st (x - 1) deg refl cs = true →
+        ∀ c ∈ cs, c.2.testBit (degBitIdx (symCartDeg deg (x - 1) refl cartDeg c.1)) = true := by
+    intro cs
+    induction cs with
+    | nil =>
+      intro _ _ c hc
+      cases hc
+    | cons c cs ih =>
+      intro h_cs h_cs_ok c' hc'
+      rw [symForcedLoop_cons_eq] at h_cs_ok
+      dsimp only at h_cs_ok
+      have ⟨hp0_1, hp0_2⟩ := h_cs c List.mem_cons_self
+      have h_tail : ∀ c'' ∈ cs, 1 ≤ c''.1 ∧ c''.1 ≤ 2 * deg :=
+        fun c'' hm => h_cs c'' (List.mem_cons_of_mem _ hm)
+      have ⟨hp1, hp2⟩ := shiftCartPos_bounds h_deg h_shift hp0_1 hp0_2
+      cases refl with
+      | false =>
+        cases h_z : (!Nat.beq (Nat.land (getLaneNat st (shiftCartPos deg (x - 1) c.1)) (Nat.xor 31 c.2)) 0) with
+        | true =>
+          rw [h_z] at h_cs_ok; contradiction
+        | false =>
+          rw [h_z] at h_cs_ok
+          rcases List.mem_cons.mp hc' with rfl | hc_tail
+          · unfold symCartDeg symCartPos
+            have h_tb : (getLaneNat st (shiftCartPos deg (x - 1) c'.1)).testBit (degBitIdx (cartDeg (shiftCartPos deg (x - 1) c'.1))) = true :=
+              h_match (shiftCartPos deg (x - 1) c'.1) hp1 (by omega)
+            exact testBit_of_land_xor_31_eq_zero h_tb h_z
+          · exact ih h_tail h_cs_ok c' hc_tail
+      | true =>
+        cases h_p_b : (Nat.ble 1 (shiftCartPos deg (x - 1) c.1) && Nat.ble (shiftCartPos deg (x - 1) c.1) (Nat.mul 2 deg)) with
+        | false =>
+          rw [h_p_b] at h_cs_ok; contradiction
+        | true =>
+          rw [h_p_b] at h_cs_ok
+          have ⟨hq1, hq2⟩ := reflCartPos_bounds h_deg hp1 hp2
+          cases h_z : (!Nat.beq (Nat.land (getLaneNat st (reflCartPos deg (shiftCartPos deg (x - 1) c.1))) (Nat.xor 31 c.2)) 0) with
+          | true =>
+            rw [h_z] at h_cs_ok; contradiction
+          | false =>
+            rw [h_z] at h_cs_ok
+            simp only [ite_true] at h_cs_ok
+            rcases List.mem_cons.mp hc' with rfl | hc_tail
+            · unfold symCartDeg symCartPos
+              simp only [ite_true]
+              have h_tb : (getLaneNat st (reflCartPos deg (shiftCartPos deg (x - 1) c'.1))).testBit
+                  (degBitIdx (cartDeg (reflCartPos deg (shiftCartPos deg (x - 1) c'.1)))) = true :=
+                h_match (reflCartPos deg (shiftCartPos deg (x - 1) c'.1)) hq1 (by omega)
+              exact testBit_of_land_xor_31_eq_zero h_tb h_z
+            · exact ih h_tail h_cs_ok c' hc_tail
+  exact h_loop conds h_conds h_ok
+
+/-- Inner loop helper for `extractCondsRec` to prove `1 ≤ c.1 ≤ 2 * deg` for all extracted conditions. -/
+noncomputable def extractCondsLoop (deg condV condM lev : Nat) (acc0 : List (Nat × Nat)) : Option (List (Nat × Nat)) :=
+  Nat.rec
+    (motive := fun _ => List (Nat × Nat) → Option (List (Nat × Nat)))
+    (fun acc =>
+      strictNat (getLaneNat condV 0) fun n =>
+      Bool.rec
+        none
+        (some ((n, getLaneNat condM 0) :: acc))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)))
+    (fun i ih acc =>
+      strictNat (Nat.add i 1) fun idx =>
+      strictNat (getLaneNat condV idx) fun n =>
+      Bool.rec
+        none
+        (ih ((n, getLaneNat condM idx) :: acc))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)))
+    lev acc0
+
+theorem extractCondsRec_eq_loop (deg condV condM lev : Nat) :
+    extractCondsRec deg condV condM lev = extractCondsLoop deg condV condM lev [] := rfl
+
+theorem extractCondsLoop_sound (deg condV condM : Nat) :
+    ∀ (lev : Nat) (acc res : List (Nat × Nat)),
+      (∀ c ∈ acc, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
+      extractCondsLoop deg condV condM lev acc = some res →
+      ∀ c ∈ res, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg := by
+  intro lev
+  induction lev with
+  | zero =>
+    intro acc res h_acc h_some c hc
+    change (strictNat (getLaneNat condV 0) fun n =>
+      @Bool.rec (fun _ => Option (List (Nat × Nat))) none
+        (some ((n, getLaneNat condM 0) :: acc))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = some res at h_some
+    rw [strictNat_eq] at h_some
+    let n := getLaneNat condV 0
+    cases h_b : (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)) with
+    | false =>
+      rw [h_b] at h_some; contradiction
+    | true =>
+      rw [h_b] at h_some
+      dsimp only at h_some
+      injection h_some with h_eq
+      subst h_eq
+      rcases List.mem_cons.mp hc with rfl | hc_acc
+      · rcases Bool.and_eq_true_iff.mp h_b with ⟨hb1, hb2⟩
+        exact ⟨Nat.le_of_ble_eq_true hb1, Nat.le_of_ble_eq_true hb2⟩
+      · exact h_acc c hc_acc
+  | succ i ih =>
+    intro acc res h_acc h_some
+    unfold extractCondsLoop at h_some
+    dsimp only at h_some
+    rw [strictNat_eq, strictNat_eq] at h_some
+    let idx := Nat.add i 1
+    let n := getLaneNat condV idx
+    change (@Bool.rec (fun _ => Option (List (Nat × Nat))) none
+      (extractCondsLoop deg condV condM i ((n, getLaneNat condM idx) :: acc))
+      (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = some res at h_some
+    cases h_b : (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)) with
+    | false =>
+      rw [h_b] at h_some; contradiction
+    | true =>
+      rw [h_b] at h_some
+      dsimp only at h_some
+      apply ih ((n, getLaneNat condM idx) :: acc) res _ h_some
+      intro c hc
+      rcases List.mem_cons.mp hc with rfl | hc_acc
+      · rcases Bool.and_eq_true_iff.mp h_b with ⟨hb1, hb2⟩
+        exact ⟨Nat.le_of_ble_eq_true hb1, Nat.le_of_ble_eq_true hb2⟩
+      · exact h_acc c hc_acc
+
+theorem extractCondsRec_sound (deg condV condM lev : Nat) {conds : List (Nat × Nat)}
+    (h_some : extractCondsRec deg condV condM lev = some conds) :
+    ∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg := by
+  rw [extractCondsRec_eq_loop] at h_some
+  exact extractCondsLoop_sound deg condV condM lev [] conds (fun _ h => by cases h) h_some
+
+theorem findSymOutletRec_mem (line : Nat) (syms : List SymOutlet) {found : SymOutlet}
+    (h_find : findSymOutletRec line syms = some found) :
+    found ∈ syms := by
+  induction syms with
+  | nil =>
+    unfold findSymOutletRec at h_find
+    contradiction
+  | cons o syms ih =>
+    unfold findSymOutletRec at h_find
+    dsimp only at h_find
+    change (@Bool.rec (fun _ => Option SymOutlet) (findSymOutletRec line syms) (some o) (Nat.beq o.number line)) = some found at h_find
+    cases h_eq : Nat.beq o.number line with
+    | true =>
+      rw [h_eq] at h_find
+      dsimp only at h_find
+      injection h_find with h_o
+      subst h_o
+      exact List.mem_cons_self
+    | false =>
+      rw [h_eq] at h_find
+      dsimp only at h_find
+      exact List.mem_cons_of_mem _ (ih h_find)
+
+/-- Semantic leaf certificate for a cartwheel degree assignment `cartDeg`:
+    either (1) `cartDeg` has an exact reduced axle configuration (`HasExactReducedAxle`),
+    or (2) a refined state `st_red` matching `cartDeg` passes `reduceAxleRec` inside a hubcap split,
+    or (3) every member `(x, y, v)` of a hubcap leaf satisfies the linear programming bound
+       `500 + activeOutletSum ≤ (v + 500).toNat`,
+    or (4) `cartDeg` reduces by rotational/reflectional symmetry (`k < deg`, `eps ≤ 1`) to a
+       recorded ancestor condition list `found.conds` (`∀ c ∈ found.conds, 1 ≤ c.1 ≤ 2 * deg`). -/
+def SemanticCartLeaf (deg : Nat) (shiftedTable : List (List FastPosOut)) (cartDeg : Nat → Nat) : Prop :=
+  HasExactReducedAxle deg cartDeg ∨
+  (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+  (∃ members : List (Nat × Nat × Int),
+    ∀ m ∈ members,
+      500 + activeOutletSum deg cartDeg
+        (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+         else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1)
+        ≤ ((m.2.2 + 500).toNat : Int)) ∨
+  (∃ (k eps : Nat) (found : SymOutlet),
+    k < deg ∧ eps ≤ 1 ∧
+    (∀ c ∈ found.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) ∧
+    (∀ c ∈ found.conds, c.2.testBit (degBitIdx (symCartDeg deg k (!Nat.beq eps 0) cartDeg c.1)) = true))
+
+/-- Full Semantic Soundness of `verifyTreePureRec`:
+    combines `MatchesCartState31` preservation, `reduceAxleRec_sound`, `verifyHubcapMembersRec_sound`,
+    `extractCondsRec_sound`, and `symForcedRec_sound` across the entire `ProofTree`. -/
+theorem verifyTreePureRec_semantic_soundness (deg : Nat) (shiftedTable : List (List FastPosOut))
+    (t : ProofTree) (cartDeg : Nat → Nat) (h_deg1 : 1 ≤ deg) (h_deg : deg ≤ 11)
+    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true) :
+    ∀ (st lineno lev condV condM : Nat) (syms : List SymOutlet) (hs : HintStream),
+      MatchesCartState31 deg cartDeg st →
+      (∀ o ∈ syms, ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
+      (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true →
+      SemanticCartLeaf deg shiftedTable cartDeg := by
+  induction t with
+  | cond v m tTrue tFalse ihTrue ihFalse =>
+    intro st lineno lev condV condM syms hs h_match31 h_syms h_ok
+    rw [verifyTreePureRec_cond_eq] at h_ok
+    simp only [strictNat_eq] at h_ok
+    let maskTrue := condMaskNat m
+    let maskFalse := Nat.xor 31 maskTrue
+    let curLane := getLaneNat st v
+    let stTrue := setLaneNat st v (Nat.land curLane maskTrue)
+    let stFalse := setLaneNat st v (Nat.land curLane maskFalse)
+    let lev1 := Nat.add lev 1
+    let lineno1 := Nat.add lineno 1
+    let syms' :=
+      match extractCondsRec deg condV condM lev with
+      | none => syms
+      | some conds => { number := lineno, nolines := lev1, conds := conds } :: syms
+    have h_syms' : ∀ o ∈ syms', ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg := by
+      dsimp [syms']
+      cases h_ext : extractCondsRec deg condV condM lev with
+      | none => exact h_syms
+      | some conds =>
+        intro o ho
+        rcases List.mem_cons.mp ho with rfl | ho_tail
+        · exact extractCondsRec_sound deg condV condM lev h_ext
+        · exact h_syms o ho_tail
+    let condV' := setLaneNat (setLaneNat condV lev v) lev1 0
+    let condM' := setLaneNat (setLaneNat condM lev maskTrue) lev1 0
+    let resTrue := verifyTreePureRec deg shiftedTable tTrue stTrue lineno1 lev1 condV' condM' syms' hs
+    change (@Bool.rec (fun _ => Bool × Nat × HintStream) (false, resTrue.2.fst, resTrue.2.snd)
+      (verifyTreePureRec deg shiftedTable tFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd)
+      resTrue.fst).fst = true at h_ok
+    cases h_b : resTrue.fst with
+    | false =>
+      rw [h_b] at h_ok; dsimp at h_ok; contradiction
+    | true =>
+      rw [h_b] at h_ok; dsimp at h_ok
+      rcases matchesCartState31_cond_split deg cartDeg st v m h_deg h_match31 with h_mTrue | h_mFalse
+      · exact ihTrue stTrue lineno1 lev1 condV' condM' syms' hs h_mTrue h_syms' h_b
+      · exact ihFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd h_mFalse h_syms' h_ok
+  | reduce =>
+    intro st lineno lev condV condM syms hs h_match31 _ h_ok
+    change (let (ok, hs') := reduceAxleRec deg 64 [st] hs
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    exact Or.inl (reduceAxleRec_sound deg cartDeg h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok)
+  | hubcap members =>
+    intro st lineno lev condV condM syms hs h_match31 _ h_ok
+    change (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    have h_hub := verifyHubcapMembersRec_sound deg cartDeg h_deg st h_match31.1 shiftedTable h_table members hs h_ok
+    -- Either some member triggered a `reduceAxleRec` witness, or all members satisfy the activeOutletSum bound!
+    have h_split :
+        (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+        (∀ m ∈ members,
+          500 + activeOutletSum deg cartDeg
+            (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+             else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1)
+            ≤ ((m.2.2 + 500).toNat : Int)) := by
+      clear h_ok
+      induction members with
+      | nil =>
+        right
+        intro m hm; cases hm
+      | cons m ms ih =>
+        rcases h_hub m List.mem_cons_self with h_red | h_b
+        · exact Or.inl h_red
+        · rcases ih (fun m' hm' => h_hub m' (List.mem_cons_of_mem _ hm')) with h_red | h_all
+          · exact Or.inl h_red
+          · right
+            intro m' hm'
+            rcases List.mem_cons.mp hm' with rfl | hm_tail
+            · exact h_b
+            · exact h_all m' hm_tail
+    rcases h_split with h_red | h_all
+    · exact Or.inr (Or.inl h_red)
+    · exact Or.inr (Or.inr (Or.inl ⟨members, h_all⟩))
+  | sym k eps lev_in line =>
+    intro st lineno lev condV condM syms hs h_match31 h_syms h_ok
+    change (let ok :=
+              Bool.rec false
+                (match findSymOutletRec line syms with
+                 | none => false
+                 | some found =>
+                   Bool.rec false
+                     (symForcedRec st (Nat.add k 1) deg (!Nat.beq eps 0) found.conds)
+                     (Nat.beq found.nolines (Nat.add lev_in 1)))
+                (!Nat.ble deg k && Nat.ble eps 1)
+            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs)).1 = true at h_ok
+    simp only [strictNat_eq] at h_ok
+    cases h_ke : (!Nat.ble deg k && Nat.ble eps 1) with
+    | false =>
+      rw [h_ke] at h_ok; dsimp at h_ok; contradiction
+    | true =>
+      rw [h_ke] at h_ok; dsimp at h_ok
+      cases h_find : findSymOutletRec line syms with
+      | none =>
+        rw [h_find] at h_ok; contradiction
+      | some found =>
+        rw [h_find] at h_ok; dsimp at h_ok
+        cases h_nl : Nat.beq found.nolines (Nat.add lev_in 1) with
+        | false =>
+          rw [h_nl] at h_ok; dsimp at h_ok; contradiction
+        | true =>
+          rw [h_nl] at h_ok; dsimp at h_ok
+          rcases Bool.and_eq_true_iff.mp h_ke with ⟨hk_not, heps⟩
+          have hk_lt : k < deg :=
+            Classical.byContradiction fun h_ge => by
+              rw [Nat.ble_eq_true_of_le (by omega)] at hk_not
+              contradiction
+          have heps_le : eps ≤ 1 := Nat.le_of_ble_eq_true heps
+          have h_found_conds : ∀ c ∈ found.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg :=
+            h_syms found (findSymOutletRec_mem line syms h_find)
+          have h_shift_lt : Nat.add k 1 - 1 < deg := by
+            change (k + 1) - 1 < deg
+            omega
+          have h_forced := symForcedRec_sound deg cartDeg st (Nat.add k 1) (!Nat.beq eps 0)
+            found.conds h_deg1 h_shift_lt h_match31.1 h_found_conds h_ok
+          exact Or.inr (Or.inr (Or.inr ⟨k, eps, found, hk_lt, heps_le, h_found_conds, h_forced⟩))
+
+/-- Top-level Semantic Soundness of `verifyTree`:
+    keeps `deg` and `t` abstract so `getHintsForDeg deg` and `t` are never unfolded during elaboration. -/
+theorem verifyTree_semantic_soundness (configs : List Configuration) (deg : Nat)
+    (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
+    (h_ver : verifyTree configs deg A_low A_upp t outs = true) :
+    SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg := by
+  have h_deg1 : 1 ≤ deg := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
+  have h_le11 : deg ≤ 11 := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
+  have h_syms0 : ∀ o ∈ ([] : List SymOutlet), ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg :=
+    fun _ h => by cases h
+  exact verifyTreePureRec_semantic_soundness deg (getShiftedTableForDeg deg) t cartDeg
+    h_deg1 h_le11 (validFastPosOut_getShiftedTableForDeg deg h_deg)
+    (getInitStateForDeg deg) 2 0 0 0 [] ([], getHintsForDeg deg)
+    (matchesCartState31_getInitStateForDeg deg cartDeg h_deg) h_syms0 h_ver
+
+/-- Top-level Semantic Soundness of `DischargingTreesVerified`:
+    for every hub degree `deg ∈ {7, 8, 9, 10, 11}` and every cartwheel degree assignment `cartDeg : Nat → Nat`,
+    `DischargingTreesVerified configs` guarantees `SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg`. -/
+theorem dischargingTreesVerified_semantic_soundness (configs : List Configuration)
+    (h_trees : DischargingTreesVerified configs) (deg : Nat) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg := by
+  rcases h_trees with ⟨h7, h8, h9, h10, h11⟩
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · exact verifyTree_semantic_soundness configs 7 (trivial_A_low 7) (trivial_A_upp 7) (present7 ()) (readOutlets 7 theRules) cartDeg (Or.inl rfl) h7
+  · exact verifyTree_semantic_soundness configs 8 (trivial_A_low 8) (trivial_A_upp 8) (present8 ()) (readOutlets 8 theRules) cartDeg (Or.inr (Or.inl rfl)) h8
+  · exact verifyTree_semantic_soundness configs 9 (trivial_A_low 9) (trivial_A_upp 9) (present9 ()) (readOutlets 9 theRules) cartDeg (Or.inr (Or.inr (Or.inl rfl))) h9
+  · exact verifyTree_semantic_soundness configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) h10
+  · exact verifyTree_semantic_soundness configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) h11
+
 end Discharging
 end Math
