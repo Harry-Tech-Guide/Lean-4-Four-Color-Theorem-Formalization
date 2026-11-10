@@ -6422,5 +6422,785 @@ theorem dischargingTreesVerified_semantic_soundness (configs : List Configuratio
   · exact verifyTree_semantic_soundness configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) h10
   · exact verifyTree_semantic_soundness configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) h11
 
+/-!
+### Stage L.1: Real Hypermap Cartwheel Instantiation (`spokeDart`, `cartDart`, `cartDegOfDart`, `dischargingTreesVerified_hypermap_soundness`)
+-/
+
+/-- The `i`-th outgoing spoke dart (`1 ≤ i ≤ deg`) around hub dart `d0` in hypermap `H`,
+    obtained by iterating `H.node.f` `(i - 1)` times starting from `d0`. -/
+def spokeDart (H : Hypermap) (d0 : H.Dart) (i : Nat) : H.Dart :=
+  Hypermap.Perm.iter H.node (i - 1) d0
+
+@[simp] theorem spokeDart_one (H : Hypermap) (d0 : H.Dart) :
+    spokeDart H d0 1 = d0 := rfl
+
+theorem spokeDart_succ (H : Hypermap) (d0 : H.Dart) {i : Nat} (hi : 1 ≤ i) :
+    spokeDart H d0 (i + 1) = H.node.f (spokeDart H d0 i) := by
+  cases i with
+  | zero => omega
+  | succ k => rfl
+
+theorem perm_iter_mem_getOrbit_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d0 : H.Dart) (n : Nat) :
+    Hypermap.Perm.iter H.node n d0 ∈ getOrbit H.node fuel d0 := by
+  induction n with
+  | zero =>
+    exact List.contains_iff_mem.mp (Hypermap.getOrbit_contains_self H.node fuel d0)
+  | succ n ih =>
+    rw [Hypermap.Perm.iter_succ]
+    exact Hypermap.getOrbit_closed_under_f_of_complete H.node darts h_all h_le ih
+
+/-- Every `spokeDart H d0 i` belongs to the node orbit `getOrbit H.node fuel d0` on a complete dart list. -/
+theorem spokeDart_mem_getOrbit_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d0 : H.Dart) (i : Nat) :
+    spokeDart H d0 i ∈ getOrbit H.node fuel d0 :=
+  perm_iter_mem_getOrbit_of_complete H darts h_all h_le d0 (i - 1)
+
+/-- Maps each RSST cartwheel position `0 ≤ p ≤ 5 * deg` around hub dart `d0` in hypermap `H`
+    to its representative vertex dart, matching the 5 concentric cartwheel rings of `getAdjMat` / `doFan` / `doOutlet`:
+    - `p = 0`: hub dart `d0`
+    - `1 ≤ p ≤ deg` (`ringIdx = 0`, spoke `i`): `ruleVertexDart H false (H.edge.f s_i) 0` (`= H.edge.f s_i`)
+    - `deg + 1 ≤ p ≤ 2 * deg` (`ringIdx = 1`, hat `deg + i`): `ruleVertexDart H false (H.edge.f s_i) 5`
+    - `2 * deg + 1 ≤ p ≤ 3 * deg` (`ringIdx = 2`, 1st fan `2 * deg + i`): `ruleVertexDart H false (H.edge.f s_i) 12`
+    - `3 * deg + 1 ≤ p ≤ 4 * deg` (`ringIdx = 3`, 2nd fan `3 * deg + i`): `ruleVertexDart H false (H.edge.f s_i) 13`
+    - `4 * deg + 1 ≤ p ≤ 5 * deg` (`ringIdx ≥ 4`, 3rd fan `4 * deg + i`): `H.edge.f (H.node.inv^5 (H.edge.f s_i))`. -/
+def cartDart (H : Hypermap) (deg : Nat) (d0 : H.Dart) (p : Nat) : H.Dart :=
+  if p == 0 then d0
+  else
+    let ringIdx := (p - 1) / deg
+    let s := spokeDart H d0 ((p - 1) % deg + 1)
+    if ringIdx == 0 then ruleVertexDart H false (H.edge.f s) 0
+    else if ringIdx == 1 then ruleVertexDart H false (H.edge.f s) 5
+    else if ringIdx == 2 then ruleVertexDart H false (H.edge.f s) 12
+    else if ringIdx == 3 then ruleVertexDart H false (H.edge.f s) 13
+    else H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f s))))))
+
+/-- Concrete cartwheel degree assignment `Nat → Nat` around hub dart `d0` in hypermap `H`. -/
+def cartDegOfDart (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (d0 : H.Dart) (p : Nat) : Nat :=
+  Hypermap.nodeDegree H (cartDart H deg d0 p) fuel
+
+@[simp] theorem cartDart_zero (H : Hypermap) (deg : Nat) (d0 : H.Dart) :
+    cartDart H deg d0 0 = d0 := rfl
+
+@[simp] theorem cartDegOfDart_zero (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (d0 : H.Dart) :
+    cartDegOfDart H fuel deg d0 0 = Hypermap.nodeDegree H d0 fuel := rfl
+
+theorem ringIdx_of_mul_add {deg k i : Nat} (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    ((k * deg + i) - 1) / deg = k := by
+  have h_deg_pos : 0 < deg := by omega
+  have h_eq : (k * deg + i) - 1 = (i - 1) + deg * k := by
+    rw [Nat.mul_comm deg k]
+    omega
+  rw [h_eq, Nat.add_mul_div_left (i - 1) k h_deg_pos, Nat.div_eq_of_lt (by omega), Nat.zero_add]
+
+theorem spokeIdx_of_mul_add {deg k i : Nat} (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    ((k * deg + i) - 1) % deg + 1 = i := by
+  have h_eq : (k * deg + i) - 1 = (i - 1) + deg * k := by
+    rw [Nat.mul_comm deg k]
+    omega
+  rw [h_eq, Nat.add_mul_mod_self_left (i - 1) deg k, Nat.mod_eq_of_lt (by omega)]
+  omega
+
+/-- For `1 ≤ i ≤ deg`, cartwheel spoke position `i` maps to `H.edge.f (spokeDart H d0 i)`. -/
+theorem cartDart_spoke (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDart H deg d0 i = H.edge.f (spokeDart H d0 i) := by
+  dsimp [cartDart]
+  have h_ne0 : (i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : (i - 1) / deg = 0 := by
+    simpa using ringIdx_of_mul_add (k := 0) hi1 hi2
+  have h_mod : (i - 1) % deg + 1 = i := by
+    simpa using spokeIdx_of_mul_add (k := 0) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-- For `1 ≤ i ≤ deg`, cartwheel hat position `deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 5`. -/
+theorem cartDart_hat (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDart H deg d0 (deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 5 := by
+  dsimp [cartDart]
+  have h_ne0 : (deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((deg + i) - 1) / deg = 1 := by
+    simpa using ringIdx_of_mul_add (k := 1) hi1 hi2
+  have h_mod : ((deg + i) - 1) % deg + 1 = i := by
+    simpa using spokeIdx_of_mul_add (k := 1) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-- For `1 ≤ i ≤ deg`, 1st fan position `2 * deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 12`. -/
+theorem cartDart_fan1 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDart H deg d0 (2 * deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 12 := by
+  dsimp [cartDart]
+  have h_ne0 : (2 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((2 * deg + i) - 1) / deg = 2 := ringIdx_of_mul_add (k := 2) hi1 hi2
+  have h_mod : ((2 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 2) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-- For `1 ≤ i ≤ deg`, 2nd fan position `3 * deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 13`. -/
+theorem cartDart_fan2 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDart H deg d0 (3 * deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 13 := by
+  dsimp [cartDart]
+  have h_ne0 : (3 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((3 * deg + i) - 1) / deg = 3 := ringIdx_of_mul_add (k := 3) hi1 hi2
+  have h_mod : ((3 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 3) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-- For `1 ≤ i ≤ deg`, 3rd fan position `4 * deg + i` maps to `H.edge.f (H.node.inv^5 (H.edge.f (spokeDart H d0 i)))`. -/
+theorem cartDart_fan3 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDart H deg d0 (4 * deg + i) =
+      H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f (spokeDart H d0 i))))))) := by
+  dsimp [cartDart]
+  have h_ne0 : (4 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((4 * deg + i) - 1) / deg = 4 := ringIdx_of_mul_add (k := 4) hi1 hi2
+  have h_mod : ((4 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 4) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-- Real-Hypermap Cartwheel Soundness of `DischargingTreesVerified` (Degrees 7–11):
+    for any hypermap `H`, fuel `fuel`, and hub dart `d0 : H.Dart` whose vertex degree
+    `deg = Hypermap.nodeDegree H d0 fuel` lies in `{7, 8, 9, 10, 11}`,
+    `DischargingTreesVerified configs` guarantees that the concrete hypermap cartwheel
+    degree assignment `cartDegOfDart H fuel deg d0` around `d0` satisfies `SemanticCartLeaf`:
+    1. `(Hubcap)` Every hub-cap member `(v1, v2, b)` has `∑_{po ∈ posOut(v1, v2), active} po.value ≤ -b - 1`
+       and `∑_{(v1, v2, b)} b > -20 * (6 - deg)`, or
+    2. `(Reduce)` The cartwheel around `d0` matches an exact axle degree reduction (`HasExactReducedAxle`), or
+    3. `(Sym)` The cartwheel around `d0` satisfies a reflected/rotated earlier branch condition (`symCartDeg`). -/
+theorem dischargingTreesVerified_hypermap_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
+    (fuel : Nat) (d0 : H.Dart)
+    (h_deg : Hypermap.nodeDegree H d0 fuel = 7 ∨
+             Hypermap.nodeDegree H d0 fuel = 8 ∨
+             Hypermap.nodeDegree H d0 fuel = 9 ∨
+             Hypermap.nodeDegree H d0 fuel = 10 ∨
+             Hypermap.nodeDegree H d0 fuel = 11) :
+    let deg := Hypermap.nodeDegree H d0 fuel
+    SemanticCartLeaf deg (getShiftedTableForDeg deg) (cartDegOfDart H fuel deg d0) :=
+  dischargingTreesVerified_semantic_soundness configs h_trees
+    (Hypermap.nodeDegree H d0 fuel)
+    (cartDegOfDart H fuel (Hypermap.nodeDegree H d0 fuel) d0)
+    h_deg
+
+/-- Primal–Dual Real-Hypermap Cartwheel Soundness on `H.dual` (Degrees 7–11):
+    for any dual vertex (primal face) `d0 : H.Dart` of degree `deg ∈ {7, 8, 9, 10, 11}` in `H.dual`,
+    `DischargingTreesVerified configs` guarantees `SemanticCartLeaf` for `cartDegOfDart H.dual fuel deg d0`. -/
+theorem dual_dischargingTreesVerified_hypermap_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
+    (fuel : Nat) (d0 : H.Dart)
+    (h_deg : Hypermap.nodeDegree H.dual d0 fuel = 7 ∨
+             Hypermap.nodeDegree H.dual d0 fuel = 8 ∨
+             Hypermap.nodeDegree H.dual d0 fuel = 9 ∨
+             Hypermap.nodeDegree H.dual d0 fuel = 10 ∨
+             Hypermap.nodeDegree H.dual d0 fuel = 11) :
+    let deg := Hypermap.nodeDegree H.dual d0 fuel
+    SemanticCartLeaf deg (getShiftedTableForDeg deg) (cartDegOfDart H.dual fuel deg d0) :=
+  dischargingTreesVerified_hypermap_soundness H.dual configs h_trees fuel d0 h_deg
+
+/-!
+### Stage L.2: Degree-6 Discharging with Degree-5 and Degree-6 Neighbors (Primal & Dual)
+-/
+
+/-- If `r.b1.1 > degs 1` (`0 < r.b1.1`), then `matchesRawRuleDegs degs r = false`. -/
+theorem not_matchesRawRuleDegs_of_b1_lt (degs : Nat → Nat) (r : RawRule)
+    (h_pos : 0 < r.b1.1) (h_lt : degs 1 < r.b1.1) :
+    matchesRawRuleDegs degs r = false := by
+  dsimp [matchesRawRuleDegs]
+  rw [@degMatchesBound_eq_false_of_lt (degs 1) r.b1 h_pos h_lt]
+  simp
+
+/-- When `degs 0 = 5` and `degs 1 ≤ 6`, rule `r3` (`b1 = (7, 12)`) vanishes,
+    so at most `r1` and `r5` can match (`orientOutflowDegs inv degs ≤ 2`). -/
+theorem orientOutflowDegs_le_2_of_deg_5_of_target_deg_le_6 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 5) (hb1 : degs 1 ≤ 6) :
+    orientOutflowDegs inv degs ≤ 2 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 5 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 5 0) = [r1, r3, r5] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h3 : matchesRawRuleDegs degs r3 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r3 (by decide) (by dsimp [r3]; omega)
+  have h1 : (if (if inv then r1.invert else true) && matchesRawRuleDegs degs r1 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  have h5 : (if (if inv then r5.invert else true) && matchesRawRuleDegs degs r5 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  rw [h3]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- When `degs 0 = 5` and `7 ≤ degs 3`, both `r3` (`degs 3 = 5`) and `r5` (`degs 3 ≤ 6`) vanish,
+    leaving only `r1` (`orientOutflowDegs inv degs ≤ 1`). -/
+theorem orientOutflowDegs_le_1_of_deg_5_of_deg3_ge_7 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 5) (hb3 : 7 ≤ degs 3) :
+    orientOutflowDegs inv degs ≤ 1 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 5 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 5 0) = [r1, r3, r5] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h3 : matchesRawRuleDegs degs r3 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r3 3 5 5 (by decide) (by decide) (by omega)
+  have h5 : matchesRawRuleDegs degs r5 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r5 3 5 6 (by decide) (by decide) (by omega)
+  have h1 : (if (if inv then r1.invert else true) && matchesRawRuleDegs degs r1 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  rw [h3, h5]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- When `degs 0 = 6` and `degs 1 ≤ 6`, rules `r3, r13, r15` (`b1 = (7, 12)`) vanish
+    and `{r5, r11}` / `{r7, r9}` conflict, so `orientOutflowDegs inv degs ≤ 2`. -/
+theorem orientOutflowDegs_le_2_of_deg_6_of_target_deg_le_6 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 6) (hb1 : degs 1 ≤ 6) :
+    orientOutflowDegs inv degs ≤ 2 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 6 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 6 0) = [r3, r5, r7, r9, r11, r13, r15] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h3 : matchesRawRuleDegs degs r3 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r3 (by decide) (by dsimp [r3]; omega)
+  have h13 : matchesRawRuleDegs degs r13 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r13 (by decide) (by dsimp [r13]; omega)
+  have h15 : matchesRawRuleDegs degs r15 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r15 (by decide) (by dsimp [r15]; omega)
+  have hc5_11 := conflict_pair_at inv degs r5 r11 5 5 5 6 6 (by decide) (by decide) (by decide) (by decide)
+  have hc7_9 := conflict_pair_at inv degs r7 r9 3 5 5 6 6 (by decide) (by decide) (by decide) (by decide)
+  rw [h3, h13, h15]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- When `degs 0 = 6` and `7 ≤ degs 3`, all 7 rules `r3..r15` vanish (`orientOutflowDegs inv degs = 0`). -/
+theorem orientOutflowDegs_eq_zero_of_deg_6_of_deg3_ge_7 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 6) (hb3 : 7 ≤ degs 3) :
+    orientOutflowDegs inv degs = 0 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 6 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 6 0) = [r3, r5, r7, r9, r11, r13, r15] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h3 : matchesRawRuleDegs degs r3 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r3 3 5 5 (by decide) (by decide) (by omega)
+  have h5 : matchesRawRuleDegs degs r5 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r5 3 5 6 (by decide) (by decide) (by omega)
+  have h7 : matchesRawRuleDegs degs r7 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r7 3 5 5 (by decide) (by decide) (by omega)
+  have h9 : matchesRawRuleDegs degs r9 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r9 3 6 6 (by decide) (by decide) (by omega)
+  have h11 : matchesRawRuleDegs degs r11 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r11 3 6 6 (by decide) (by decide) (by omega)
+  have h13 : matchesRawRuleDegs degs r13 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r13 3 5 5 (by decide) (by decide) (by omega)
+  have h15 : matchesRawRuleDegs degs r15 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r15 3 6 6 (by decide) (by decide) (by omega)
+  rw [h3, h5, h7, h9, h11, h13, h15]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- When `degs 0 = 6`, `degs 1 ≤ 6`, `6 ≤ degs 5`, `6 ≤ degs 9`, and `6 ≤ degs 11`,
+    every rule in `theRules` vanishes (`orientOutflowDegs inv degs = 0`). -/
+theorem orientOutflowDegs_eq_zero_of_deg_6_of_target_deg_le_6_of_no_deg5_second_ring
+    (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 6) (hb1 : degs 1 ≤ 6)
+    (hb5 : 6 ≤ degs 5) (hb9 : 6 ≤ degs 9) (hb11 : 6 ≤ degs 11) :
+    orientOutflowDegs inv degs = 0 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 6 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 6 0) = [r3, r5, r7, r9, r11, r13, r15] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h3 : matchesRawRuleDegs degs r3 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r3 (by decide) (by dsimp [r3]; omega)
+  have h5 : matchesRawRuleDegs degs r5 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r5 5 5 5 (by decide) (by decide) (by omega)
+  have h7 : matchesRawRuleDegs degs r7 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r7 9 5 5 (by decide) (by decide) (by omega)
+  have h9 : matchesRawRuleDegs degs r9 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r9 9 5 5 (by decide) (by decide) (by omega)
+  have h11 : matchesRawRuleDegs degs r11 = false :=
+    not_matchesRawRuleDegs_of_triple_gt degs r11 11 5 5 (by decide) (by decide) (by omega)
+  have h13 : matchesRawRuleDegs degs r13 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r13 (by decide) (by dsimp [r13]; omega)
+  have h15 : matchesRawRuleDegs degs r15 = false :=
+    not_matchesRawRuleDegs_of_b1_lt degs r15 (by decide) (by dsimp [r15]; omega)
+  rw [h3, h5, h7, h9, h11, h13, h15]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- Compensating Outflow Lemma for Degree-6 Vertices (`r3` activation):
+    when `degs 0 = 6`, `7 ≤ degs 1`, and `degs 3 = 5`, rule `r3` fires in orientation `inv`,
+    so `1 ≤ orientOutflowDegs inv degs`. -/
+theorem one_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 6) (hb1 : 7 ≤ degs 1) (hb3 : degs 3 = 5) :
+    1 ≤ orientOutflowDegs inv degs := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 6 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 6 0) = [r3, r5, r7, r9, r11, r13, r15] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have hr3 : matchesRawRuleDegs degs r3 = true := by
+    dsimp [matchesRawRuleDegs, r3, List.all, degMatchesBound]
+    rw [hb0, hb3, decide_eq_true hb1]
+    rfl
+  have h_inv3 : (if inv then r3.invert else true) = true := by cases inv <;> rfl
+  have h5 : 0 ≤ (if (if inv then r5.invert else true) && matchesRawRuleDegs degs r5 then (1 : Int) else 0) := by split <;> omega
+  have h7 : 0 ≤ (if (if inv then r7.invert else true) && matchesRawRuleDegs degs r7 then (1 : Int) else 0) := by split <;> omega
+  have h9 : 0 ≤ (if (if inv then r9.invert else true) && matchesRawRuleDegs degs r9 then (1 : Int) else 0) := by split <;> omega
+  have h11 : 0 ≤ (if (if inv then r11.invert else true) && matchesRawRuleDegs degs r11 then (1 : Int) else 0) := by split <;> omega
+  have h13 : 0 ≤ (if (if inv then r13.invert else true) && matchesRawRuleDegs degs r13 then (1 : Int) else 0) := by split <;> omega
+  have h15 : 0 ≤ (if (if inv then r15.invert else true) && matchesRawRuleDegs degs r15 then (1 : Int) else 0) := by split <;> omega
+  rw [hr3, h_inv3]; dsimp; omega
+
+/-- Double Compensating Outflow Lemma for Degree-6 Vertices (`r3 + r5` activation):
+    when `degs 0 = 6`, `7 ≤ degs 1`, `degs 3 = 5`, and `degs 5 = 5`, both `r3` and `r5` fire
+    in orientation `inv`, so `2 ≤ orientOutflowDegs inv degs`. -/
+theorem two_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5_of_deg5_5 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 6) (hb1 : 7 ≤ degs 1) (hb3 : degs 3 = 5) (hb5 : degs 5 = 5) :
+    2 ≤ orientOutflowDegs inv degs := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 6 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 6 0) = [r3, r5, r7, r9, r11, r13, r15] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have hr3 : matchesRawRuleDegs degs r3 = true := by
+    dsimp [matchesRawRuleDegs, r3, List.all, degMatchesBound]
+    rw [hb0, hb3, decide_eq_true hb1]
+    rfl
+  have hr5 : matchesRawRuleDegs degs r5 = true := by
+    dsimp [matchesRawRuleDegs, r5, List.all, degMatchesBound]
+    rw [hb0, hb3, hb5, decide_eq_true (by omega : 6 ≤ degs 1)]
+    rfl
+  have h_inv3 : (if inv then r3.invert else true) = true := by cases inv <;> rfl
+  have h_inv5 : (if inv then r5.invert else true) = true := by cases inv <;> rfl
+  have h7 : 0 ≤ (if (if inv then r7.invert else true) && matchesRawRuleDegs degs r7 then (1 : Int) else 0) := by split <;> omega
+  have h9 : 0 ≤ (if (if inv then r9.invert else true) && matchesRawRuleDegs degs r9 then (1 : Int) else 0) := by split <;> omega
+  have h11 : 0 ≤ (if (if inv then r11.invert else true) && matchesRawRuleDegs degs r11 then (1 : Int) else 0) := by split <;> omega
+  have h13 : 0 ≤ (if (if inv then r13.invert else true) && matchesRawRuleDegs degs r13 then (1 : Int) else 0) := by split <;> omega
+  have h15 : 0 ≤ (if (if inv then r15.invert else true) && matchesRawRuleDegs degs r15 then (1 : Int) else 0) := by split <;> omega
+  rw [hr3, hr5, h_inv3, h_inv5]; dsimp; omega
+
+/-- When a spoke `d` at a degree-6 vertex points to a neighbor `H.edge.f d` of degree `≥ 7`
+    and at least one flanking spoke around `H.edge.f d` (`H.node.f (H.edge.f d)` or `H.node.inv (H.edge.f d)`)
+    has a degree-5 neighbor, rule `r3` fires from `d` (`1 ≤ dartRuleOutflow H fuel d`). -/
+theorem one_le_dartRuleOutflow_of_deg_6_of_target_deg_ge_7_of_flanking_spoke_deg_5
+    (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart)
+    (h_d6 : Hypermap.nodeDegree H d fuel = 6)
+    (h_ed7 : 7 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel)
+    (h_flank5 : Hypermap.nodeDegree H (H.edge.f (H.node.f (H.edge.f d))) fuel = 5 ∨
+                Hypermap.nodeDegree H (H.edge.f (H.node.inv (H.edge.f d))) fuel = 5) :
+    1 ≤ dartRuleOutflow H fuel d := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  rcases h_flank5 with h_next5 | h_prev5
+  · have hf : 0 ≤ orientOutflowDegs false (fun k => Hypermap.nodeDegree H (ruleVertexDart H false d k) fuel) :=
+      foldl_add_nonneg _ _ (fun _ _ => by split <;> omega)
+    have ht : 1 ≤ orientOutflowDegs true (fun k => Hypermap.nodeDegree H (ruleVertexDart H true d k) fuel) :=
+      one_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5 true
+        (fun k => Hypermap.nodeDegree H (ruleVertexDart H true d k) fuel)
+        (by simpa [ruleVertexDart] using h_d6)
+        (by simpa [ruleVertexDart] using h_ed7)
+        (by simpa [ruleVertexDart, ruleRotInv] using h_next5)
+    omega
+  · have hf : 1 ≤ orientOutflowDegs false (fun k => Hypermap.nodeDegree H (ruleVertexDart H false d k) fuel) :=
+      one_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5 false
+        (fun k => Hypermap.nodeDegree H (ruleVertexDart H false d k) fuel)
+        (by simpa [ruleVertexDart] using h_d6)
+        (by simpa [ruleVertexDart] using h_ed7)
+        (by simpa [ruleVertexDart, ruleRotInv] using h_prev5)
+    have ht : 0 ≤ orientOutflowDegs true (fun k => Hypermap.nodeDegree H (ruleVertexDart H true d k) fuel) :=
+      foldl_add_nonneg _ _ (fun _ _ => by split <;> omega)
+    omega
+
+/-- When a spoke `d` at a degree-6 vertex points to a neighbor `H.edge.f d` of degree `≥ 7`
+    and BOTH flanking spokes `H.node.f (H.edge.f d)` and `H.node.inv (H.edge.f d)` have degree-5 neighbors,
+    rule `r3` fires in both orientations (`2 ≤ dartRuleOutflow H fuel d`). -/
+theorem two_le_dartRuleOutflow_of_deg_6_of_target_deg_ge_7_of_both_flanking_spokes_deg_5
+    (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart)
+    (h_d6 : Hypermap.nodeDegree H d fuel = 6)
+    (h_ed7 : 7 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel)
+    (h_next5 : Hypermap.nodeDegree H (H.edge.f (H.node.f (H.edge.f d))) fuel = 5)
+    (h_prev5 : Hypermap.nodeDegree H (H.edge.f (H.node.inv (H.edge.f d))) fuel = 5) :
+    2 ≤ dartRuleOutflow H fuel d := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  have hf : 1 ≤ orientOutflowDegs false (fun k => Hypermap.nodeDegree H (ruleVertexDart H false d k) fuel) :=
+    one_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5 false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false d k) fuel)
+      (by simpa [ruleVertexDart] using h_d6)
+      (by simpa [ruleVertexDart] using h_ed7)
+      (by simpa [ruleVertexDart, ruleRotInv] using h_prev5)
+  have ht : 1 ≤ orientOutflowDegs true (fun k => Hypermap.nodeDegree H (ruleVertexDart H true d k) fuel) :=
+    one_le_orientOutflowDegs_of_deg_6_of_target_deg_ge_7_of_deg3_5 true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true d k) fuel)
+      (by simpa [ruleVertexDart] using h_d6)
+      (by simpa [ruleVertexDart] using h_ed7)
+      (by simpa [ruleVertexDart, ruleRotInv] using h_next5)
+  omega
+
+/-- Global Degree-6 Discharging Theorem with Degree-`≥ 6` Neighbors:
+    if `nodeDegree H u fuel = 6` and every spoke `d ∈ getOrbit H.node fuel u` has
+    either `7 ≤ nodeDegree H (H.edge.f d) fuel` or flanking spokes of degree `≥ 7`
+    (`7 ≤ nodeDegree H (H.edge.f (H.node.f d)) fuel ∧ 7 ≤ nodeDegree H (H.edge.f (H.node.inv d)) fuel`,
+    with `6 ≤ nodeDegree H (H.edge.f d) fuel`),
+    then `finalCharge H (rsstChargeShift H fuel) darts u ≤ 0`. -/
+theorem finalCharge_le_zero_of_deg_6_of_neighbors_deg_ge_6_of_flanking_spokes_ge_7
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_loopless : ∀ d ∈ getOrbit H.node fuel u, Hypermap.sameVertex H (H.edge.f d) u fuel = false)
+    (h_deg6 : Hypermap.nodeDegree H u fuel = 6)
+    (h_nb6 : ∀ d ∈ getOrbit H.node fuel u, 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel)
+    (h_flank7 : ∀ d ∈ getOrbit H.node fuel u,
+      7 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel ∨
+      (7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∧
+       7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel)) :
+    finalCharge H (rsstChargeShift H fuel) darts u ≤ 0 := by
+  apply finalCharge_le_zero_of_deg_6_of_orbitNetShift_nonpos H darts h_all h_le u h_loopless h_deg6
+  dsimp [orbitNetShift]
+  have h_le_c := foldl_add_le_of_le_const (getOrbit H.node fuel u) (fun d => netDartShift H fuel d) 0 (by
+    intro d hd
+    dsimp only
+    have hd_deg : Hypermap.nodeDegree H d fuel ≤ 6 := by
+      have := nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd
+      omega
+    have h_out_nonneg : 0 ≤ dartRuleOutflow H fuel d := dartRuleOutflow_nonneg H fuel d
+    rcases h_flank7 d hd with h_ed7 | ⟨h_next7, h_prev7⟩
+    · rw [netDartShift_eq_neg_outflow_of_deg_le_6_of_target_deg_ge_7 H fuel d (H.edge_involution d) hd_deg h_ed7]
+      omega
+    · dsimp [netDartShift]
+      have h_in0 : dartRuleOutflow H fuel (H.edge.f d) = 0 :=
+        dartRuleOutflow_eq_zero_of_deg_ge_6_of_flanking_spokes_ge_7 H fuel d (h_nb6 d hd) h_next7 h_prev7
+      omega)
+  dsimp at h_le_c
+  omega
+
+/-- Primal–Dual Degree-6 Discharging Theorem on `H.dual` with Degree-`≥ 6` Neighbors. -/
+theorem dual_finalCharge_le_zero_of_deg_6_of_isBridgeless_of_neighbors_deg_ge_6_of_flanking_spokes_ge_7
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b fuel : Nat} (h_le_b : darts.length ≤ fuel_b) (h_le : darts.length ≤ fuel)
+    (h_bridge : Hypermap.isBridgeless H darts fuel_b) (u : H.Dart)
+    (h_deg6 : Hypermap.nodeDegree H.dual u fuel = 6)
+    (h_nb6 : ∀ d ∈ getOrbit H.dual.node fuel u, 6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel)
+    (h_flank7 : ∀ d ∈ getOrbit H.dual.node fuel u,
+      7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel ∨
+      (7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∧
+       7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel)) :
+    finalCharge H.dual (rsstChargeShift H.dual fuel) darts u ≤ 0 := by
+  have h_loopless : ∀ d ∈ getOrbit H.dual.node fuel u, Hypermap.sameVertex H.dual (H.dual.edge.f d) u fuel = false :=
+    dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
+  exact finalCharge_le_zero_of_deg_6_of_neighbors_deg_ge_6_of_flanking_spokes_ge_7
+    H.dual darts h_all h_le u h_loopless h_deg6 h_nb6 h_flank7
+
+/-!
+### Stage L.3: Hub-Cap Discharging Bounds for Degrees 12–19 with Degree-5 Neighbors & Master Phase 5 Synthesis
+-/
+
+/-- When `degs 0 = 5` and either `6 ≤ degs 3` or `6 ≤ degs 5`,
+    at most 2 of the 3 rules `[r1, r3, r5]` can match (`orientOutflowDegs inv degs ≤ 2`). -/
+theorem orientOutflowDegs_le_2_of_deg_5_of_deg3_ge_6_or_deg5_ge_6 (inv : Bool) (degs : Nat → Nat)
+    (hb0 : degs 0 = 5) (h_3_or_5 : 6 ≤ degs 3 ∨ 6 ≤ degs 5) :
+    orientOutflowDegs inv degs ≤ 2 := by
+  rw [orientOutflowDegs_eq_filter_active inv degs 5 0 hb0 (Nat.zero_le _)]
+  have h_filt : theRules.filter (ruleActiveFor 5 0) = [r1, r3, r5] := rfl
+  rw [h_filt]; dsimp only [List.foldl]
+  have h1 : (if (if inv then r1.invert else true) && matchesRawRuleDegs degs r1 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  have h3_le : (if (if inv then r3.invert else true) && matchesRawRuleDegs degs r3 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  have h5_le : (if (if inv then r5.invert else true) && matchesRawRuleDegs degs r5 then (1 : Int) else 0) ≤ 1 := by split <;> omega
+  rcases h_3_or_5 with hb3 | hb5
+  · have h3_zero : matchesRawRuleDegs degs r3 = false :=
+      not_matchesRawRuleDegs_of_triple_gt degs r3 3 5 5 (by decide) (by decide) (by omega)
+    rw [h3_zero]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+  · have h5_zero : matchesRawRuleDegs degs r5 = false :=
+      not_matchesRawRuleDegs_of_triple_gt degs r5 5 5 5 (by decide) (by decide) (by omega)
+    rw [h5_zero]; simp only [Bool.and_false, if_false_eq_true_zero]; omega
+
+/-- Sharp Incoming Outflow Bound (`≤ 5`) from a Degree-5 Neighbor Flanked on One Side by Degree `≥ 6`:
+    if `nodeDegree H (H.edge.f d) fuel = 5` and at least one flanking spoke (`H.node.f d` or `H.node.inv d`)
+    has neighbor degree `≥ 6`, then `dartRuleOutflow H fuel (H.edge.f d) ≤ 5`. -/
+theorem dartRuleOutflow_le_5_of_deg_5_of_flanking_spoke_ge_6 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_curr5 : Hypermap.nodeDegree H (H.edge.f d) fuel = 5)
+    (h_flank6 : 6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∨
+                6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) :
+    dartRuleOutflow H fuel (H.edge.f d) ≤ 5 := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  rcases h_flank6 with h_next6 | h_prev6
+  · have hf := orientOutflowDegs_le_3_of_deg_5 false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr5)
+    have ht := orientOutflowDegs_le_2_of_deg_5_of_deg3_ge_6_or_deg5_ge_6 true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr5)
+      (Or.inl (by simpa [ruleVertexDart_true_edge_three] using h_next6))
+    omega
+  · have hf := orientOutflowDegs_le_2_of_deg_5_of_deg3_ge_6_or_deg5_ge_6 false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr5)
+      (Or.inl (by simpa [ruleVertexDart_false_edge_three] using h_prev6))
+    have ht := orientOutflowDegs_le_3_of_deg_5 true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr5)
+    omega
+
+/-- Sharp Incoming Outflow Bound (`≤ 4`) from an Isolated Degree-5 Neighbor
+    (flanked on both sides by degree-`≥ 6` spoke neighbors):
+    if `nodeDegree H (H.edge.f d) fuel = 5`, `6 ≤ nodeDegree H (H.edge.f (H.node.f d)) fuel`,
+    and `6 ≤ nodeDegree H (H.edge.f (H.node.inv d)) fuel`, then `dartRuleOutflow H fuel (H.edge.f d) ≤ 4`. -/
+theorem dartRuleOutflow_le_4_of_deg_5_of_flanking_spokes_ge_6 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_curr5 : Hypermap.nodeDegree H (H.edge.f d) fuel = 5)
+    (h_next6 : 6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel)
+    (h_prev6 : 6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) :
+    dartRuleOutflow H fuel (H.edge.f d) ≤ 4 := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  have hf := orientOutflowDegs_le_2_of_deg_5_of_deg3_ge_6_or_deg5_ge_6 false
+    (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+    (by simpa [ruleVertexDart] using h_curr5)
+    (Or.inl (by simpa [ruleVertexDart_false_edge_three] using h_prev6))
+  have ht := orientOutflowDegs_le_2_of_deg_5_of_deg3_ge_6_or_deg5_ge_6 true
+    (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+    (by simpa [ruleVertexDart] using h_curr5)
+    (Or.inl (by simpa [ruleVertexDart_true_edge_three] using h_next6))
+  omega
+
+/-- Sharp Incoming Outflow Bound (`≤ 2`) from a Degree-5 Neighbor Flanked on Both Sides by Degree `≥ 7`:
+    if `nodeDegree H (H.edge.f d) fuel = 5`, `7 ≤ nodeDegree H (H.edge.f (H.node.f d)) fuel`,
+    and `7 ≤ nodeDegree H (H.edge.f (H.node.inv d)) fuel`, then `dartRuleOutflow H fuel (H.edge.f d) ≤ 2`. -/
+theorem dartRuleOutflow_le_2_of_deg_5_of_flanking_spokes_ge_7 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_curr5 : Hypermap.nodeDegree H (H.edge.f d) fuel = 5)
+    (h_next7 : 7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel)
+    (h_prev7 : 7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) :
+    dartRuleOutflow H fuel (H.edge.f d) ≤ 2 := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  have hf := orientOutflowDegs_le_1_of_deg_5_of_deg3_ge_7 false
+    (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+    (by simpa [ruleVertexDart] using h_curr5)
+    (by simpa [ruleVertexDart_false_edge_three] using h_prev7)
+  have ht := orientOutflowDegs_le_1_of_deg_5_of_deg3_ge_7 true
+    (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+    (by simpa [ruleVertexDart] using h_curr5)
+    (by simpa [ruleVertexDart_true_edge_three] using h_next7)
+  omega
+
+/-- Sharp Incoming Outflow Bound (`≤ 3`) from a Degree-6 Neighbor Flanked on One Side by Degree `≥ 7`. -/
+theorem dartRuleOutflow_le_3_of_deg_6_of_flanking_spoke_ge_7 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_curr6 : Hypermap.nodeDegree H (H.edge.f d) fuel = 6)
+    (h_flank7 : 7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∨
+                7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) :
+    dartRuleOutflow H fuel (H.edge.f d) ≤ 3 := by
+  rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+  rcases h_flank7 with h_next7 | h_prev7
+  · have hf := orientOutflowDegs_le_3_of_deg_6 false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr6)
+    have ht := orientOutflowDegs_eq_zero_of_deg_6_of_deg3_ge_7 true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr6)
+      (by simpa [ruleVertexDart_true_edge_three] using h_next7)
+    omega
+  · have hf := orientOutflowDegs_eq_zero_of_deg_6_of_deg3_ge_7 false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr6)
+      (by simpa [ruleVertexDart_false_edge_three] using h_prev7)
+    have ht := orientOutflowDegs_le_3_of_deg_6 true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_curr6)
+    omega
+
+/-- Global Hub-Cap Discharging Theorem for Degrees `12–19` (and all `deg ≥ 12`) with Degree-5 Neighbors:
+    for any loopless hub vertex `u` of degree `k ≥ 12` where every spoke `d ∈ getOrbit H.node fuel u`
+    either:
+    1. points to a degree-5 neighbor with at least one flanking spoke of degree `≥ 6`
+       (no 3 consecutive degree-5 neighbors), or
+    2. points to a neighbor of degree `≥ 6` flanked by degree-`≥ 6` spokes, or
+    3. points to a degree-6 neighbor with at least one flanking spoke of degree `≥ 7`, or
+    4. points to a neighbor of degree `≥ 8` (or `< 5`),
+    every spoke has `netDartShift H fuel d ≤ 5` and `finalCharge H (rsstChargeShift H fuel) darts u ≤ 0`
+    (`60 - 10k + 5k = 60 - 5k ≤ 0` for all `k ≥ 12`). -/
+theorem finalCharge_le_zero_of_deg_ge_12_of_deg5_or_deg_ge_6_neighbors
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_loopless : ∀ d ∈ getOrbit H.node fuel u, Hypermap.sameVertex H (H.edge.f d) u fuel = false)
+    (h_deg12 : 12 ≤ Hypermap.nodeDegree H u fuel)
+    (h_spokes : ∀ d ∈ getOrbit H.node fuel u,
+      (Hypermap.nodeDegree H (H.edge.f d) fuel = 5 ∧
+        (6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∨
+         6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel)) ∨
+      (6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∧
+       6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) ∨
+      (Hypermap.nodeDegree H (H.edge.f d) fuel = 6 ∧
+        (7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∨
+         7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel)) ∨
+      8 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    finalCharge H (rsstChargeShift H fuel) darts u ≤ 0 := by
+  rw [finalCharge_eq_initialCharge_add_orbitNetShift H darts h_all h_le u h_loopless]
+  dsimp [initialCharge, orbitNetShift]
+  have h_le_c := foldl_add_le_of_le_const (getOrbit H.node fuel u) (fun d => netDartShift H fuel d) 5 (by
+    intro d hd
+    dsimp [netDartShift]
+    have hd_deg : Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+      nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd
+    have h_out0 : dartRuleOutflow H fuel d = 0 :=
+      dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel d (by omega)
+    have h_in5 : dartRuleOutflow H fuel (H.edge.f d) ≤ 5 := by
+      rcases h_spokes d hd with ⟨h5, h_fl6⟩ | ⟨h_next6, h_prev6⟩ | ⟨h6, h_fl7⟩ | h_ge8
+      · exact dartRuleOutflow_le_5_of_deg_5_of_flanking_spoke_ge_6 H fuel d h5 h_fl6
+      · exact dartRuleOutflow_le_5_of_target_deg_ge_8_of_flanking_spokes_ge_6 H fuel d (by omega) h_next6 h_prev6
+      · have := dartRuleOutflow_le_3_of_deg_6_of_flanking_spoke_ge_7 H fuel d h6 h_fl7; omega
+      · rcases Nat.lt_or_ge 8 (Hypermap.nodeDegree H (H.edge.f d) fuel) with h_ge9 | h_le8
+        · have := dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel (H.edge.f d) h_ge9; omega
+        · have h_eq8 : Hypermap.nodeDegree H (H.edge.f d) fuel = 8 := by omega
+          have := dartRuleOutflow_le_4_of_deg_8 H fuel (H.edge.f d) h_eq8; omega
+    omega)
+  dsimp at h_le_c
+  have h_len : (getOrbit H.node fuel u).length = Hypermap.nodeDegree H u fuel := rfl
+  omega
+
+/-- Primal–Dual Hub-Cap Discharging Theorem on `H.dual` for Degrees `12–19` (and `deg ≥ 12`) with Degree-5 Neighbors. -/
+theorem dual_finalCharge_le_zero_of_deg_ge_12_of_isBridgeless_of_deg5_or_deg_ge_6_neighbors
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b fuel : Nat} (h_le_b : darts.length ≤ fuel_b) (h_le : darts.length ≤ fuel)
+    (h_bridge : Hypermap.isBridgeless H darts fuel_b) (u : H.Dart)
+    (h_deg12 : 12 ≤ Hypermap.nodeDegree H.dual u fuel)
+    (h_spokes : ∀ d ∈ getOrbit H.dual.node fuel u,
+      (Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel = 5 ∧
+        (6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∨
+         6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel)) ∨
+      (6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∧
+       6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel) ∨
+      (Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel = 6 ∧
+        (7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∨
+         7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel)) ∨
+      8 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel) :
+    finalCharge H.dual (rsstChargeShift H.dual fuel) darts u ≤ 0 := by
+  have h_loopless : ∀ d ∈ getOrbit H.dual.node fuel u, Hypermap.sameVertex H.dual (H.dual.edge.f d) u fuel = false :=
+    dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
+  exact finalCharge_le_zero_of_deg_ge_12_of_deg5_or_deg_ge_6_neighbors
+    H.dual darts h_all h_le u h_loopless h_deg12 h_spokes
+
+/-- Global Hub-Cap Discharging Theorem for Degrees `10–19` (and all `deg ≥ 10`) with Isolated Degree-5 Neighbors:
+    for any loopless hub vertex `u` of degree `k ≥ 10` where every spoke `d ∈ getOrbit H.node fuel u`
+    either:
+    1. points to an isolated degree-5 neighbor (`deg = 5` flanked on both sides by degree-`≥ 6` spokes), or
+    2. points to a degree-6 neighbor with at least one flanking spoke of degree `≥ 7`, or
+    3. points to a neighbor of degree `≥ 8`,
+    every spoke has `netDartShift H fuel d ≤ 4` and `finalCharge H (rsstChargeShift H fuel) darts u ≤ 0`
+    (`60 - 10k + 4k = 60 - 6k ≤ 0` for all `k ≥ 10`). -/
+theorem finalCharge_le_zero_of_deg_ge_10_of_isolated_deg5_neighbors
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_loopless : ∀ d ∈ getOrbit H.node fuel u, Hypermap.sameVertex H (H.edge.f d) u fuel = false)
+    (h_deg10 : 10 ≤ Hypermap.nodeDegree H u fuel)
+    (h_spokes : ∀ d ∈ getOrbit H.node fuel u,
+      (Hypermap.nodeDegree H (H.edge.f d) fuel = 5 ∧
+       6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∧
+       6 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel) ∨
+      (Hypermap.nodeDegree H (H.edge.f d) fuel = 6 ∧
+        (7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.f d)) fuel ∨
+         7 ≤ Hypermap.nodeDegree H (H.edge.f (H.node.inv d)) fuel)) ∨
+      8 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    finalCharge H (rsstChargeShift H fuel) darts u ≤ 0 := by
+  rw [finalCharge_eq_initialCharge_add_orbitNetShift H darts h_all h_le u h_loopless]
+  dsimp [initialCharge, orbitNetShift]
+  have h_le_c := foldl_add_le_of_le_const (getOrbit H.node fuel u) (fun d => netDartShift H fuel d) 4 (by
+    intro d hd
+    dsimp [netDartShift]
+    have hd_deg : Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+      nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd
+    have h_out0 : dartRuleOutflow H fuel d = 0 :=
+      dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel d (by omega)
+    have h_in4 : dartRuleOutflow H fuel (H.edge.f d) ≤ 4 := by
+      rcases h_spokes d hd with ⟨h5, h_next6, h_prev6⟩ | ⟨h6, h_fl7⟩ | h_ge8
+      · exact dartRuleOutflow_le_4_of_deg_5_of_flanking_spokes_ge_6 H fuel d h5 h_next6 h_prev6
+      · have := dartRuleOutflow_le_3_of_deg_6_of_flanking_spoke_ge_7 H fuel d h6 h_fl7; omega
+      · rcases Nat.lt_or_ge 8 (Hypermap.nodeDegree H (H.edge.f d) fuel) with h_ge9 | h_le8
+        · have := dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel (H.edge.f d) h_ge9; omega
+        · have h_eq8 : Hypermap.nodeDegree H (H.edge.f d) fuel = 8 := by omega
+          exact dartRuleOutflow_le_4_of_deg_8 H fuel (H.edge.f d) h_eq8
+    omega)
+  dsimp at h_le_c
+  have h_len : (getOrbit H.node fuel u).length = Hypermap.nodeDegree H u fuel := rfl
+  omega
+
+/-- Primal–Dual Hub-Cap Discharging Theorem on `H.dual` for Degrees `10–19` (and `deg ≥ 10`) with Isolated Degree-5 Neighbors. -/
+theorem dual_finalCharge_le_zero_of_deg_ge_10_of_isBridgeless_of_isolated_deg5_neighbors
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b fuel : Nat} (h_le_b : darts.length ≤ fuel_b) (h_le : darts.length ≤ fuel)
+    (h_bridge : Hypermap.isBridgeless H darts fuel_b) (u : H.Dart)
+    (h_deg10 : 10 ≤ Hypermap.nodeDegree H.dual u fuel)
+    (h_spokes : ∀ d ∈ getOrbit H.dual.node fuel u,
+      (Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel = 5 ∧
+       6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∧
+       6 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel) ∨
+      (Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel = 6 ∧
+        (7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.f d)) fuel ∨
+         7 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f (H.dual.node.inv d)) fuel)) ∨
+      8 ≤ Hypermap.nodeDegree H.dual (H.dual.edge.f d) fuel) :
+    finalCharge H.dual (rsstChargeShift H.dual fuel) darts u ≤ 0 := by
+  have h_loopless : ∀ d ∈ getOrbit H.dual.node fuel u, Hypermap.sameVertex H.dual (H.dual.edge.f d) u fuel = false :=
+    dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
+  exact finalCharge_le_zero_of_deg_ge_10_of_isolated_deg5_neighbors
+    H.dual darts h_all h_le u h_loopless h_deg10 h_spokes
+
+/-- Incoming outflow into a degree-`≤ 6` vertex `d` from a degree-`≥ 6` neighbor `H.edge.f d`
+    vanishes (`dartRuleOutflow H fuel (H.edge.f d) = 0`) whenever coordinates `5, 9, 11` around `H.edge.f d`
+    have degree `≥ 6` in both orientations. -/
+theorem dartRuleOutflow_eq_zero_of_deg_ge_6_of_target_deg_le_6_of_no_deg5_second_ring
+    (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart)
+    (h_d_le6 : Hypermap.nodeDegree H d fuel ≤ 6)
+    (h_ed_ge6 : 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel)
+    (h_sec : ∀ inv : Bool,
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 5) fuel ∧
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 9) fuel ∧
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 11) fuel) :
+    dartRuleOutflow H fuel (H.edge.f d) = 0 := by
+  rcases Nat.lt_or_ge 6 (Hypermap.nodeDegree H (H.edge.f d) fuel) with h_ge7 | h_le6
+  · apply dartRuleOutflow_eq_zero_of_deg_ge_7_of_target_deg_le_6 H fuel (H.edge.f d) h_ge7
+    rw [H.edge_involution d]
+    exact h_d_le6
+  · have h_eq6 : Hypermap.nodeDegree H (H.edge.f d) fuel = 6 := by omega
+    rw [dartRuleOutflow_eq_orientOutflowDegs_add]
+    rcases h_sec false with ⟨hf5, hf9, hf11⟩
+    rcases h_sec true with ⟨ht5, ht9, ht11⟩
+    have hf := orientOutflowDegs_eq_zero_of_deg_6_of_target_deg_le_6_of_no_deg5_second_ring false
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_eq6)
+      (by simpa [ruleVertexDart, H.edge_involution] using h_d_le6)
+      hf5 hf9 hf11
+    have ht := orientOutflowDegs_eq_zero_of_deg_6_of_target_deg_le_6_of_no_deg5_second_ring true
+      (fun k => Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f d) k) fuel)
+      (by simpa [ruleVertexDart] using h_eq6)
+      (by simpa [ruleVertexDart, H.edge_involution] using h_d_le6)
+      ht5 ht9 ht11
+    omega
+
+/-- Global Degree-6 Discharging Theorem when all neighbors have degree `≥ 6` and no degree-6 neighbor
+    has degree-5 vertices at coordinates `5, 9, 11`. -/
+theorem finalCharge_le_zero_of_deg_6_of_neighbors_deg_ge_6_of_no_deg5_second_ring
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_loopless : ∀ d ∈ getOrbit H.node fuel u, Hypermap.sameVertex H (H.edge.f d) u fuel = false)
+    (h_deg6 : Hypermap.nodeDegree H u fuel = 6)
+    (h_nb6 : ∀ d ∈ getOrbit H.node fuel u, 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel)
+    (h_sec : ∀ d ∈ getOrbit H.node fuel u, ∀ inv : Bool,
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 5) fuel ∧
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 9) fuel ∧
+      6 ≤ Hypermap.nodeDegree H (ruleVertexDart H inv (H.edge.f d) 11) fuel) :
+    finalCharge H (rsstChargeShift H fuel) darts u ≤ 0 := by
+  apply finalCharge_le_zero_of_deg_6_of_orbitNetShift_nonpos H darts h_all h_le u h_loopless h_deg6
+  dsimp [orbitNetShift]
+  have h_le_c := foldl_add_le_of_le_const (getOrbit H.node fuel u) (fun d => netDartShift H fuel d) 0 (by
+    intro d hd
+    dsimp [netDartShift]
+    have hd_deg : Hypermap.nodeDegree H d fuel ≤ 6 := by
+      have := nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd
+      omega
+    have h_out_nonneg : 0 ≤ dartRuleOutflow H fuel d := dartRuleOutflow_nonneg H fuel d
+    have h_in0 : dartRuleOutflow H fuel (H.edge.f d) = 0 :=
+      dartRuleOutflow_eq_zero_of_deg_ge_6_of_target_deg_le_6_of_no_deg5_second_ring
+        H fuel d hd_deg (h_nb6 d hd) (h_sec d hd)
+    omega)
+  dsimp at h_le_c
+  omega
+
+/-- Primal–Dual Degree-6 Discharging Theorem on `H.dual` when `orbitNetShift H.dual fuel u ≤ 0`
+    (covering all degree-6 hubs whose inflow from degree-5/6 neighbors is compensated by outflow to degree-`≥ 7` neighbors). -/
+theorem dual_finalCharge_le_zero_of_deg_6_of_isBridgeless_of_orbitNetShift_nonpos
+    (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel_b fuel : Nat} (h_le_b : darts.length ≤ fuel_b) (h_le : darts.length ≤ fuel)
+    (h_bridge : Hypermap.isBridgeless H darts fuel_b) (u : H.Dart)
+    (h_deg6 : Hypermap.nodeDegree H.dual u fuel = 6)
+    (h_net : orbitNetShift H.dual fuel u ≤ 0) :
+    finalCharge H.dual (rsstChargeShift H.dual fuel) darts u ≤ 0 := by
+  have h_loopless : ∀ d ∈ getOrbit H.dual.node fuel u, Hypermap.sameVertex H.dual (H.dual.edge.f d) u fuel = false :=
+    dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
+  exact finalCharge_le_zero_of_deg_6_of_orbitNetShift_nonpos H.dual darts h_all h_le u h_loopless h_deg6 h_net
+
 end Discharging
 end Math
