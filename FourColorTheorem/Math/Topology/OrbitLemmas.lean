@@ -1284,4 +1284,62 @@ theorem filter_not_contains_nil (l : List D) :
     l.filter (fun x => !([] : List D).contains x) = l := by
   simp
 
+/-!
+### Stage C.1: Orbit `.contains` Equivalence Relation & Length Invariance on Complete Dart Lists
+-/
+
+/-- Every dart belongs to its own `getOrbit` (boolean `.contains` form). -/
+theorem getOrbit_contains_self (p : Perm D) (fuel : Nat) (d : D) :
+    (getOrbit p fuel d).contains d = true :=
+  List.contains_iff_mem.mpr (mem_getOrbit_self p fuel d)
+
+/-- Symmetry of `(getOrbit p fuel _).contains _` for any two closed orbits. -/
+theorem getOrbit_contains_symm (p : Perm D) (fuel : Nat) {d1 d2 : D}
+    (h_closes1 : orbitClosesWithin p d1 d1 fuel)
+    (h_closes2 : orbitClosesWithin p d2 d2 fuel) :
+    (getOrbit p fuel d1).contains d2 = (getOrbit p fuel d2).contains d1 := by
+  by_cases h12 : d2 ∈ getOrbit p fuel d1
+  · have h21 : d1 ∈ getOrbit p fuel d2 := mem_getOrbit_symm p fuel h_closes1 h12
+    rw [List.contains_iff_mem.mpr h12, List.contains_iff_mem.mpr h21]
+  · have h21 : d1 ∉ getOrbit p fuel d2 :=
+      fun h => h12 (mem_getOrbit_symm p fuel h_closes2 h)
+    cases hc1 : (getOrbit p fuel d1).contains d2 with
+    | true => exact False.elim (h12 (List.contains_iff_mem.mp hc1))
+    | false =>
+      cases hc2 : (getOrbit p fuel d2).contains d1 with
+      | true => exact False.elim (h21 (List.contains_iff_mem.mp hc2))
+      | false => rfl
+
+/-- Unconditional symmetry of `(getOrbit p fuel _).contains _` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem getOrbit_contains_symm_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : D) :
+    (getOrbit p fuel u).contains v = (getOrbit p fuel v).contains u := by
+  have hc_u := orbitClosesWithin_mono p u u (orbitClosesWithin_of_complete p darts h_all u) h_le
+  have hc_v := orbitClosesWithin_mono p v v (orbitClosesWithin_of_complete p darts h_all v) h_le
+  exact getOrbit_contains_symm p fuel hc_u hc_v
+
+/-- Unconditional transitivity of `(getOrbit p fuel _).contains _` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem getOrbit_contains_trans_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u v w : D}
+    (huv : (getOrbit p fuel u).contains v = true)
+    (hvw : (getOrbit p fuel v).contains w = true) :
+    (getOrbit p fuel u).contains w = true := by
+  have hc_u := orbitClosesWithin_mono p u u (orbitClosesWithin_of_complete p darts h_all u) h_le
+  have h_mem_uv : v ∈ getOrbit p fuel u := List.contains_iff_mem.mp huv
+  rw [← getOrbit_contains_eq_of_mem p fuel hc_u h_mem_uv w]
+  exact hvw
+
+/-- Unconditional orbit length invariance for any member `d ∈ getOrbit p fuel u` on a complete dart list. -/
+theorem getOrbit_length_eq_of_complete_mem (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d : D}
+    (h_mem : d ∈ getOrbit p fuel u) :
+    (getOrbit p fuel d).length = (getOrbit p fuel u).length := by
+  have hc_u := orbitClosesWithin_mono p u u (orbitClosesWithin_of_complete p darts h_all u) h_le
+  exact getOrbit_length_eq_of_mem p fuel hc_u h_mem
+
+
+
 end Hypermap

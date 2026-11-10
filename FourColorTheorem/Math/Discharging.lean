@@ -469,5 +469,685 @@ theorem initial_charge_sum_eq_120_of_complete_triangulation (H : Hypermap) [Deci
   exact initial_charge_sum_eq_120_of_triangulation H (Hypermap.extractGraph H darts).vertices
     darts.length E F hDegSum hEuler hTriang
 
+/-!
+### Stage C.1: Vertex Equivalence (`sameVertex`) & Orbit Degree Invariance
+-/
+
+/-- Reflexivity of `Hypermap.sameVertex`. -/
+theorem sameVertex_refl (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart) :
+    Hypermap.sameVertex H d d fuel = true :=
+  Hypermap.getOrbit_contains_self H.node fuel d
+
+/-- Symmetry of `Hypermap.sameVertex` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem sameVertex_symm_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart) :
+    Hypermap.sameVertex H u v fuel = Hypermap.sameVertex H v u fuel :=
+  Hypermap.getOrbit_contains_symm_of_complete H.node darts h_all h_le u v
+
+/-- Transitivity of `Hypermap.sameVertex` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem sameVertex_trans_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u v w : H.Dart}
+    (huv : Hypermap.sameVertex H u v fuel = true)
+    (hvw : Hypermap.sameVertex H v w fuel = true) :
+    Hypermap.sameVertex H u w fuel = true :=
+  Hypermap.getOrbit_contains_trans_of_complete H.node darts h_all h_le huv hvw
+
+/-- Every dart `d` in the vertex orbit `getOrbit H.node fuel u` has the same `nodeDegree` as `u`. -/
+theorem nodeDegree_eq_of_mem_getOrbit (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d : H.Dart}
+    (h_mem : d ∈ getOrbit H.node fuel u) :
+    Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+  Hypermap.getOrbit_length_eq_of_complete_mem H.node darts h_all h_le h_mem
+
+/-- Any two darts at the same vertex (`sameVertex H u v fuel = true`) have identical `nodeDegree`. -/
+theorem nodeDegree_eq_of_sameVertex (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u v : H.Dart}
+    (h_same : Hypermap.sameVertex H u v fuel = true) :
+    Hypermap.nodeDegree H v fuel = Hypermap.nodeDegree H u fuel :=
+  nodeDegree_eq_of_mem_getOrbit H darts h_all h_le (List.contains_iff_mem.mp h_same)
+
+@[simp] theorem ruleVertexDart_zero (H : Hypermap) (inv : Bool) (d : H.Dart) :
+    ruleVertexDart H inv d 0 = d := by
+  unfold ruleVertexDart
+  rfl
+
+@[simp] theorem ruleVertexDart_one (H : Hypermap) (inv : Bool) (d : H.Dart) :
+    ruleVertexDart H inv d 1 = H.edge.f d := by
+  unfold ruleVertexDart
+  rfl
+
+
+
+/-!
+### Stage C.2: Additive `foldl` Infrastructure & Structural Degree Bounds on `theRules`
+-/
+
+/-- Shift-invariance of integer additive `List.foldl`. -/
+theorem foldl_add_shift {α : Type} (L : List α) (f : α → Int) (init : Int) :
+    L.foldl (fun acc x => acc + f x) init = init + L.foldl (fun acc x => acc + f x) 0 := by
+  induction L generalizing init with
+  | nil =>
+    dsimp [List.foldl]
+    omega
+  | cons a as ih =>
+    dsimp [List.foldl]
+    rw [ih (init + f a), ih (0 + f a)]
+    omega
+
+/-- Unfolding integer additive `List.foldl` on `a :: L`. -/
+theorem foldl_add_cons {α : Type} (a : α) (L : List α) (f : α → Int) :
+    (a :: L).foldl (fun acc x => acc + f x) 0 = f a + L.foldl (fun acc x => acc + f x) 0 := by
+  dsimp [List.foldl]
+  rw [foldl_add_shift L f (0 + f a)]
+  omega
+
+/-- Non-negativity of integer additive `List.foldl` when all terms are non-negative. -/
+theorem foldl_add_nonneg {α : Type} (L : List α) (f : α → Int)
+    (h_nonneg : ∀ x ∈ L, 0 ≤ f x) :
+    0 ≤ L.foldl (fun acc x => acc + f x) 0 := by
+  induction L with
+  | nil =>
+    dsimp [List.foldl]
+    omega
+  | cons a as ih =>
+    rw [foldl_add_cons]
+    have ha : 0 ≤ f a := h_nonneg a (List.Mem.head as)
+    have has : 0 ≤ as.foldl (fun acc x => acc + f x) 0 :=
+      ih (fun x hx => h_nonneg x (List.Mem.tail a hx))
+    omega
+
+/-- Vanishing of integer additive `List.foldl` when all terms are zero. -/
+theorem foldl_add_eq_zero {α : Type} (L : List α) (f : α → Int)
+    (h_zero : ∀ x ∈ L, f x = 0) :
+    L.foldl (fun acc x => acc + f x) 0 = 0 := by
+  induction L with
+  | nil => rfl
+  | cons a as ih =>
+    rw [foldl_add_cons]
+    rw [h_zero a (List.Mem.head as), ih (fun x hx => h_zero x (List.Mem.tail a hx))]
+    rfl
+
+/-- Upper bound on integer additive `List.foldl` when each term is bounded above by `c`. -/
+theorem foldl_add_le_of_le_const {α : Type} (L : List α) (f : α → Int) (c : Int)
+    (h_le : ∀ x ∈ L, f x ≤ c) :
+    L.foldl (fun acc x => acc + f x) 0 ≤ c * (L.length : Int) := by
+  induction L with
+  | nil =>
+    dsimp [List.foldl]
+    omega
+  | cons a as ih =>
+    rw [foldl_add_cons]
+    have ha : f a ≤ c := h_le a (List.Mem.head as)
+    have has : as.foldl (fun acc x => acc + f x) 0 ≤ c * (as.length : Int) :=
+      ih (fun x hx => h_le x (List.Mem.tail a hx))
+    have hlen : ((a :: as).length : Int) = (as.length : Int) + 1 := by simp
+    rw [hlen, Int.mul_add, Int.mul_one]
+    omega
+
+/-- Lower bound on integer additive `List.foldl` when each term is bounded below by `c`. -/
+theorem foldl_add_ge_of_ge_const {α : Type} (L : List α) (f : α → Int) (c : Int)
+    (h_ge : ∀ x ∈ L, c ≤ f x) :
+    c * (L.length : Int) ≤ L.foldl (fun acc x => acc + f x) 0 := by
+  induction L with
+  | nil =>
+    dsimp [List.foldl]
+    omega
+  | cons a as ih =>
+    rw [foldl_add_cons]
+    have ha : c ≤ f a := h_ge a (List.Mem.head as)
+    have has : c * (as.length : Int) ≤ as.foldl (fun acc x => acc + f x) 0 :=
+      ih (fun x hx => h_ge x (List.Mem.tail a hx))
+    have hlen : ((a :: as).length : Int) = (as.length : Int) + 1 := by simp
+    rw [hlen, Int.mul_add, Int.mul_one]
+    omega
+
+/-- Every single-rule outflow `rawRuleOutflow` is non-negative (`≥ 0`). -/
+theorem rawRuleOutflow_nonneg (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (r : RawRule) :
+    0 ≤ rawRuleOutflow H fuel d r := by
+  dsimp [rawRuleOutflow]
+  split <;> split <;> omega
+
+/-- Every single-rule outflow `rawRuleOutflow` is at most `2`. -/
+theorem rawRuleOutflow_le_two (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (r : RawRule) :
+    rawRuleOutflow H fuel d r ≤ 2 := by
+  dsimp [rawRuleOutflow]
+  split <;> split <;> omega
+
+/-- Total dart outflow `dartRuleOutflow` is non-negative (`≥ 0`). -/
+theorem dartRuleOutflow_nonneg (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) :
+    0 ≤ dartRuleOutflow H fuel d := by
+  dsimp [dartRuleOutflow]
+  exact foldl_add_nonneg theRules (fun r => rawRuleOutflow H fuel d r)
+    (fun r _ => rawRuleOutflow_nonneg H fuel d r)
+
+/-- Total vertex-to-vertex outflow `vertexRuleOutflow` is non-negative (`≥ 0`). -/
+theorem vertexRuleOutflow_nonneg (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (u v : H.Dart) :
+    0 ≤ vertexRuleOutflow H fuel u v := by
+  dsimp [vertexRuleOutflow]
+  split
+  · omega
+  · exact foldl_add_nonneg _ (fun d => dartRuleOutflow H fuel d)
+      (fun d _ => dartRuleOutflow_nonneg H fuel d)
+
+/-- Decidable source degree bounds for all 35 entries in `theRules`:
+    every rule has `5 ≤ r.b0.1 ≤ r.b0.2 ≤ 8`. -/
+theorem theRules_b0_bounds :
+    ∀ r ∈ theRules, 5 ≤ r.b0.1 ∧ r.b0.1 ≤ r.b0.2 ∧ r.b0.2 ≤ 8 := by decide
+
+/-- Decidable target degree bounds for all 35 entries in `theRules`:
+    every rule has `5 ≤ r.b1.1`. -/
+theorem theRules_b1_bounds :
+    ∀ r ∈ theRules, 5 ≤ r.b1.1 := by decide
+
+/-- Decidable target degree bounds for all rules after Rule 1 (`theRules.tail`):
+    every rule in `theRules.tail` has `6 ≤ r.b1.1`. -/
+theorem theRules_tail_b1_bounds :
+    ∀ r ∈ theRules.tail, 6 ≤ r.b1.1 := by decide
+
+/-- If `0 < bnd.1` and `deg < bnd.1`, then `degMatchesBound deg bnd = false`. -/
+theorem degMatchesBound_eq_false_of_lt {deg : Nat} {bnd : Nat × Nat}
+    (h_pos : 0 < bnd.1) (h_lt : deg < bnd.1) :
+    degMatchesBound deg bnd = false := by
+  dsimp [degMatchesBound]
+  have h_ne0 : (bnd.1 == 0) = false := beq_eq_false_iff_ne.mpr (by omega)
+  rw [h_ne0]
+  dsimp
+  have h_not_le : ¬ (bnd.1 ≤ deg) := by omega
+  rw [decide_eq_false h_not_le]
+  rfl
+
+/-- If `bnd.2 ≤ 8` and `bnd.2 < deg`, then `degMatchesBound deg bnd = false`. -/
+theorem degMatchesBound_eq_false_of_gt {deg : Nat} {bnd : Nat × Nat}
+    (h_upp8 : bnd.2 ≤ 8) (h_gt : bnd.2 < deg) :
+    degMatchesBound deg bnd = false := by
+  dsimp [degMatchesBound]
+  have h_ne9 : (bnd.2 == 9) = false := beq_eq_false_iff_ne.mpr (by omega)
+  rw [h_ne9]
+  dsimp
+  have h_ne12 : ¬ ((bnd.2 == 12) = true) := by
+    rw [beq_iff_eq]
+    omega
+  have h_not_le : ¬ (deg ≤ bnd.2) := by omega
+  rw [decide_eq_false h_ne12, decide_eq_false h_not_le]
+  simp
+
+/-- If `Hypermap.nodeDegree H d fuel < 5`, no rule in `theRules` matches `d`. -/
+theorem matchesRawRule_eq_false_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (inv : Bool) (d : H.Dart) {r : RawRule} (hr : r ∈ theRules)
+    (h_lt : Hypermap.nodeDegree H d fuel < 5) :
+    matchesRawRule H fuel inv d r = false := by
+  have hb0 := (theRules_b0_bounds r hr).1
+  unfold matchesRawRule
+  rw [ruleVertexDart_zero, degMatchesBound_eq_false_of_lt (by omega) (by omega)]
+  rfl
+
+/-- If `9 ≤ Hypermap.nodeDegree H d fuel`, no rule in `theRules` matches `d`. -/
+theorem matchesRawRule_eq_false_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (inv : Bool) (d : H.Dart) {r : RawRule} (hr : r ∈ theRules)
+    (h_ge : 9 ≤ Hypermap.nodeDegree H d fuel) :
+    matchesRawRule H fuel inv d r = false := by
+  have hb0 := (theRules_b0_bounds r hr).2.2
+  unfold matchesRawRule
+  rw [ruleVertexDart_zero, degMatchesBound_eq_false_of_gt hb0 (by omega)]
+  rfl
+
+/-- If `Hypermap.nodeDegree H (H.edge.f d) fuel < 5`, no rule in `theRules` matches `d`. -/
+theorem matchesRawRule_eq_false_of_target_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (inv : Bool) (d : H.Dart) {r : RawRule} (hr : r ∈ theRules)
+    (h_lt : Hypermap.nodeDegree H (H.edge.f d) fuel < 5) :
+    matchesRawRule H fuel inv d r = false := by
+  have hb1 := theRules_b1_bounds r hr
+  unfold matchesRawRule
+  rw [ruleVertexDart_one, @degMatchesBound_eq_false_of_lt (Hypermap.nodeDegree H (H.edge.f d) fuel) r.b1 (by omega) (by omega)]
+  simp
+
+/-- If `Hypermap.nodeDegree H (H.edge.f d) fuel ≤ 5`, no rule in `theRules.tail` matches `d`. -/
+theorem matchesRawRule_eq_false_of_target_deg_le_5_tail (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (inv : Bool) (d : H.Dart) {r : RawRule} (hr : r ∈ theRules.tail)
+    (h_le : Hypermap.nodeDegree H (H.edge.f d) fuel ≤ 5) :
+    matchesRawRule H fuel inv d r = false := by
+  have hb1 := theRules_tail_b1_bounds r hr
+  unfold matchesRawRule
+  rw [ruleVertexDart_one, @degMatchesBound_eq_false_of_lt (Hypermap.nodeDegree H (H.edge.f d) fuel) r.b1 (by omega) (by omega)]
+  simp
+
+
+/-- Outflow along dart `d` is `0` when `Hypermap.nodeDegree H d fuel < 5`. -/
+theorem dartRuleOutflow_eq_zero_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (h_lt : Hypermap.nodeDegree H d fuel < 5) :
+    dartRuleOutflow H fuel d = 0 := by
+  dsimp [dartRuleOutflow]
+  apply foldl_add_eq_zero
+  intro r hr
+  dsimp [rawRuleOutflow]
+  rw [matchesRawRule_eq_false_of_deg_lt_5 H fuel false d hr h_lt,
+      matchesRawRule_eq_false_of_deg_lt_5 H fuel true d hr h_lt]
+  simp
+
+/-- Outflow along dart `d` is `0` when `9 ≤ Hypermap.nodeDegree H d fuel`. -/
+theorem dartRuleOutflow_eq_zero_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (h_ge : 9 ≤ Hypermap.nodeDegree H d fuel) :
+    dartRuleOutflow H fuel d = 0 := by
+  dsimp [dartRuleOutflow]
+  apply foldl_add_eq_zero
+  intro r hr
+  dsimp [rawRuleOutflow]
+  rw [matchesRawRule_eq_false_of_deg_ge_9 H fuel false d hr h_ge,
+      matchesRawRule_eq_false_of_deg_ge_9 H fuel true d hr h_ge]
+  simp
+
+/-- Outflow along dart `d` is `0` when target `H.edge.f d` has `nodeDegree < 5`. -/
+theorem dartRuleOutflow_eq_zero_of_target_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (h_lt : Hypermap.nodeDegree H (H.edge.f d) fuel < 5) :
+    dartRuleOutflow H fuel d = 0 := by
+  dsimp [dartRuleOutflow]
+  apply foldl_add_eq_zero
+  intro r hr
+  dsimp [rawRuleOutflow]
+  rw [matchesRawRule_eq_false_of_target_deg_lt_5 H fuel false d hr h_lt,
+      matchesRawRule_eq_false_of_target_deg_lt_5 H fuel true d hr h_lt]
+  simp
+
+/-- Head-tail decomposition of `dartRuleOutflow` separating Rule 1 (`r₁`) from `theRules.tail`. -/
+theorem dartRuleOutflow_eq_rule1_add_tail (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) :
+    dartRuleOutflow H fuel d =
+      rawRuleOutflow H fuel d { num := 1, b0 := (5, 5), b1 := (5, 12), triples := [], invert := true } +
+      theRules.tail.foldl (fun acc r => acc + rawRuleOutflow H fuel d r) 0 := by
+  conv =>
+    lhs
+    unfold dartRuleOutflow
+    change ({ num := 1, b0 := (5, 5), b1 := (5, 12), triples := [], invert := true } :: theRules.tail).foldl
+      (fun acc r => acc + rawRuleOutflow H fuel d r) 0
+  rw [foldl_add_cons]
+
+/-- Rule 1 outflow is `2` whenever `nodeDegree H d fuel = 5` and `5 ≤ nodeDegree H (H.edge.f d) fuel`. -/
+theorem rawRuleOutflow_rule1_eq_two (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : 5 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    rawRuleOutflow H fuel d { num := 1, b0 := (5, 5), b1 := (5, 12), triples := [], invert := true } = 2 := by
+  have h_b0 : degMatchesBound (Hypermap.nodeDegree H d fuel) (5, 5) = true := by
+    rw [h_d]; decide
+  have h_b1 : degMatchesBound (Hypermap.nodeDegree H (H.edge.f d) fuel) (5, 12) = true := by
+    dsimp [degMatchesBound]
+    rw [decide_eq_true h_ed]
+    rfl
+  unfold rawRuleOutflow matchesRawRule
+  simp only [ruleVertexDart_zero, ruleVertexDart_one, h_b0, h_b1]
+  rfl
+
+/-- Rule 1 outflow is `0` whenever `nodeDegree H d fuel ≠ 5`. -/
+theorem rawRuleOutflow_rule1_eq_zero_of_ne_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_ne : Hypermap.nodeDegree H d fuel ≠ 5) :
+    rawRuleOutflow H fuel d { num := 1, b0 := (5, 5), b1 := (5, 12), triples := [], invert := true } = 0 := by
+  have h_b0 : degMatchesBound (Hypermap.nodeDegree H d fuel) (5, 5) = false := by
+    rcases Nat.lt_or_gt_of_ne h_ne with h_lt | h_gt
+    · exact degMatchesBound_eq_false_of_lt (by decide) h_lt
+    · exact degMatchesBound_eq_false_of_gt (by decide) h_gt
+  unfold rawRuleOutflow matchesRawRule
+  simp only [ruleVertexDart_zero, h_b0]
+  rfl
+
+
+/-- If target `H.edge.f d` has degree `5` and source `d` has degree `≠ 5`, then `dartRuleOutflow H fuel d = 0`. -/
+theorem dartRuleOutflow_eq_zero_of_target_deg_5_of_deg_ne_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_ed : Hypermap.nodeDegree H (H.edge.f d) fuel = 5)
+    (h_ne : Hypermap.nodeDegree H d fuel ≠ 5) :
+    dartRuleOutflow H fuel d = 0 := by
+  rw [dartRuleOutflow_eq_rule1_add_tail, rawRuleOutflow_rule1_eq_zero_of_ne_5 H fuel d h_ne]
+  have h_tail : theRules.tail.foldl (fun acc r => acc + rawRuleOutflow H fuel d r) 0 = 0 := by
+    apply foldl_add_eq_zero
+    intro r hr
+    dsimp [rawRuleOutflow]
+    rw [matchesRawRule_eq_false_of_target_deg_le_5_tail H fuel false d hr (by omega),
+        matchesRawRule_eq_false_of_target_deg_le_5_tail H fuel true d hr (by omega)]
+    simp
+  rw [h_tail]
+  rfl
+
+/-- If both `d` and `H.edge.f d` have degree `5`, then `dartRuleOutflow H fuel d = 2`. -/
+theorem dartRuleOutflow_eq_two_of_deg_5_of_target_deg_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : Hypermap.nodeDegree H (H.edge.f d) fuel = 5) :
+    dartRuleOutflow H fuel d = 2 := by
+  rw [dartRuleOutflow_eq_rule1_add_tail, rawRuleOutflow_rule1_eq_two H fuel d h_d (by omega)]
+  have h_tail : theRules.tail.foldl (fun acc r => acc + rawRuleOutflow H fuel d r) 0 = 0 := by
+    apply foldl_add_eq_zero
+    intro r hr
+    dsimp [rawRuleOutflow]
+    rw [matchesRawRule_eq_false_of_target_deg_le_5_tail H fuel false d hr (by omega),
+        matchesRawRule_eq_false_of_target_deg_le_5_tail H fuel true d hr (by omega)]
+    simp
+  rw [h_tail]
+  rfl
+
+/-- If `d` has degree `5` and `H.edge.f d` has degree `≥ 5`, then `2 ≤ dartRuleOutflow H fuel d`. -/
+theorem two_le_dartRuleOutflow_of_deg_5_of_target_deg_ge_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : 5 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    2 ≤ dartRuleOutflow H fuel d := by
+  rw [dartRuleOutflow_eq_rule1_add_tail, rawRuleOutflow_rule1_eq_two H fuel d h_d h_ed]
+  have h_tail : 0 ≤ theRules.tail.foldl (fun acc r => acc + rawRuleOutflow H fuel d r) 0 :=
+    foldl_add_nonneg theRules.tail (fun r => rawRuleOutflow H fuel d r)
+      (fun r _ => rawRuleOutflow_nonneg H fuel d r)
+  omega
+
+/-- Vertex outflow `vertexRuleOutflow H fuel u v = 0` when `Hypermap.nodeDegree H u fuel < 5`. -/
+theorem vertexRuleOutflow_eq_zero_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_lt : Hypermap.nodeDegree H u fuel < 5) :
+    vertexRuleOutflow H fuel u v = 0 := by
+  dsimp [vertexRuleOutflow]
+  split
+  · rfl
+  · apply foldl_add_eq_zero
+    intro d hd
+    have hd_orb : d ∈ getOrbit H.node fuel u := (List.mem_filter.mp hd).1
+    have hd_deg : Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+      nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd_orb
+    exact dartRuleOutflow_eq_zero_of_deg_lt_5 H fuel d (by omega)
+
+/-- Vertex outflow `vertexRuleOutflow H fuel u v = 0` when target `Hypermap.nodeDegree H v fuel < 5`. -/
+theorem vertexRuleOutflow_eq_zero_of_target_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_lt : Hypermap.nodeDegree H v fuel < 5) :
+    vertexRuleOutflow H fuel u v = 0 := by
+  dsimp [vertexRuleOutflow]
+  split
+  · rfl
+  · apply foldl_add_eq_zero
+    intro d hd
+    have hd_same : Hypermap.sameVertex H (H.edge.f d) v fuel = true := (List.mem_filter.mp hd).2
+    have hed_deg : Hypermap.nodeDegree H (H.edge.f d) fuel = Hypermap.nodeDegree H v fuel :=
+      (nodeDegree_eq_of_sameVertex H darts h_all h_le hd_same).symm
+    exact dartRuleOutflow_eq_zero_of_target_deg_lt_5 H fuel d (by omega)
+
+/-- Net shift `rsstShift H fuel u v = 0` when `Hypermap.nodeDegree H u fuel < 5`. -/
+theorem rsstShift_eq_zero_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_lt : Hypermap.nodeDegree H u fuel < 5) :
+    rsstShift H fuel u v = 0 := by
+  dsimp [rsstShift]
+  rw [vertexRuleOutflow_eq_zero_of_target_deg_lt_5 H darts h_all h_le v u h_lt,
+      vertexRuleOutflow_eq_zero_of_deg_lt_5 H darts h_all h_le u v h_lt]
+  rfl
+
+/-- Vertex outflow `vertexRuleOutflow H fuel u v = 0` when `9 ≤ Hypermap.nodeDegree H u fuel`. -/
+theorem vertexRuleOutflow_eq_zero_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_ge : 9 ≤ Hypermap.nodeDegree H u fuel) :
+    vertexRuleOutflow H fuel u v = 0 := by
+  dsimp [vertexRuleOutflow]
+  split
+  · rfl
+  · apply foldl_add_eq_zero
+    intro d hd
+    have hd_orb : d ∈ getOrbit H.node fuel u := (List.mem_filter.mp hd).1
+    have hd_deg : Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+      nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd_orb
+    exact dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel d (by omega)
+
+/-- For any vertex `u` with `9 ≤ Hypermap.nodeDegree H u fuel`, `rsstShift H fuel u v = vertexRuleOutflow H fuel v u` (`≥ 0`). -/
+theorem rsstShift_eq_inflow_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_ge : 9 ≤ Hypermap.nodeDegree H u fuel) :
+    rsstShift H fuel u v = vertexRuleOutflow H fuel v u := by
+  dsimp [rsstShift]
+  rw [vertexRuleOutflow_eq_zero_of_deg_ge_9 H darts h_all h_le u v h_ge]
+  omega
+
+/-- No vertex `u` of degree `≠ 5` sends any charge to a vertex `v` of degree `5`. -/
+theorem vertexRuleOutflow_eq_zero_of_target_deg_5_of_deg_ne_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_v : Hypermap.nodeDegree H v fuel = 5)
+    (h_u : Hypermap.nodeDegree H u fuel ≠ 5) :
+    vertexRuleOutflow H fuel u v = 0 := by
+  dsimp [vertexRuleOutflow]
+  split
+  · rfl
+  · apply foldl_add_eq_zero
+    intro d hd
+    have hd_orb : d ∈ getOrbit H.node fuel u := (List.mem_filter.mp hd).1
+    have hd_same : Hypermap.sameVertex H (H.edge.f d) v fuel = true := (List.mem_filter.mp hd).2
+    have hd_deg : Hypermap.nodeDegree H d fuel = Hypermap.nodeDegree H u fuel :=
+      nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd_orb
+    have hed_deg : Hypermap.nodeDegree H (H.edge.f d) fuel = 5 := by
+      rw [← h_v]
+      exact (nodeDegree_eq_of_sameVertex H darts h_all h_le hd_same).symm
+    exact dartRuleOutflow_eq_zero_of_target_deg_5_of_deg_ne_5 H fuel d hed_deg (by omega)
+
+/-!
+### Stage C.3: Local `netDartShift` & `orbitNetShift` Discharging Bounds for Degrees $5$ and $\ge 12$
+-/
+
+/-- Net charge shift across directed dart `d`: inflow along `H.edge.f d` minus outflow along `d`. -/
+def netDartShift (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (d : H.Dart) : Int :=
+  dartRuleOutflow H fuel (H.edge.f d) - dartRuleOutflow H fuel d
+
+/-- Total net charge shift summed locally over the vertex orbit `getOrbit H.node fuel u`. -/
+def orbitNetShift (H : Hypermap) [DecidableEq H.Dart] (fuel : Nat) (u : H.Dart) : Int :=
+  (getOrbit H.node fuel u).foldl (fun acc d => acc + netDartShift H fuel d) 0
+
+/-- When both `d` and `H.edge.f d` have degree `5` (and `H.edge.f (H.edge.f d) = d`),
+    Rule 1 sends `2` units in each direction and all other rules send `0`, so `netDartShift H fuel d = 0`. -/
+theorem netDartShift_eq_zero_of_deg_5_of_target_deg_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_inv : H.edge.f (H.edge.f d) = d)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : Hypermap.nodeDegree H (H.edge.f d) fuel = 5) :
+    netDartShift H fuel d = 0 := by
+  dsimp [netDartShift]
+  have h_out : dartRuleOutflow H fuel d = 2 :=
+    dartRuleOutflow_eq_two_of_deg_5_of_target_deg_5 H fuel d h_d h_ed
+  have h_in : dartRuleOutflow H fuel (H.edge.f d) = 2 := by
+    apply dartRuleOutflow_eq_two_of_deg_5_of_target_deg_5 H fuel (H.edge.f d) h_ed
+    rw [h_inv]
+    exact h_d
+  omega
+
+/-- When `d` has degree `5` and `H.edge.f d` has degree `≥ 6` (with `H.edge.f (H.edge.f d) = d`),
+    inflow is `0` and outflow is `≥ 2`, so `netDartShift H fuel d ≤ -2`. -/
+theorem netDartShift_le_neg_two_of_deg_5_of_target_deg_ge_6 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_inv : H.edge.f (H.edge.f d) = d)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    netDartShift H fuel d ≤ -2 := by
+  dsimp [netDartShift]
+  have h_out : 2 ≤ dartRuleOutflow H fuel d :=
+    two_le_dartRuleOutflow_of_deg_5_of_target_deg_ge_5 H fuel d h_d (by omega)
+  have h_in : dartRuleOutflow H fuel (H.edge.f d) = 0 := by
+    apply dartRuleOutflow_eq_zero_of_target_deg_5_of_deg_ne_5 H fuel (H.edge.f d)
+    · rw [h_inv]; exact h_d
+    · omega
+  omega
+
+/-- When `d` has degree `5` and `H.edge.f d` has degree `≥ 5` (with `H.edge.f (H.edge.f d) = d`),
+    `netDartShift H fuel d ≤ 0`. -/
+theorem netDartShift_le_zero_of_deg_5_of_target_deg_ge_5 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart)
+    (h_inv : H.edge.f (H.edge.f d) = d)
+    (h_d : Hypermap.nodeDegree H d fuel = 5)
+    (h_ed : 5 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    netDartShift H fuel d ≤ 0 := by
+  by_cases h5 : Hypermap.nodeDegree H (H.edge.f d) fuel = 5
+  · rw [netDartShift_eq_zero_of_deg_5_of_target_deg_5 H fuel d h_inv h_d h5]
+    omega
+  · have h6 : 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel := by omega
+    have h_le := netDartShift_le_neg_two_of_deg_5_of_target_deg_ge_6 H fuel d h_inv h_d h6
+    omega
+
+/-- When `9 ≤ Hypermap.nodeDegree H d fuel`, outflow is `0`, so `netDartShift H fuel d = dartRuleOutflow H fuel (H.edge.f d)`. -/
+theorem netDartShift_eq_inflow_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (fuel : Nat) (d : H.Dart) (h_ge : 9 ≤ Hypermap.nodeDegree H d fuel) :
+    netDartShift H fuel d = dartRuleOutflow H fuel (H.edge.f d) := by
+  dsimp [netDartShift]
+  rw [dartRuleOutflow_eq_zero_of_deg_ge_9 H fuel d h_ge]
+  omega
+
+/-- Local Discharging Bound for Degree 5:
+    if `Hypermap.nodeDegree H u fuel = 5` on a complete dart list (`darts.length ≤ fuel`)
+    and every neighbor dart `H.edge.f d` (`d ∈ getOrbit H.node fuel u`) has degree `≥ 6`,
+    then `orbitNetShift H fuel u ≤ -10` and `initialCharge H u fuel + orbitNetShift H fuel u ≤ 0`. -/
+theorem initialCharge_add_orbitNetShift_le_zero_of_deg_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_inv : ∀ d ∈ getOrbit H.node fuel u, H.edge.f (H.edge.f d) = d)
+    (h_deg5 : Hypermap.nodeDegree H u fuel = 5)
+    (h_nb6 : ∀ d ∈ getOrbit H.node fuel u, 6 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel) :
+    initialCharge H u fuel + orbitNetShift H fuel u ≤ 0 := by
+  dsimp [initialCharge, orbitNetShift]
+  have h_bound :
+      (getOrbit H.node fuel u).foldl (fun acc d => acc + netDartShift H fuel d) 0 ≤
+        (-2 : Int) * ((getOrbit H.node fuel u).length : Int) := by
+    apply foldl_add_le_of_le_const
+    intro d hd
+    have hd_deg : Hypermap.nodeDegree H d fuel = 5 := by
+      rw [nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd, h_deg5]
+    exact netDartShift_le_neg_two_of_deg_5_of_target_deg_ge_6 H fuel d (h_inv d hd) hd_deg (h_nb6 d hd)
+  change (getOrbit H.node fuel u).length = 5 at h_deg5
+  change 10 * (6 - ((getOrbit H.node fuel u).length : Int)) +
+    (getOrbit H.node fuel u).foldl (fun acc d => acc + netDartShift H fuel d) 0 ≤ 0
+  omega
+
+
+/-- Local Discharging Bound for Degree `≥ 12`:
+    if `12 ≤ Hypermap.nodeDegree H u fuel` on a complete dart list (`darts.length ≤ fuel`)
+    and every incoming dart `H.edge.f d` (`d ∈ getOrbit H.node fuel u`) has `dartRuleOutflow ≤ 5`,
+    then `initialCharge H u fuel + orbitNetShift H fuel u ≤ 0`. -/
+theorem initialCharge_add_orbitNetShift_le_zero_of_deg_ge_12 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_deg12 : 12 ≤ Hypermap.nodeDegree H u fuel)
+    (h_in5 : ∀ d ∈ getOrbit H.node fuel u, dartRuleOutflow H fuel (H.edge.f d) ≤ 5) :
+    initialCharge H u fuel + orbitNetShift H fuel u ≤ 0 := by
+  dsimp [initialCharge, orbitNetShift]
+  have h_bound :
+      (getOrbit H.node fuel u).foldl (fun acc d => acc + netDartShift H fuel d) 0 ≤
+        (5 : Int) * ((getOrbit H.node fuel u).length : Int) := by
+    apply foldl_add_le_of_le_const
+    intro d hd
+    have hd_deg : 9 ≤ Hypermap.nodeDegree H d fuel := by
+      have := nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd
+      omega
+    rw [netDartShift_eq_inflow_of_deg_ge_9 H fuel d hd_deg]
+    exact h_in5 d hd
+  change 12 ≤ (getOrbit H.node fuel u).length at h_deg12
+  change 10 * (6 - ((getOrbit H.node fuel u).length : Int)) +
+    (getOrbit H.node fuel u).foldl (fun acc d => acc + netDartShift H fuel d) 0 ≤ 0
+  omega
+
+/-- Fuel-independence of `sumShiftsTo (rsstChargeShift H fuel)` on any complete dart list. -/
+theorem sumShiftsTo_rsstChargeShift_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (u : H.Dart) (vs : List H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    sumShiftsTo (rsstChargeShift H fuel) u vs =
+      sumShiftsTo (rsstChargeShift H darts.length) u vs := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    dsimp [sumShiftsTo]
+    change rsstShift H fuel u v + sumShiftsTo (rsstChargeShift H fuel) u vs =
+      rsstShift H darts.length u v + sumShiftsTo (rsstChargeShift H darts.length) u vs
+    rw [rsstShift_fuel_eq_of_complete H darts h_all u v h_le, ih]
+
+/-- Fuel-independence of `finalCharge H (rsstChargeShift H fuel)` on any complete dart list. -/
+theorem finalCharge_rsstChargeShift_fuel_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    (u : H.Dart) {fuel : Nat} (h_le : darts.length ≤ fuel) :
+    finalCharge H (rsstChargeShift H fuel) darts u =
+      finalCharge H (rsstChargeShift H darts.length) darts u := by
+  dsimp [finalCharge]
+  rw [sumShiftsTo_rsstChargeShift_fuel_eq_of_complete H darts h_all u _ h_le]
+
+/-- When `Hypermap.nodeDegree H u fuel < 5`, `sumShiftsTo (rsstChargeShift H fuel) u vs = 0` for any vertex list `vs`. -/
+theorem sumShiftsTo_eq_zero_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_lt : Hypermap.nodeDegree H u fuel < 5) (vs : List H.Dart) :
+    sumShiftsTo (rsstChargeShift H fuel) u vs = 0 := by
+  induction vs with
+  | nil => rfl
+  | cons v vs ih =>
+    dsimp [sumShiftsTo]
+    change rsstShift H fuel u v + sumShiftsTo (rsstChargeShift H fuel) u vs = 0
+    rw [rsstShift_eq_zero_of_deg_lt_5 H darts h_all h_le u v h_lt, ih]
+    rfl
+
+/-- When `Hypermap.nodeDegree H u darts.length < 5`, `finalCharge` equals `initialCharge` (`> 0`). -/
+theorem finalCharge_eq_initialCharge_of_deg_lt_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_lt : Hypermap.nodeDegree H u darts.length < 5) :
+    finalCharge H (rsstChargeShift H fuel) darts u = initialCharge H u darts.length := by
+  rw [finalCharge_rsstChargeShift_fuel_eq_of_complete H darts h_all u h_le]
+  dsimp [finalCharge]
+  rw [sumShiftsTo_eq_zero_of_deg_lt_5 H darts h_all (Nat.le_refl _) u h_lt]
+  omega
+
+/-- When `9 ≤ Hypermap.nodeDegree H u fuel`, `sumShiftsTo (rsstChargeShift H fuel) u vs ≥ 0` for any vertex list `vs`. -/
+theorem sumShiftsTo_nonneg_of_deg_ge_9 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u : H.Dart)
+    (h_ge : 9 ≤ Hypermap.nodeDegree H u fuel) (vs : List H.Dart) :
+    0 ≤ sumShiftsTo (rsstChargeShift H fuel) u vs := by
+  induction vs with
+  | nil =>
+    dsimp [sumShiftsTo]
+    omega
+  | cons v vs ih =>
+    dsimp [sumShiftsTo]
+    change 0 ≤ rsstShift H fuel u v + sumShiftsTo (rsstChargeShift H fuel) u vs
+    rw [rsstShift_eq_inflow_of_deg_ge_9 H darts h_all h_le u v h_ge]
+    have hv : 0 ≤ vertexRuleOutflow H fuel v u := vertexRuleOutflow_nonneg H fuel v u
+    omega
+
+
+/-- When `Hypermap.nodeDegree H u fuel = 5` and `5 ≤ Hypermap.nodeDegree H v fuel` with `¬ sameVertex H u v fuel`,
+    `vertexRuleOutflow H fuel u v` is at least `2` times the number of darts from `u` to `v`. -/
+theorem two_mul_length_le_vertexRuleOutflow_of_deg_5 (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (u v : H.Dart)
+    (h_not_same : Hypermap.sameVertex H u v fuel = false)
+    (h_u : Hypermap.nodeDegree H u fuel = 5)
+    (h_v : 5 ≤ Hypermap.nodeDegree H v fuel) :
+    2 * (((getOrbit H.node fuel u).filter (fun d => Hypermap.sameVertex H (H.edge.f d) v fuel)).length : Int) ≤
+      vertexRuleOutflow H fuel u v := by
+  dsimp [vertexRuleOutflow]
+  rw [h_not_same]
+  dsimp
+  apply foldl_add_ge_of_ge_const
+  intro d hd
+  have hd_orb : d ∈ getOrbit H.node fuel u := (List.mem_filter.mp hd).1
+  have hd_same : Hypermap.sameVertex H (H.edge.f d) v fuel = true := (List.mem_filter.mp hd).2
+  have hd_deg : Hypermap.nodeDegree H d fuel = 5 := by
+    rw [nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hd_orb, h_u]
+  have hed_deg : 5 ≤ Hypermap.nodeDegree H (H.edge.f d) fuel := by
+    have := nodeDegree_eq_of_sameVertex H darts h_all h_le hd_same
+    omega
+  exact two_le_dartRuleOutflow_of_deg_5_of_target_deg_ge_5 H fuel d hd_deg hed_deg
+
+
+
+
 end Discharging
 end Math
