@@ -4269,5 +4269,1085 @@ theorem exists_verifiedCartLeaf_of_dischargingTreesVerified (configs : List Conf
   · exact exists_verifiedCartLeaf_of_verifyTree configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) h10
   · exact exists_verifiedCartLeaf_of_verifyTree configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) h11
 
+/-!
+### Stage J.1: 6-Bit SWAR Lane Addition Without Carry & `outletPermittedSWAR` Soundness
+-/
+
+theorem land_63_eq_mod_64 (n : Nat) : n &&& 63 = n % 64 := by
+  have h63 : (63 : Nat) = 2 ^ 6 - 1 := rfl
+  rw [h63, Nat.and_two_pow_sub_one_eq_mod]
+
+theorem getLaneNat_eq_div_mod (st p : Nat) :
+    getLaneNat st p = (st / 2 ^ (p * 6)) % 64 := by
+  dsimp [getLaneNat]
+  change ((st >>> (p * 6)) &&& 63) = (st / 2 ^ (p * 6)) % 64
+  rw [Nat.shiftRight_eq_div_pow, land_63_eq_mod_64]
+
+theorem pow_succ_mul_six (p : Nat) : 2 ^ ((p + 1) * 6) = 2 ^ (p * 6) * 64 := by
+  have h1 : (p + 1) * 6 = p * 6 + 6 := by omega
+  rw [h1, Nat.pow_add]
+
+theorem mod_pow_succ_mul_six (Z p : Nat) :
+    Z % 2 ^ ((p + 1) * 6) = Z % 2 ^ (p * 6) + 2 ^ (p * 6) * getLaneNat Z p := by
+  rw [pow_succ_mul_six, getLaneNat_eq_div_mod]
+  let P := 2 ^ (p * 6)
+  have h_pos : 0 < P := Nat.two_pow_pos (p * 6)
+  have h1 := Nat.div_add_mod Z P
+  have h2 := Nat.div_add_mod (Z / P) 64
+  have h3 := Nat.mod_lt Z h_pos
+  have h4 : (Z / P) % 64 < 64 := Nat.mod_lt _ (by omega)
+  have h_mul_add : P * (64 * ((Z / P) / 64) + (Z / P) % 64) =
+      (P * 64) * ((Z / P) / 64) + P * ((Z / P) % 64) := by
+    rw [Nat.mul_add, ← Nat.mul_assoc, Nat.mul_comm P 64, Nat.mul_assoc]
+  have h_eq : Z = (P * 64) * ((Z / P) / 64) + (Z % P + P * ((Z / P) % 64)) := by
+    have h_div : P * (Z / P) = P * (64 * ((Z / P) / 64) + (Z / P) % 64) :=
+      congrArg (P * ·) h2.symm
+    omega
+  have h_rem_lt : Z % P + P * ((Z / P) % 64) < P * 64 := by
+    have h_le63 : (Z / P) % 64 ≤ 63 := by omega
+    have h_mul_le : P * ((Z / P) % 64) ≤ P * 63 := Nat.mul_le_mul_left P h_le63
+    omega
+  have h_mod : ((P * 64) * ((Z / P) / 64) + (Z % P + P * ((Z / P) % 64))) % (P * 64) =
+      Z % P + P * ((Z / P) % 64) := by
+    rw [Nat.mul_add_mod, Nat.mod_eq_of_lt h_rem_lt]
+  simpa [← h_eq] using h_mod
+
+theorem mod_add_mod_lt_pow_mul_six (X Y : Nat) (hX : ∀ q, getLaneNat X q ≤ 31) (hY : ∀ q, getLaneNat Y q ≤ 31) :
+    ∀ p, X % 2 ^ (p * 6) + Y % 2 ^ (p * 6) < 2 ^ (p * 6) := by
+  intro p
+  induction p with
+  | zero =>
+    change X % 1 + Y % 1 < 1
+    omega
+  | succ p ih =>
+    rw [mod_pow_succ_mul_six X p, mod_pow_succ_mul_six Y p, pow_succ_mul_six]
+    have hXp : 2 ^ (p * 6) * getLaneNat X p ≤ 2 ^ (p * 6) * 31 := Nat.mul_le_mul_left _ (hX p)
+    have hYp : 2 ^ (p * 6) * getLaneNat Y p ≤ 2 ^ (p * 6) * 31 := Nat.mul_le_mul_left _ (hY p)
+    omega
+
+/-- Fundamental SWAR No-Carry Addition Theorem:
+    When every 6-bit lane of `X` and `Y` is at most `31` (so bit 5, the guard bit `32`, is `0`),
+    binary addition `X + Y` never carries across 6-bit lane boundaries:
+    `getLaneNat (X + Y) p = getLaneNat X p + getLaneNat Y p` for every lane `p`. -/
+theorem getLaneNat_add_of_le_31 (X Y : Nat)
+    (hX : ∀ q, getLaneNat X q ≤ 31) (hY : ∀ q, getLaneNat Y q ≤ 31) (p : Nat) :
+    getLaneNat (X + Y) p = getLaneNat X p + getLaneNat Y p := by
+  have h_no_carry := mod_add_mod_lt_pow_mul_six X Y hX hY p
+  have h_no_carry_succ := mod_add_mod_lt_pow_mul_six X Y hX hY (p + 1)
+  have h_X_succ := mod_pow_succ_mul_six X p
+  have h_Y_succ := mod_pow_succ_mul_six Y p
+  have h_XY_succ := mod_pow_succ_mul_six (X + Y) p
+  have h_pos : 0 < 2 ^ (p * 6) := Nat.two_pow_pos (p * 6)
+  have h_mod_p : (X + Y) % 2 ^ (p * 6) = X % 2 ^ (p * 6) + Y % 2 ^ (p * 6) := by
+    let P := 2 ^ (p * 6)
+    have h1 := Nat.div_add_mod X P
+    have h2 := Nat.div_add_mod Y P
+    have h_dist := Nat.mul_add P (X / P) (Y / P)
+    have h_eq : X + Y = P * (X / P + Y / P) + (X % P + Y % P) := by omega
+    rw [h_eq, Nat.mul_add_mod, Nat.mod_eq_of_lt h_no_carry]
+  have h_mod_succ : (X + Y) % 2 ^ ((p + 1) * 6) = X % 2 ^ ((p + 1) * 6) + Y % 2 ^ ((p + 1) * 6) := by
+    let Q := 2 ^ ((p + 1) * 6)
+    have h1 := Nat.div_add_mod X Q
+    have h2 := Nat.div_add_mod Y Q
+    have h_dist := Nat.mul_add Q (X / Q) (Y / Q)
+    have h_eq : X + Y = Q * (X / Q + Y / Q) + (X % Q + Y % Q) := by omega
+    rw [h_eq, Nat.mul_add_mod, Nat.mod_eq_of_lt h_no_carry_succ]
+  rw [h_XY_succ, h_X_succ, h_Y_succ, h_mod_p] at h_mod_succ
+  have h_dist := Nat.mul_add (2 ^ (p * 6)) (getLaneNat X p) (getLaneNat Y p)
+  have h_mul_eq : 2 ^ (p * 6) * getLaneNat (X + Y) p = 2 ^ (p * 6) * (getLaneNat X p + getLaneNat Y p) := by omega
+  exact Nat.eq_of_mul_eq_mul_left h_pos h_mul_eq
+
+/-- Computable structural well-formedness predicate for a SWAR outlet `po : FastPosOut` at hub degree `deg`.
+    Formulated purely with whole-word 360-bit SWAR operations (zero lane loops) for instantaneous kernel evaluation. -/
+def validFastPosOut (deg : Nat) (po : FastPosOut) : Bool :=
+  (po.mask == (po.keep &&& po.add)) &&
+  (po.add &&& all31Nat == po.add) &&
+  (po.high &&& (all63Nat ^^^ all31Nat) == po.high) &&
+  (po.high &&& 63 == 0) &&
+  (po.high >>> ((5 * deg + 1) * 6) == 0) &&
+  (po.keep &&& all63Nat == (all31Nat ^^^ (po.forbid &&& all31Nat))) &&
+  (po.add == ((po.high >>> 1) ||| (po.high >>> 2) ||| (po.high >>> 3) ||| (po.high >>> 4) ||| (po.high >>> 5)))
+
+/-- An outlet `po : FastPosOut` is active on cartwheel degree assignment `cartDeg : Nat → Nat`
+    at hub degree `deg` if no position `1 ≤ p ≤ 5 * deg` has its degree bit set in `po.forbid`. -/
+def OutletActive (deg : Nat) (cartDeg : Nat → Nat) (po : FastPosOut) : Bool :=
+  (List.range' 1 (5 * deg)).all (fun p =>
+    !(getLaneNat po.forbid p).testBit (degBitIdx (cartDeg p)))
+
+theorem getLaneNat_lt_64 (st p : Nat) : getLaneNat st p < 64 := by
+  rw [getLaneNat_eq_div_mod]
+  exact Nat.mod_lt _ (by omega)
+
+theorem testBit_getLaneNat_of_ge_6 (st p : Nat) {i : Nat} (hi : 6 ≤ i) :
+    (getLaneNat st p).testBit i = false := by
+  dsimp [getLaneNat]
+  change ((st >>> (p * 6)) &&& 63).testBit i = false
+  rw [Nat.testBit_and, testBit_63_of_ge_6 hi, Bool.and_false]
+
+theorem getLaneNat_and (X Y p : Nat) :
+    getLaneNat (X &&& Y) p = (getLaneNat X p &&& getLaneNat Y p) := by
+  apply Nat.eq_of_testBit_eq
+  intro i
+  by_cases hi : i < 6
+  · rw [testBit_getLaneNat _ p hi, Nat.testBit_and, Nat.testBit_and,
+        testBit_getLaneNat X p hi, testBit_getLaneNat Y p hi]
+  · have hi6 : 6 ≤ i := by omega
+    rw [testBit_getLaneNat_of_ge_6 _ p hi6, Nat.testBit_and,
+        testBit_getLaneNat_of_ge_6 X p hi6, Bool.false_and]
+
+set_option exponentiation.threshold 512 in
+theorem all31Nat_lt_two_pow_360 : all31Nat < 2 ^ 360 := by decide
+
+set_option exponentiation.threshold 512 in
+theorem getLaneNat_all31Nat_le_31 (p : Nat) : getLaneNat all31Nat p ≤ 31 := by
+  by_cases hp : p < 60
+  · have h_all : (List.range 60).all (fun q => getLaneNat all31Nat q == 31) = true := by decide
+    have h_eq : getLaneNat all31Nat p = 31 :=
+      beq_iff_eq.mp (List.all_eq_true.mp h_all p (List.mem_range.mpr hp))
+    omega
+  · have h_ge : 360 ≤ p * 6 := by omega
+    have h_pow : 2 ^ 360 ≤ 2 ^ (p * 6) := Nat.pow_le_pow_right (by omega) h_ge
+    have h_lt : all31Nat < 2 ^ (p * 6) := Nat.lt_of_lt_of_le all31Nat_lt_two_pow_360 h_pow
+    rw [getLaneNat_eq_div_mod, Nat.div_eq_of_lt h_lt]
+    omega
+
+theorem getLaneNat_le_31_of_and_all31Nat (X : Nat) (hX : (X &&& all31Nat) = X) (p : Nat) :
+    getLaneNat X p ≤ 31 := by
+  rw [← hX, getLaneNat_and]
+  exact Nat.le_trans Nat.and_le_right (getLaneNat_all31Nat_le_31 p)
+
+set_option exponentiation.threshold 512 in
+theorem testBit_all63Nat_of_ge_360 {k : Nat} (hk : 360 ≤ k) : all63Nat.testBit k = false := by
+  have h_eq : all63Nat = 2 ^ 360 - 1 := by decide
+  rw [h_eq, Nat.testBit_two_pow_sub_one]
+  exact decide_eq_false (by omega)
+
+set_option exponentiation.threshold 512 in
+theorem testBit_all31Nat_of_ge_360 {k : Nat} (hk : 360 ≤ k) : all31Nat.testBit k = false := by
+  have h_pow : 2 ^ 360 ≤ 2 ^ k := Nat.pow_le_pow_right (by omega) hk
+  exact Nat.testBit_lt_two_pow (Nat.lt_of_lt_of_le all31Nat_lt_two_pow_360 h_pow)
+
+theorem testBit_32_eq_true_iff {i : Nat} (hi : i < 6) :
+    (32 : Nat).testBit i = true ↔ i = 5 := by
+  match i with
+  | 0 | 1 | 2 | 3 | 4 | 5 => decide
+
+theorem testBit_add_31_five_of_testBit_lt_5 {m b : Nat} (hm : m ≤ 31) (_hb : b < 5)
+    (h_bit : m.testBit b = true) : (m + 31).testBit 5 = true := by
+  have hm_pos : 1 ≤ m := by
+    by_cases h0 : m = 0
+    · subst h0; simp at h_bit
+    · omega
+  have h_div : (m + 31) / 32 = 1 := by omega
+  rw [Nat.testBit, Nat.shiftRight_eq_div_pow]
+  change (1 &&& ((m + 31) / 32) != 0) = true
+  rw [h_div]
+  rfl
+
+/-- Soundness 1: Any forced SWAR outlet (`outletForcedSWAR st po = true`) is active on `cartDeg`. -/
+theorem outletActive_of_outletForcedSWAR (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_forced : outletForcedSWAR st po = true) :
+    OutletActive deg cartDeg po = true := by
+  dsimp [OutletActive]
+  rw [List.all_eq_true]
+  intro p hp
+  rcases List.mem_range'.mp hp with ⟨i, hi, hp_eq⟩
+  have h_false := testBit_forbid_eq_false_of_outletForcedSWAR deg cartDeg st po h_match h_forced p (by omega) (by omega)
+  rw [h_false]
+  rfl
+
+set_option exponentiation.threshold 512 in
+theorem testBit_all31Nat_of_lt_360 (p : Nat) (hp : p < 60) {i : Nat} (hi : i < 6) :
+    all31Nat.testBit (p * 6 + i) = (31 : Nat).testBit i := by
+  have h_all : (List.range 60).all (fun q => getLaneNat all31Nat q == 31) = true := by decide
+  have h_eq : getLaneNat all31Nat p = 31 :=
+    beq_iff_eq.mp (List.all_eq_true.mp h_all p (List.mem_range.mpr hp))
+  rw [← testBit_getLaneNat all31Nat p hi, h_eq]
+
+theorem eq_31_of_le_31_of_testBits {a : Nat} (ha : a ≤ 31)
+    (h0 : a.testBit 0 = true) (h1 : a.testBit 1 = true) (h2 : a.testBit 2 = true)
+    (h3 : a.testBit 3 = true) (h4 : a.testBit 4 = true) : a = 31 := by
+  apply Nat.eq_of_testBit_eq
+  intro i
+  match i with
+  | 0 => exact h0
+  | 1 => exact h1
+  | 2 => exact h2
+  | 3 => exact h3
+  | 4 => exact h4
+  | i + 5 =>
+    have h_pow : 32 ≤ 2 ^ (i + 5) := by
+      have : 2 ^ 5 ≤ 2 ^ (i + 5) := Nat.pow_le_pow_right (by omega) (by omega)
+      omega
+    rw [Nat.testBit_lt_two_pow (by omega), Nat.testBit_lt_two_pow (by omega)]
+
+/-- Soundness 2: Any active well-formed SWAR outlet preserves `MatchesCartState` under `narrowSWAR`. -/
+theorem matchesCartState_narrowSWAR_of_outletActive (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_deg : deg ≤ 11)
+    (h_valid : validFastPosOut deg po = true)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_active : OutletActive deg cartDeg po = true) :
+    MatchesCartState deg cartDeg (narrowSWAR st po) := by
+  apply matchesCartState_narrowSWAR deg cartDeg st po h_match
+  intro p hp1 hp2
+  dsimp [validFastPosOut] at h_valid
+  simp only [Bool.and_eq_true, beq_iff_eq] at h_valid
+  rcases h_valid with ⟨⟨⟨⟨⟨⟨_, _⟩, _⟩, _⟩, _⟩, h_keep_all⟩, _⟩
+  have hp60 : p < 60 := by omega
+  have hb6 : degBitIdx (cartDeg p) < 6 := degBitIdx_lt_6 _
+  have h_tb : (po.keep &&& all63Nat).testBit (p * 6 + degBitIdx (cartDeg p)) =
+      (all31Nat ^^^ (po.forbid &&& all31Nat)).testBit (p * 6 + degBitIdx (cartDeg p)) := by
+    rw [h_keep_all]
+  rw [Nat.testBit_and, testBit_all63Nat_of_lt (by omega), Bool.and_true,
+      ← testBit_getLaneNat po.keep p hb6,
+      Nat.testBit_xor, Nat.testBit_and, testBit_all31Nat_of_lt_360 p hp60 hb6,
+      testBit_31_degBitIdx, Bool.true_xor, Bool.and_true,
+      ← testBit_getLaneNat po.forbid p hb6] at h_tb
+  have hp_range : p ∈ List.range' 1 (5 * deg) := List.mem_range'.mpr ⟨p - 1, by omega, by omega⟩
+  have h_not_forbid := List.all_eq_true.mp h_active p hp_range
+  rw [h_tb]
+  exact h_not_forbid
+
+/-- Soundness 3: Any active well-formed SWAR outlet satisfies `outletPermittedSWAR st po = true`. -/
+theorem outletPermittedSWAR_of_outletActive (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_deg : deg ≤ 11)
+    (h_valid : validFastPosOut deg po = true)
+    (h_match : MatchesCartState deg cartDeg st)
+    (h_active : OutletActive deg cartDeg po = true) :
+    outletPermittedSWAR st po = true := by
+  have h_valid_orig := h_valid
+  dsimp [validFastPosOut] at h_valid
+  simp only [Bool.and_eq_true, beq_iff_eq] at h_valid
+  rcases h_valid with ⟨⟨⟨⟨⟨⟨h_mask_eq, h_add31⟩, h_high_mask⟩, h_high_low⟩, h_high_up⟩, h_keep_all⟩, h_add_shifts⟩
+  have h_mask31 : (po.mask &&& all31Nat) = po.mask := by
+    rw [h_mask_eq, Nat.and_assoc, h_add31]
+  dsimp [outletPermittedSWAR]
+  rw [Nat.beq_eq]
+  apply Nat.eq_of_testBit_eq
+  intro k
+  change (((st &&& po.mask) + po.add) &&& po.high).testBit k = po.high.testBit k
+  rw [Nat.testBit_and]
+  cases h_hk : po.high.testBit k with
+  | false => simp
+  | true =>
+    rw [Bool.and_true]
+    have h_hk_mask : (po.high &&& (all63Nat ^^^ all31Nat)).testBit k = true := by
+      rw [h_high_mask, h_hk]
+    rw [Nat.testBit_and, Nat.testBit_xor] at h_hk_mask
+    have hk_lt360 : k < 360 := by
+      by_cases hk : k < 360
+      · exact hk
+      · have h_ge360 : 360 ≤ k := by omega
+        rw [testBit_all63Nat_of_ge_360 h_ge360, testBit_all31Nat_of_ge_360 h_ge360] at h_hk_mask
+        simp at h_hk_mask
+    let p := k / 6
+    let i := k % 6
+    have hp60 : p < 60 := by omega
+    have hi6 : i < 6 := by omega
+    have hk_eq : k = p * 6 + i := by omega
+    have hi5 : i = 5 := by
+      rw [hk_eq, testBit_all63Nat_of_lt (by omega), testBit_all31Nat_of_lt_360 p hp60 hi6] at h_hk_mask
+      by_cases hi_lt5 : i < 5
+      · rw [testBit_31_of_lt_5 hi_lt5] at h_hk_mask
+        simp at h_hk_mask
+      · omega
+    have hp1 : 1 ≤ p := by
+      by_cases hp0 : p = 0
+      · have hk6 : k < 6 := by omega
+        have h_tb0 : (po.high &&& 63).testBit k = false := by rw [h_high_low, Nat.zero_testBit]
+        rw [Nat.testBit_and, h_hk, testBit_63_of_lt_6 hk6] at h_tb0
+        contradiction
+      · omega
+    have hp2 : p ≤ 5 * deg := by
+      by_cases hp_le : p ≤ 5 * deg
+      · exact hp_le
+      · have h_sh : (5 * deg + 1) * 6 ≤ k := by omega
+        have h_tb_up : (po.high >>> ((5 * deg + 1) * 6)).testBit (k - (5 * deg + 1) * 6) = false := by
+          rw [h_high_up, Nat.zero_testBit]
+        rw [Nat.testBit_shiftRight, Nat.add_sub_of_le h_sh, h_hk] at h_tb_up
+        contradiction
+    have h_hk5 : po.high.testBit (p * 6 + 5) = true := by rw [← hi5, ← hk_eq, h_hk]
+    have h_add_bit : ∀ b < 5, (getLaneNat po.add p).testBit b = true := by
+      intro b hb
+      rw [testBit_getLaneNat po.add p (by omega), h_add_shifts]
+      simp only [Nat.testBit_or, Nat.testBit_shiftRight]
+      match b with
+      | 0 =>
+        have : 5 + (p * 6 + 0) = p * 6 + 5 := by omega
+        rw [this, h_hk5]; simp
+      | 1 =>
+        have : 4 + (p * 6 + 1) = p * 6 + 5 := by omega
+        rw [this, h_hk5]; simp
+      | 2 =>
+        have : 3 + (p * 6 + 2) = p * 6 + 5 := by omega
+        rw [this, h_hk5]; simp
+      | 3 =>
+        have : 2 + (p * 6 + 3) = p * 6 + 5 := by omega
+        rw [this, h_hk5]; simp
+      | 4 =>
+        have : 1 + (p * 6 + 4) = p * 6 + 5 := by omega
+        rw [this, h_hk5]; simp
+    have h_Y_le : ∀ q, getLaneNat po.add q ≤ 31 :=
+      getLaneNat_le_31_of_and_all31Nat po.add h_add31
+    have h_add31_p : getLaneNat po.add p = 31 :=
+      eq_31_of_le_31_of_testBits (h_Y_le p)
+        (h_add_bit 0 (by omega)) (h_add_bit 1 (by omega)) (h_add_bit 2 (by omega))
+        (h_add_bit 3 (by omega)) (h_add_bit 4 (by omega))
+    have h_X_le : ∀ q, getLaneNat (st &&& po.mask) q ≤ 31 := by
+      intro q
+      have h_sub : ((st &&& po.mask) &&& all31Nat) = (st &&& po.mask) := by
+        rw [Nat.and_assoc, h_mask31]
+      exact getLaneNat_le_31_of_and_all31Nat (st &&& po.mask) h_sub q
+    rw [hk_eq, hi5, ← testBit_getLaneNat _ p (by omega),
+        getLaneNat_add_of_le_31 (st &&& po.mask) po.add h_X_le h_Y_le p,
+        getLaneNat_and, h_mask_eq, getLaneNat_and, h_add31_p]
+    have h_m_le : (getLaneNat st p &&& (getLaneNat po.keep p &&& 31)) ≤ 31 :=
+      Nat.le_trans Nat.and_le_right Nat.and_le_right
+    have h_keep_bit : (getLaneNat po.keep p).testBit (degBitIdx (cartDeg p)) = true := by
+      have h_m_narrow := matchesCartState_narrowSWAR_of_outletActive deg cartDeg st po h_deg
+        h_valid_orig h_match h_active p hp1 hp2
+      rw [testBit_getLaneNat_narrowSWAR st po p (degBitIdx_lt_6 _)] at h_m_narrow
+      simpa using (Bool.and_eq_true _ _).mp h_m_narrow |>.2
+    have h_and_bit : (getLaneNat st p &&& (getLaneNat po.keep p &&& 31)).testBit (degBitIdx (cartDeg p)) = true := by
+      rw [Nat.testBit_and, Nat.testBit_and, h_match p hp1 hp2, h_keep_bit, testBit_31_degBitIdx]; rfl
+    exact testBit_add_31_five_of_testBit_lt_5 h_m_le (degBitIdx_lt_5 _) h_and_bit
+
+/-!
+### Stage J.2: Inductive Soundness of `filterNegAPS`, `filterRemAPS`, `checkBoundRec`, and `verifyHubcapMembersRec`
+-/
+
+/-- Signed value (`+1` or `-1`) of a `FastPosOut` outlet. -/
+def outletVal (po : FastPosOut) : Int :=
+  if po.isPos then 1 else -1
+
+/-- Sum of `outletVal po` over all outlets in `l` that are active on `cartDeg` at hub degree `deg`. -/
+def activeOutletSum (deg : Nat) (cartDeg : Nat → Nat) : List FastPosOut → Int
+  | [] => 0
+  | po :: rest =>
+    (if OutletActive deg cartDeg po then outletVal po else 0) + activeOutletSum deg cartDeg rest
+
+/-- Number of positive outlets (`po.isPos = true`) in `l`. -/
+def countPos : List FastPosOut → Nat
+  | [] => 0
+  | po :: rest => (if po.isPos then 1 else 0) + countPos rest
+
+theorem activeOutletSum_append (deg : Nat) (cartDeg : Nat → Nat) (l1 l2 : List FastPosOut) :
+    activeOutletSum deg cartDeg (l1 ++ l2) =
+      activeOutletSum deg cartDeg l1 + activeOutletSum deg cartDeg l2 := by
+  induction l1 with
+  | nil => simp [activeOutletSum]
+  | cons po rest ih =>
+    simp only [List.cons_append, activeOutletSum, ih]
+    omega
+
+theorem countPos_append (l1 l2 : List FastPosOut) :
+    countPos (l1 ++ l2) = countPos l1 + countPos l2 := by
+  induction l1 with
+  | nil => simp [countPos]
+  | cons po rest ih =>
+    simp only [List.cons_append, countPos, ih]
+    omega
+
+theorem appendFastPosOut_eq_append (l1 l2 : List FastPosOut) :
+    appendFastPosOut l1 l2 = l1 ++ l2 := by
+  induction l1 with
+  | nil => rfl
+  | cons x rest ih =>
+    change x :: appendFastPosOut rest l2 = x :: (rest ++ l2)
+    rw [ih]
+
+theorem revFastPosOut_loop_eq (l acc : List FastPosOut) :
+    List.rec (motive := fun _ => List FastPosOut → List FastPosOut)
+      (fun a => a) (fun x _ ih a => ih (x :: a)) l acc = l.reverse ++ acc := by
+  induction l generalizing acc with
+  | nil => rfl
+  | cons x rest ih =>
+    change List.rec (motive := fun _ => List FastPosOut → List FastPosOut)
+      (fun a => a) (fun x _ ih a => ih (x :: a)) rest (x :: acc) = (x :: rest).reverse ++ acc
+    rw [ih (x :: acc), List.reverse_cons, List.append_assoc]
+    rfl
+
+theorem revFastPosOut_eq_reverse (l : List FastPosOut) :
+    revFastPosOut l = l.reverse := by
+  dsimp [revFastPosOut]
+  rw [revFastPosOut_loop_eq l [], List.append_nil]
+
+theorem activeOutletSum_reverse (deg : Nat) (cartDeg : Nat → Nat) (l : List FastPosOut) :
+    activeOutletSum deg cartDeg l.reverse = activeOutletSum deg cartDeg l := by
+  induction l with
+  | nil => rfl
+  | cons po rest ih =>
+    rw [List.reverse_cons, activeOutletSum_append, ih]
+    simp only [activeOutletSum]
+    omega
+
+theorem countPos_reverse (l : List FastPosOut) :
+    countPos l.reverse = countPos l := by
+  induction l with
+  | nil => rfl
+  | cons po rest ih =>
+    rw [List.reverse_cons, countPos_append, ih]
+    simp only [countPos]
+    omega
+
+theorem activeOutletSum_le_countPos (deg : Nat) (cartDeg : Nat → Nat) (l : List FastPosOut) :
+    activeOutletSum deg cartDeg l ≤ (countPos l : Int) := by
+  induction l with
+  | nil => simp [activeOutletSum, countPos]
+  | cons po rest ih =>
+    simp only [activeOutletSum, countPos, outletVal]
+    cases po.isPos <;> cases OutletActive deg cartDeg po <;> simp <;> omega
+
+theorem activeOutletSum_le_zero_of_all_neg (deg : Nat) (cartDeg : Nat → Nat) (l : List FastPosOut)
+    (h_neg : ∀ po ∈ l, po.isPos = false) :
+    activeOutletSum deg cartDeg l ≤ 0 := by
+  induction l with
+  | nil => simp [activeOutletSum]
+  | cons po rest ih =>
+    have h_po : po.isPos = false := h_neg po List.mem_cons_self
+    have h_rest : ∀ q ∈ rest, q.isPos = false := fun q hq => h_neg q (List.mem_cons_of_mem po hq)
+    have ih_le := ih h_rest
+    simp only [activeOutletSum, outletVal, h_po]
+    cases OutletActive deg cartDeg po <;> simp <;> omega
+
+noncomputable def filterNegStep (st : Nat) (l : List FastPosOut) (f0 : Nat) (acc0 : List FastPosOut) :
+    Nat × List FastPosOut :=
+  List.rec
+    (motive := fun _ => Nat → List FastPosOut → Nat × List FastPosOut)
+    (fun f acc => strictNat f fun f' => (f', acc))
+    (fun po _ ih f acc =>
+      Bool.rec
+        (Bool.rec
+          (ih f acc)
+          (ih f (po :: acc))
+          (outletPermittedSWAR st po))
+        (ih (Bool.rec (Nat.sub f 1) (Nat.add f 1) po.isPos) acc)
+        (outletForcedSWAR st po))
+    l f0 acc0
+
+theorem filterNegAPS_eq_step (st : Nat) (negBefore : List FastPosOut) (f0 : Nat) :
+    filterNegAPS st negBefore f0 = filterNegStep st negBefore f0 [] := rfl
+
+theorem filterNegStep_nil (st : Nat) (f : Nat) (acc : List FastPosOut) :
+    filterNegStep st [] f acc = (f, acc) := by
+  change strictNat f (fun f' => (f', acc)) = (f, acc)
+  rw [strictNat_eq]
+
+theorem filterNegStep_cons (st : Nat) (po : FastPosOut) (rest : List FastPosOut) (f : Nat) (acc : List FastPosOut) :
+    filterNegStep st (po :: rest) f acc =
+      @Bool.rec (fun _ => Nat × List FastPosOut)
+        (@Bool.rec (fun _ => Nat × List FastPosOut)
+          (filterNegStep st rest f acc)
+          (filterNegStep st rest f (po :: acc))
+          (outletPermittedSWAR st po))
+        (filterNegStep st rest (@Bool.rec (fun _ => Nat) (Nat.sub f 1) (Nat.add f 1) po.isPos) acc)
+        (outletForcedSWAR st po) := rfl
+
+theorem filterNegStep_sound (deg : Nat) (cartDeg : Nat → Nat) (st : Nat)
+    (h_deg : deg ≤ 11) (h_match : MatchesCartState deg cartDeg st)
+    (l : List FastPosOut) :
+    ∀ (f : Nat) (acc : List FastPosOut),
+      (∀ po ∈ l, validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ acc, validFastPosOut deg po = true ∧ po.isPos = false) →
+      let res := filterNegStep st l f acc
+      (∀ po ∈ res.2, validFastPosOut deg po = true ∧ po.isPos = false) ∧
+      (f : Int) + activeOutletSum deg cartDeg acc + activeOutletSum deg cartDeg l ≤
+        (res.1 : Int) + activeOutletSum deg cartDeg res.2 := by
+  induction l with
+  | nil =>
+    intro f acc _ h_acc
+    dsimp only
+    rw [filterNegStep_nil]
+    simp only [activeOutletSum]
+    exact ⟨h_acc, by omega⟩
+  | cons po rest ih =>
+    intro f acc h_l h_acc
+    have h_po := h_l po List.mem_cons_self
+    have h_rest : ∀ q ∈ rest, validFastPosOut deg q = true ∧ q.isPos = false :=
+      fun q hq => h_l q (List.mem_cons_of_mem po hq)
+    dsimp only
+    rw [filterNegStep_cons]
+    cases h_forced : outletForcedSWAR st po with
+    | true =>
+      dsimp only
+      have h_act := outletActive_of_outletForcedSWAR deg cartDeg st po h_match h_forced
+      rw [h_po.2]
+      dsimp only
+      have h_ih := ih (Nat.sub f 1) acc h_rest h_acc
+      refine ⟨h_ih.1, ?_⟩
+      have h_ih2 := h_ih.2
+      have h_f_sub : (f : Int) - 1 ≤ (Nat.sub f 1 : Int) := by simp [Nat.sub_eq]; omega
+      have h_sum_cons : activeOutletSum deg cartDeg (po :: rest) = -1 + activeOutletSum deg cartDeg rest := by
+        simp [activeOutletSum, outletVal, h_act, h_po.2]
+      omega
+    | false =>
+      dsimp only
+      cases h_perm : outletPermittedSWAR st po with
+      | true =>
+        dsimp only
+        have h_acc' : ∀ q ∈ po :: acc, validFastPosOut deg q = true ∧ q.isPos = false := by
+          intro q hq
+          rcases List.mem_cons.mp hq with rfl | hq_mem
+          · exact h_po
+          · exact h_acc q hq_mem
+        have h_ih := ih f (po :: acc) h_rest h_acc'
+        refine ⟨h_ih.1, ?_⟩
+        simp only [activeOutletSum] at h_ih ⊢
+        have := h_ih.2
+        omega
+      | false =>
+        dsimp only
+        have h_inact : OutletActive deg cartDeg po = false := by
+          cases h_act : OutletActive deg cartDeg po with
+          | false => rfl
+          | true =>
+            have := outletPermittedSWAR_of_outletActive deg cartDeg st po h_deg h_po.1 h_match h_act
+            rw [this] at h_perm; contradiction
+        have h_ih := ih f acc h_rest h_acc
+        refine ⟨h_ih.1, ?_⟩
+        simp only [activeOutletSum, h_inact, Bool.false_eq_true, ↓reduceIte]
+        have := h_ih.2
+        omega
+
+theorem filterNegAPS_sound (deg : Nat) (cartDeg : Nat → Nat) (st : Nat)
+    (h_deg : deg ≤ 11) (h_match : MatchesCartState deg cartDeg st)
+    (negBefore : List FastPosOut) (f0 : Nat)
+    (h_neg : ∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) :
+    let res := filterNegAPS st negBefore f0
+    (∀ po ∈ res.2, validFastPosOut deg po = true ∧ po.isPos = false) ∧
+    (f0 : Int) + activeOutletSum deg cartDeg negBefore ≤
+      (res.1 : Int) + activeOutletSum deg cartDeg res.2 := by
+  rw [filterNegAPS_eq_step]
+  have h := filterNegStep_sound deg cartDeg st h_deg h_match negBefore f0 [] h_neg (by intro _ h; contradiction)
+  simpa [activeOutletSum] using h
+
+noncomputable def filterRemStep (st : Nat) (l : List FastPosOut) (f0 a0 : Nat) (acc0 : List FastPosOut) :
+    Nat × Nat × List FastPosOut :=
+  List.rec
+    (motive := fun _ => Nat → Nat → List FastPosOut → Nat × Nat × List FastPosOut)
+    (fun f a acc =>
+      strictNat f fun f' =>
+      strictNat a fun a' =>
+      (f', a', revFastPosOut acc))
+    (fun po _ ih f a acc =>
+      Bool.rec
+        (Bool.rec
+          (ih f a acc)
+          (Bool.rec
+            (ih f a (po :: acc))
+            (ih f (Nat.add a 1) (po :: acc))
+            po.isPos)
+          (outletPermittedSWAR st po))
+        (ih (Bool.rec (Nat.sub f 1) (Nat.add f 1) po.isPos) a acc)
+        (outletForcedSWAR st po))
+    l f0 a0 acc0
+
+theorem filterRemAPS_eq_step (st : Nat) (rem : List FastPosOut) (f0 : Nat) :
+    filterRemAPS st rem f0 = filterRemStep st rem f0 0 [] := rfl
+
+theorem filterRemStep_nil (st : Nat) (f a : Nat) (acc : List FastPosOut) :
+    filterRemStep st [] f a acc = (f, a, revFastPosOut acc) := by
+  change (strictNat f fun f' => strictNat a fun a' => (f', a', revFastPosOut acc)) = (f, a, revFastPosOut acc)
+  simp only [strictNat_eq]
+
+theorem filterRemStep_cons (st : Nat) (po : FastPosOut) (rest : List FastPosOut) (f a : Nat) (acc : List FastPosOut) :
+    filterRemStep st (po :: rest) f a acc =
+      @Bool.rec (fun _ => Nat × Nat × List FastPosOut)
+        (@Bool.rec (fun _ => Nat × Nat × List FastPosOut)
+          (filterRemStep st rest f a acc)
+          (@Bool.rec (fun _ => Nat × Nat × List FastPosOut)
+            (filterRemStep st rest f a (po :: acc))
+            (filterRemStep st rest f (Nat.add a 1) (po :: acc))
+            po.isPos)
+          (outletPermittedSWAR st po))
+        (filterRemStep st rest (@Bool.rec (fun _ => Nat) (Nat.sub f 1) (Nat.add f 1) po.isPos) a acc)
+        (outletForcedSWAR st po) := rfl
+
+theorem filterRemStep_sound (deg : Nat) (cartDeg : Nat → Nat) (st : Nat)
+    (h_deg : deg ≤ 11) (h_match : MatchesCartState deg cartDeg st)
+    (l : List FastPosOut) :
+    ∀ (f a : Nat) (acc : List FastPosOut),
+      a = countPos acc →
+      (∀ po ∈ l, validFastPosOut deg po = true) →
+      (∀ po ∈ acc, validFastPosOut deg po = true) →
+      let res := filterRemStep st l f a acc
+      (∀ po ∈ res.2.2, validFastPosOut deg po = true) ∧
+      res.2.1 = countPos res.2.2 ∧
+      (f : Int) + activeOutletSum deg cartDeg acc + activeOutletSum deg cartDeg l ≤
+        (res.1 : Int) + activeOutletSum deg cartDeg res.2.2 := by
+  induction l with
+  | nil =>
+    intro f a acc ha _ h_acc
+    dsimp only
+    rw [filterRemStep_nil, revFastPosOut_eq_reverse, countPos_reverse, activeOutletSum_reverse]
+    refine ⟨?_, ha, by simp [activeOutletSum]⟩
+    intro po hpo
+    exact h_acc po (List.mem_reverse.mp hpo)
+  | cons po rest ih =>
+    intro f a acc ha h_l h_acc
+    have h_po := h_l po List.mem_cons_self
+    have h_rest : ∀ q ∈ rest, validFastPosOut deg q = true :=
+      fun q hq => h_l q (List.mem_cons_of_mem po hq)
+    dsimp only
+    rw [filterRemStep_cons]
+    cases h_forced : outletForcedSWAR st po with
+    | true =>
+      dsimp only
+      have h_act := outletActive_of_outletForcedSWAR deg cartDeg st po h_match h_forced
+      cases h_pos : po.isPos with
+      | true =>
+        dsimp only
+        have h_ih := ih (Nat.add f 1) a acc ha h_rest h_acc
+        refine ⟨h_ih.1, h_ih.2.1, ?_⟩
+        have h_ih2 := h_ih.2.2
+        simp only [Nat.add_eq, activeOutletSum, outletVal, h_act, h_pos, ↓reduceIte] at h_ih2 ⊢
+        omega
+      | false =>
+        dsimp only
+        have h_ih := ih (Nat.sub f 1) a acc ha h_rest h_acc
+        refine ⟨h_ih.1, h_ih.2.1, ?_⟩
+        have h_ih2 := h_ih.2.2
+        simp only [Nat.sub_eq, activeOutletSum, outletVal, h_act, h_pos, Bool.false_eq_true, ↓reduceIte] at h_ih2 ⊢
+        omega
+    | false =>
+      dsimp only
+      cases h_perm : outletPermittedSWAR st po with
+      | true =>
+        dsimp only
+        have h_acc' : ∀ q ∈ po :: acc, validFastPosOut deg q = true := by
+          intro q hq
+          rcases List.mem_cons.mp hq with rfl | hq_mem
+          · exact h_po
+          · exact h_acc q hq_mem
+        cases h_pos : po.isPos with
+        | true =>
+          dsimp only
+          have ha' : Nat.add a 1 = countPos (po :: acc) := by
+            simp [countPos, h_pos, ha]; omega
+          have h_ih := ih f (Nat.add a 1) (po :: acc) ha' h_rest h_acc'
+          refine ⟨h_ih.1, h_ih.2.1, ?_⟩
+          have h_ih2 := h_ih.2.2
+          simp only [activeOutletSum] at h_ih2 ⊢
+          omega
+        | false =>
+          dsimp only
+          have ha' : a = countPos (po :: acc) := by
+            simp [countPos, h_pos, ha]
+          have h_ih := ih f a (po :: acc) ha' h_rest h_acc'
+          refine ⟨h_ih.1, h_ih.2.1, ?_⟩
+          have h_ih2 := h_ih.2.2
+          simp only [activeOutletSum] at h_ih2 ⊢
+          omega
+      | false =>
+        dsimp only
+        have h_inact : OutletActive deg cartDeg po = false := by
+          cases h_act : OutletActive deg cartDeg po with
+          | false => rfl
+          | true =>
+            have := outletPermittedSWAR_of_outletActive deg cartDeg st po h_deg h_po h_match h_act
+            rw [this] at h_perm; contradiction
+        have h_ih := ih f a acc ha h_rest h_acc
+        refine ⟨h_ih.1, h_ih.2.1, ?_⟩
+        have h_ih2 := h_ih.2.2
+        simp only [activeOutletSum, h_inact, Bool.false_eq_true, ↓reduceIte] at h_ih2 ⊢
+        omega
+
+theorem filterRemAPS_sound (deg : Nat) (cartDeg : Nat → Nat) (st : Nat)
+    (h_deg : deg ≤ 11) (h_match : MatchesCartState deg cartDeg st)
+    (rem : List FastPosOut) (f0 : Nat)
+    (h_rem : ∀ po ∈ rem, validFastPosOut deg po = true) :
+    let res := filterRemAPS st rem f0
+    (∀ po ∈ res.2.2, validFastPosOut deg po = true) ∧
+    res.2.1 = countPos res.2.2 ∧
+    (f0 : Int) + activeOutletSum deg cartDeg rem ≤
+      (res.1 : Int) + activeOutletSum deg cartDeg res.2.2 := by
+  rw [filterRemAPS_eq_step]
+  have h := filterRemStep_sound deg cartDeg st h_deg h_match rem f0 0 [] rfl h_rem (by intro _ h; contradiction)
+  simpa [activeOutletSum] using h
+
+theorem noExcludedForcedRec_nil (st : Nat) : noExcludedForcedRec st [] = true := rfl
+
+theorem noExcludedForcedRec_cons (st : Nat) (ex : FastPosOut) (rest : List FastPosOut) :
+    noExcludedForcedRec st (ex :: rest) =
+      @Bool.rec (fun _ => Bool) (noExcludedForcedRec st rest) false (outletForcedSWAR st ex) := rfl
+
+theorem noExcludedForcedRec_eq_true (deg : Nat) (cartDeg : Nat → Nat) (st : Nat)
+    (h_match : MatchesCartState deg cartDeg st)
+    (excluded : List FastPosOut)
+    (h_excl : ∀ ex ∈ excluded, OutletActive deg cartDeg ex = false) :
+    noExcludedForcedRec st excluded = true := by
+  induction excluded with
+  | nil => rfl
+  | cons ex rest ih =>
+    rw [noExcludedForcedRec_cons]
+    cases h_forced : outletForcedSWAR st ex with
+    | true =>
+      have h_act := outletActive_of_outletForcedSWAR deg cartDeg st ex h_match h_forced
+      have h_inact := h_excl ex List.mem_cons_self
+      rw [h_act] at h_inact; contradiction
+    | false =>
+      dsimp only
+      exact ih (fun q hq => h_excl q (List.mem_cons_of_mem ex hq))
+
+theorem checkBoundLoopRec_nil
+    (cb : Nat → Nat → List FastPosOut → List FastPosOut → List FastPosOut → Nat → HintStream → Bool × HintStream)
+    (st forcedch maxch : Nat) (allowed0 : Nat) (neg0 excl0 : List FastPosOut) (hs0 : HintStream) :
+    checkBoundLoopRec cb st forcedch maxch [] allowed0 neg0 excl0 hs0 = (false, hs0) := rfl
+
+theorem checkBoundLoopRec_cons_eq
+    (cb : Nat → Nat → List FastPosOut → List FastPosOut → List FastPosOut → Nat → HintStream → Bool × HintStream)
+    (st forcedch maxch : Nat) (po : FastPosOut) (subRem : List FastPosOut)
+    (allowedch : Nat) (negBefore curExcluded : List FastPosOut) (hs : HintStream) :
+    checkBoundLoopRec cb st forcedch maxch (po :: subRem) allowedch negBefore curExcluded hs =
+      @Bool.rec (fun _ => Bool × HintStream)
+        (checkBoundLoopRec cb st forcedch maxch subRem allowedch (po :: negBefore) curExcluded hs)
+        (strictNat (narrowSWAR st po) fun st_next =>
+         strictNat (Nat.add forcedch 1) fun forced_next =>
+         let (okSub, hs') :=
+           @Bool.rec (fun _ => Bool × HintStream)
+             (true, hs)
+             (cb st_next forced_next negBefore subRem curExcluded maxch hs)
+             (noExcludedForcedRec st_next curExcluded)
+         @Bool.rec (fun _ => Bool × HintStream)
+           (false, hs')
+           (strictNat (Nat.sub allowedch 1) fun allowedch' =>
+            @Bool.rec (fun _ => Bool × HintStream)
+              (checkBoundLoopRec cb st forcedch maxch subRem allowedch' negBefore (po :: curExcluded) hs')
+              (true, hs')
+              (Nat.ble (Nat.add allowedch' forcedch) maxch))
+           okSub)
+        po.isPos := rfl
+
+theorem checkBoundLoopRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11)
+    (cb : Nat → Nat → List FastPosOut → List FastPosOut → List FastPosOut → Nat → HintStream → Bool × HintStream)
+    (h_cb : ∀ (st' forcedIn' : Nat) (negBefore' rem' excluded' : List FastPosOut) (maxch' : Nat) (hs' : HintStream),
+      MatchesCartState deg cartDeg st' →
+      (∀ po ∈ negBefore', validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem', validFastPosOut deg po = true) →
+      (∀ ex ∈ excluded', OutletActive deg cartDeg ex = false) →
+      (cb st' forcedIn' negBefore' rem' excluded' maxch' hs').1 = true →
+      (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+      (forcedIn' : Int) + activeOutletSum deg cartDeg negBefore' + activeOutletSum deg cartDeg rem' ≤ (maxch' : Int))
+    (st forcedch maxch : Nat) (h_match : MatchesCartState deg cartDeg st)
+    (rem : List FastPosOut) :
+    ∀ (allowedch : Nat) (negBefore curExcluded : List FastPosOut) (hs : HintStream),
+      allowedch = countPos rem →
+      (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem, validFastPosOut deg po = true) →
+      (∀ ex ∈ curExcluded, OutletActive deg cartDeg ex = false) →
+      (checkBoundLoopRec cb st forcedch maxch rem allowedch negBefore curExcluded hs).1 = true →
+      (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+      (forcedch : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
+  induction rem with
+  | nil =>
+    intro allowedch negBefore curExcluded hs _ _ _ _ h_ok
+    rw [checkBoundLoopRec_nil] at h_ok
+    contradiction
+  | cons po subRem ih =>
+    intro allowedch negBefore curExcluded hs h_all h_neg h_rem h_excl h_ok
+    have h_po := h_rem po List.mem_cons_self
+    have h_sub : ∀ q ∈ subRem, validFastPosOut deg q = true :=
+      fun q hq => h_rem q (List.mem_cons_of_mem po hq)
+    rw [checkBoundLoopRec_cons_eq] at h_ok
+    simp only [strictNat_eq] at h_ok
+    cases h_pos : po.isPos with
+    | false =>
+      rw [h_pos] at h_ok
+      dsimp only at h_ok
+      have h_all' : allowedch = countPos subRem := by
+        simpa [countPos, h_pos] using h_all
+      have h_neg' : ∀ q ∈ po :: negBefore, validFastPosOut deg q = true ∧ q.isPos = false := by
+        intro q hq
+        rcases List.mem_cons.mp hq with rfl | hq_mem
+        · exact ⟨h_po, h_pos⟩
+        · exact h_neg q hq_mem
+      rcases ih allowedch (po :: negBefore) curExcluded hs h_all' h_neg' h_sub h_excl h_ok with h_red | h_bound
+      · exact Or.inl h_red
+      · right
+        simp only [activeOutletSum] at h_bound ⊢
+        omega
+    | true =>
+      rw [h_pos] at h_ok
+      dsimp only at h_ok
+      cases h_act : OutletActive deg cartDeg po with
+      | true =>
+        have h_match_next := matchesCartState_narrowSWAR_of_outletActive deg cartDeg st po h_deg h_po h_match h_act
+        have h_no_excl := noExcludedForcedRec_eq_true deg cartDeg (narrowSWAR st po) h_match_next curExcluded h_excl
+        rw [h_no_excl] at h_ok
+        dsimp only at h_ok
+        cases h_cb_ok : (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs).fst with
+        | false =>
+          rw [h_cb_ok] at h_ok; dsimp only at h_ok; contradiction
+        | true =>
+          rcases h_cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs
+            h_match_next h_neg h_sub h_excl h_cb_ok with h_red | h_bound
+          · exact Or.inl h_red
+          · right
+            simp only [Nat.add_eq, activeOutletSum, outletVal, h_act, h_pos, ↓reduceIte] at h_bound ⊢
+            omega
+      | false =>
+        let resSub :=
+          @Bool.rec (fun _ => Bool × HintStream)
+            (true, hs)
+            (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs)
+            (noExcludedForcedRec (narrowSWAR st po) curExcluded)
+        change (@Bool.rec (fun _ => Bool × HintStream)
+          (false, resSub.2)
+          (@Bool.rec (fun _ => Bool × HintStream)
+            (checkBoundLoopRec cb st forcedch maxch subRem (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2)
+            (true, resSub.2)
+            (Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch))
+          resSub.1).1 = true at h_ok
+        cases h_okSub : resSub.1 with
+        | false =>
+          rw [h_okSub] at h_ok; dsimp only at h_ok; contradiction
+        | true =>
+          rw [h_okSub] at h_ok; dsimp only at h_ok
+          have h_all' : Nat.sub allowedch 1 = countPos subRem := by
+            have : allowedch = 1 + countPos subRem := by simpa [countPos, h_pos] using h_all
+            simp only [Nat.sub_eq]
+            omega
+          cases h_ble : Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch with
+          | true =>
+            right
+            have h_le : (Nat.sub allowedch 1) + forcedch ≤ maxch := Nat.le_of_ble_eq_true h_ble
+            have h_neg_le : activeOutletSum deg cartDeg negBefore ≤ 0 :=
+              activeOutletSum_le_zero_of_all_neg deg cartDeg negBefore (fun q hq => (h_neg q hq).2)
+            have h_sub_le : activeOutletSum deg cartDeg subRem ≤ (countPos subRem : Int) :=
+              activeOutletSum_le_countPos deg cartDeg subRem
+            simp only [activeOutletSum, h_act, Bool.false_eq_true, ↓reduceIte]
+            omega
+          | false =>
+            rw [h_ble] at h_ok; dsimp only at h_ok
+            have h_excl' : ∀ ex ∈ po :: curExcluded, OutletActive deg cartDeg ex = false := by
+              intro ex hex
+              rcases List.mem_cons.mp hex with rfl | hex_mem
+              · exact h_act
+              · exact h_excl ex hex_mem
+            rcases ih (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2 h_all' h_neg h_sub h_excl' h_ok with h_red | h_bound
+            · exact Or.inl h_red
+            · right
+              simp only [activeOutletSum, h_act, Bool.false_eq_true, ↓reduceIte]
+              omega
+
+theorem checkBoundRec_zero (deg st forcedIn : Nat) (negBefore rem excluded : List FastPosOut)
+    (maxch : Nat) (hs : HintStream) :
+    checkBoundRec deg 0 st forcedIn negBefore rem excluded maxch hs = (false, hs) := rfl
+
+theorem checkBoundRec_succ_eq (deg fuel st forcedIn : Nat) (negBefore rem excluded : List FastPosOut)
+    (maxch : Nat) (hs : HintStream) :
+    checkBoundRec deg (fuel + 1) st forcedIn negBefore rem excluded maxch hs =
+      (let (forced1, nextNegBefore) := filterNegAPS st negBefore forcedIn
+       let (forcedch, allowedch, nextRem) := filterRemAPS st rem forced1
+       @Bool.rec (fun _ => Bool × HintStream)
+         (@Bool.rec (fun _ => Bool × HintStream)
+           (checkBoundLoopRec (checkBoundRec deg fuel) st forcedch maxch nextRem allowedch nextNegBefore excluded hs)
+           (reduceAxleRec deg 64 [st] hs)
+           (Nat.ble (Nat.add maxch 1) forcedch))
+         (true, hs)
+         (Nat.ble (Nat.add forcedch allowedch) maxch)) := rfl
+
+/-- Fundamental Inductive Soundness of `checkBoundRec`:
+    whenever `(checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).1 = true`
+    on a state `st` matching `cartDeg` (with `deg ≤ 11`), either `reduceAxleRec` succeeds on a
+    refinement `st_red` matching `cartDeg`, or the active outlet sum plus `forcedIn` is at most `maxch`. -/
+theorem checkBoundRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11) (fuel : Nat) :
+    ∀ (st forcedIn : Nat) (negBefore rem excluded : List FastPosOut) (maxch : Nat) (hs : HintStream),
+      MatchesCartState deg cartDeg st →
+      (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem, validFastPosOut deg po = true) →
+      (∀ ex ∈ excluded, OutletActive deg cartDeg ex = false) →
+      (checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).1 = true →
+      (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+      (forcedIn : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
+  induction fuel with
+  | zero =>
+    intro st forcedIn negBefore rem excluded maxch hs _ _ _ _ h_ok
+    rw [checkBoundRec_zero] at h_ok
+    contradiction
+  | succ fuel ih =>
+    intro st forcedIn negBefore rem excluded maxch hs h_match h_neg h_rem h_excl h_ok
+    rw [checkBoundRec_succ_eq] at h_ok
+    have h_fneg := filterNegAPS_sound deg cartDeg st h_deg h_match negBefore forcedIn h_neg
+    let forced1 := (filterNegAPS st negBefore forcedIn).1
+    let nextNegBefore := (filterNegAPS st negBefore forcedIn).2
+    have h_frem := filterRemAPS_sound deg cartDeg st h_deg h_match rem forced1 h_rem
+    let forcedch := (filterRemAPS st rem forced1).1
+    let allowedch := (filterRemAPS st rem forced1).2.1
+    let nextRem := (filterRemAPS st rem forced1).2.2
+    change (@Bool.rec (fun _ => Bool × HintStream)
+      (@Bool.rec (fun _ => Bool × HintStream)
+        (checkBoundLoopRec (checkBoundRec deg fuel) st forcedch maxch nextRem allowedch nextNegBefore excluded hs)
+        (reduceAxleRec deg 64 [st] hs)
+        (Nat.ble (Nat.add maxch 1) forcedch))
+      (true, hs)
+      (Nat.ble (Nat.add forcedch allowedch) maxch)).1 = true at h_ok
+    cases h_ble1 : Nat.ble (Nat.add forcedch allowedch) maxch with
+    | true =>
+      right
+      have h_le : forcedch + allowedch ≤ maxch := Nat.le_of_ble_eq_true h_ble1
+      have h_neg_le : activeOutletSum deg cartDeg nextNegBefore ≤ 0 :=
+        activeOutletSum_le_zero_of_all_neg deg cartDeg nextNegBefore (fun q hq => (h_fneg.1 q hq).2)
+      have h_rem_le : activeOutletSum deg cartDeg nextRem ≤ (countPos nextRem : Int) :=
+        activeOutletSum_le_countPos deg cartDeg nextRem
+      have h_all_eq : allowedch = countPos nextRem := h_frem.2.1
+      have h1 : (forcedIn : Int) + activeOutletSum deg cartDeg negBefore ≤
+          (forced1 : Int) + activeOutletSum deg cartDeg nextNegBefore := h_fneg.2
+      have h2 : (forced1 : Int) + activeOutletSum deg cartDeg rem ≤
+          (forcedch : Int) + activeOutletSum deg cartDeg nextRem := h_frem.2.2
+      omega
+    | false =>
+      rw [h_ble1] at h_ok; dsimp only at h_ok
+      cases h_ble2 : Nat.ble (Nat.add maxch 1) forcedch with
+      | true =>
+        rw [h_ble2] at h_ok; dsimp only at h_ok
+        exact Or.inl ⟨st, hs, h_match, h_ok⟩
+      | false =>
+        rw [h_ble2] at h_ok; dsimp only at h_ok
+        rcases checkBoundLoopRec_sound deg cartDeg h_deg (checkBoundRec deg fuel) ih
+          st forcedch maxch h_match nextRem allowedch nextNegBefore excluded hs
+          h_frem.2.1 h_fneg.1 h_frem.1 h_excl h_ok with h_red | h_bound
+        · exact Or.inl h_red
+        · right
+          have h1 : (forcedIn : Int) + activeOutletSum deg cartDeg negBefore ≤
+              (forced1 : Int) + activeOutletSum deg cartDeg nextNegBefore := h_fneg.2
+          have h2 : (forced1 : Int) + activeOutletSum deg cartDeg rem ≤
+              (forcedch : Int) + activeOutletSum deg cartDeg nextRem := h_frem.2.2
+          omega
+
+theorem lookupListRec_mem_or_default {α : Type} (d : α) (l : List α) (idx : Nat) :
+    lookupListRec d l idx = d ∨ lookupListRec d l idx ∈ l := by
+  induction l generalizing idx with
+  | nil => exact Or.inl rfl
+  | cons x rest ih =>
+    cases idx with
+    | zero =>
+      change x = d ∨ x ∈ x :: rest
+      exact Or.inr List.mem_cons_self
+    | succ k =>
+      change lookupListRec d rest k = d ∨ lookupListRec d rest k ∈ x :: rest
+      rcases ih k with h_def | h_mem
+      · exact Or.inl h_def
+      · exact Or.inr (List.mem_cons_of_mem x h_mem)
+
+theorem validFastPosOut_lookupListRec (deg : Nat) (shiftedTable : List (List FastPosOut))
+    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true)
+    (idx : Nat) :
+    ∀ po ∈ lookupListRec [] shiftedTable idx, validFastPosOut deg po = true := by
+  rcases lookupListRec_mem_or_default [] shiftedTable idx with h_nil | h_mem
+  · rw [h_nil]; intro _ h; contradiction
+  · exact h_table _ h_mem
+
+theorem verifyHubcapMembersRec_cons (deg st : Nat) (shiftedTable : List (List FastPosOut))
+    (m : Nat × Nat × Int) (rest : List (Nat × Nat × Int)) (hs : HintStream) :
+    verifyHubcapMembersRec deg st shiftedTable (m :: rest) hs =
+      (let (x, y, v) := m
+       let outsX := lookupListRec [] shiftedTable x
+       let initRem :=
+         @Bool.rec (fun _ => List FastPosOut)
+           outsX
+           (appendFastPosOut outsX (lookupListRec [] shiftedTable y))
+           (!Nat.beq x y)
+       let maxchNat := (v + 500).toNat
+       strictNat maxchNat fun maxchStrict =>
+       let (ok, hs') := checkBoundRec deg 20 st 500 [] initRem [] maxchStrict hs
+       @Bool.rec (fun _ => Bool × HintStream) (false, hs') (verifyHubcapMembersRec deg st shiftedTable rest hs') ok) := rfl
+
+/-- Soundness of `verifyHubcapMembersRec`:
+    Whenever `(verifyHubcapMembersRec deg st shiftedTable members hs).1 = true` on a state `st`
+    matching `cartDeg` (with `deg ≤ 11`), then for EVERY hubcap member `(x, y, v) ∈ members`,
+    either `reduceAxleRec` succeeds on a refinement `st_red` matching `cartDeg`, or the active outlet
+    sum on `(x, y)` plus `500` is at most `(v + 500).toNat`. -/
+theorem verifyHubcapMembersRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11)
+    (st : Nat) (h_match : MatchesCartState deg cartDeg st)
+    (shiftedTable : List (List FastPosOut))
+    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true)
+    (members : List (Nat × Nat × Int)) :
+    ∀ (hs : HintStream),
+      (verifyHubcapMembersRec deg st shiftedTable members hs).1 = true →
+      ∀ m ∈ members,
+        (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
+        500 + activeOutletSum deg cartDeg
+          (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+           else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤
+          ((m.2.2 + 500).toNat : Int) := by
+  induction members with
+  | nil =>
+    intro _ _ _ hm; contradiction
+  | cons m rest ih =>
+    intro hs h_ok m' hm'
+    rw [verifyHubcapMembersRec_cons] at h_ok
+    rcases m with ⟨x, y, v⟩
+    dsimp only at h_ok
+    simp only [strictNat_eq] at h_ok
+    let outsX := lookupListRec [] shiftedTable x
+    let outsY := lookupListRec [] shiftedTable y
+    let initRem :=
+      @Bool.rec (fun _ => List FastPosOut)
+        outsX
+        (appendFastPosOut outsX outsY)
+        (!Nat.beq x y)
+    let resCB := checkBoundRec deg 20 st 500 [] initRem [] (v + 500).toNat hs
+    change (@Bool.rec (fun _ => Bool × HintStream) (false, resCB.2)
+      (verifyHubcapMembersRec deg st shiftedTable rest resCB.2) resCB.1).1 = true at h_ok
+    cases h_cb : resCB.1 with
+    | false =>
+      rw [h_cb] at h_ok; dsimp only at h_ok; contradiction
+    | true =>
+      rw [h_cb] at h_ok; dsimp only at h_ok
+      rcases List.mem_cons.mp hm' with rfl | hm_rest
+      · dsimp only
+        have h_init_valid : ∀ po ∈ initRem, validFastPosOut deg po = true := by
+          dsimp [initRem]
+          cases (!Nat.beq x y) with
+          | false =>
+            exact validFastPosOut_lookupListRec deg shiftedTable h_table x
+          | true =>
+            dsimp only
+            rw [appendFastPosOut_eq_append]
+            intro po hpo
+            rcases List.mem_append.mp hpo with hX | hY
+            · exact validFastPosOut_lookupListRec deg shiftedTable h_table x po hX
+            · exact validFastPosOut_lookupListRec deg shiftedTable h_table y po hY
+        rcases checkBoundRec_sound deg cartDeg h_deg 20 st 500 [] initRem [] (v + 500).toNat hs
+          h_match (by intro _ h; contradiction) h_init_valid (by intro _ h; contradiction) h_cb with h_red | h_bound
+        · exact Or.inl h_red
+        · right
+          have h_init_eq : initRem = (if Nat.beq x y then outsX else outsX ++ outsY) := by
+            dsimp [initRem]
+            cases Nat.beq x y with
+            | true => rfl
+            | false => exact appendFastPosOut_eq_append outsX outsY
+          rw [← h_init_eq]
+          simpa [activeOutletSum] using h_bound
+      · exact ih resCB.2 h_ok m' hm_rest
+
+theorem validFastPosOut_getShiftedTableForDeg_7 :
+    (getShiftedTableForDeg 7).all (fun row => row.all (validFastPosOut 7)) = true := by decide
+
+theorem validFastPosOut_getShiftedTableForDeg_8 :
+    (getShiftedTableForDeg 8).all (fun row => row.all (validFastPosOut 8)) = true := by decide
+
+theorem validFastPosOut_getShiftedTableForDeg_9 :
+    (getShiftedTableForDeg 9).all (fun row => row.all (validFastPosOut 9)) = true := by decide
+
+theorem validFastPosOut_getShiftedTableForDeg_10 :
+    (getShiftedTableForDeg 10).all (fun row => row.all (validFastPosOut 10)) = true := by decide
+
+theorem validFastPosOut_getShiftedTableForDeg_11 :
+    (getShiftedTableForDeg 11).all (fun row => row.all (validFastPosOut 11)) = true := by decide
+
+theorem validFastPosOut_getShiftedTableForDeg (deg : Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    ∀ row ∈ getShiftedTableForDeg deg, ∀ po ∈ row, validFastPosOut deg po = true := by
+  intro row hrow po hpo
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_7 row hrow) po hpo
+  · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_8 row hrow) po hpo
+  · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_9 row hrow) po hpo
+  · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_10 row hrow) po hpo
+  · exact List.all_eq_true.mp (List.all_eq_true.mp validFastPosOut_getShiftedTableForDeg_11 row hrow) po hpo
+
 end Discharging
 end Math
