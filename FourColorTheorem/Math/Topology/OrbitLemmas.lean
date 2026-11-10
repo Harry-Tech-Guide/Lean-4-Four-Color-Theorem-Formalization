@@ -1340,6 +1340,181 @@ theorem getOrbit_length_eq_of_complete_mem (p : Perm D)
   have hc_u := orbitClosesWithin_mono p u u (orbitClosesWithin_of_complete p darts h_all u) h_le
   exact getOrbit_length_eq_of_mem p fuel hc_u h_mem
 
+/-!
+### Stage D.1: Inverse Permutation Orbits & Canonical Orbit Representative Partition
+-/
 
+/-- Unconditional `.contains` equality for `getOrbit p.symm` and `getOrbit p` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem getOrbit_symm_contains_eq_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d x : D) :
+    (getOrbit p.symm fuel d).contains x = (getOrbit p fuel d).contains x := by
+  have hc := orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le
+  exact getOrbit_symm_contains_eq p fuel d x hc
+
+/-- Unconditional orbit length equality for `getOrbit p.symm` and `getOrbit p` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem getOrbit_symm_length_eq_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d : D) :
+    (getOrbit p.symm fuel d).length = (getOrbit p fuel d).length := by
+  have hc := orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le
+  exact getOrbit_symm_length_eq p fuel d hc
+
+/-- Unconditional `countOrbits` equality for `p.symm` and `p` on a complete dart list (`darts.length ≤ fuel`). -/
+theorem countOrbits_symm_perm_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (l : List D) :
+    countOrbits p.symm fuel l = countOrbits p fuel l := by
+  apply countOrbits_symm_perm p fuel l
+  intro d _
+  exact orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le
+
+/-- Every representative in `canonicalOrbitsAux p fuel steps l` is an element of `l`. -/
+theorem mem_of_mem_canonicalOrbitsAux (p : Perm D) (fuel steps : Nat) (l : List D) {v : D}
+    (hv : v ∈ canonicalOrbitsAux p fuel steps l) : v ∈ l := by
+  induction steps generalizing l with
+  | zero => cases hv
+  | succ steps ih =>
+    cases l with
+    | nil => cases hv
+    | cons d ds =>
+      dsimp [canonicalOrbitsAux] at hv
+      rcases List.mem_cons.mp hv with rfl | h_tail
+      · exact List.Mem.head ds
+      · exact List.Mem.tail d (List.mem_filter.mp (ih _ h_tail)).1
+
+/-- Every representative in `canonicalOrbits p fuel l` is an element of `l`. -/
+theorem mem_of_mem_canonicalOrbits (p : Perm D) (fuel : Nat) (l : List D) {v : D}
+    (hv : v ∈ canonicalOrbits p fuel l) : v ∈ l :=
+  mem_of_mem_canonicalOrbitsAux p fuel l.length l hv
+
+/-- `canonicalOrbitsAux p fuel steps l` is always duplicate-free (`Nodup`). -/
+theorem canonicalOrbitsAux_nodup (p : Perm D) (fuel steps : Nat) (l : List D) :
+    (canonicalOrbitsAux p fuel steps l).Nodup := by
+  induction steps generalizing l with
+  | zero => exact List.Pairwise.nil
+  | succ steps ih =>
+    cases l with
+    | nil => exact List.Pairwise.nil
+    | cons d ds =>
+      dsimp [canonicalOrbitsAux]
+      refine List.nodup_cons.mpr ⟨?_, ih _⟩
+      intro h_in
+      have h_flt := mem_of_mem_canonicalOrbitsAux p fuel steps _ h_in
+      have h_not_orb := (List.mem_filter.mp h_flt).2
+      rw [getOrbit_contains_self p fuel d] at h_not_orb
+      contradiction
+
+/-- `canonicalOrbits p fuel l` is always duplicate-free (`Nodup`). -/
+theorem canonicalOrbits_nodup (p : Perm D) (fuel : Nat) (l : List D) :
+    (canonicalOrbits p fuel l).Nodup :=
+  canonicalOrbitsAux_nodup p fuel l.length l
+
+theorem filter_eq_nil_of_forall_false (P : D → Bool) (l : List D)
+    (h : ∀ x ∈ l, P x = false) : l.filter P = [] := by
+  induction l with
+  | nil => rfl
+  | cons x xs ih =>
+    dsimp [List.filter]
+    rw [h x (List.Mem.head xs)]
+    exact ih (fun y hy => h y (List.Mem.tail x hy))
+
+/-- On a complete dart list (`darts.length ≤ fuel`), for any `w ∈ l` with `l.length ≤ steps`,
+    filtering `canonicalOrbitsAux p fuel steps l` by `(getOrbit p fuel w).contains` yields a singleton `[v₀]`. -/
+theorem exists_singleton_filter_canonicalOrbitsAux (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (steps : Nat) (l : List D) (h_steps : l.length ≤ steps)
+    (w : D) (hw : w ∈ l) :
+    ∃ v₀ : D,
+      (canonicalOrbitsAux p fuel steps l).filter (fun v => (getOrbit p fuel w).contains v) = [v₀] := by
+  induction steps generalizing l with
+  | zero =>
+    cases l with
+    | nil => cases hw
+    | cons d ds =>
+      dsimp at h_steps
+      omega
+  | succ steps ih =>
+    cases l with
+    | nil => cases hw
+    | cons d ds =>
+      dsimp [canonicalOrbitsAux, List.filter]
+      cases hc : (getOrbit p fuel w).contains d with
+      | true =>
+        refine ⟨d, ?_⟩
+        dsimp
+        congr 1
+        apply filter_eq_nil_of_forall_false
+        intro v hv
+        have hv_flt := mem_of_mem_canonicalOrbitsAux p fuel steps _ hv
+        have hv_not_d := (List.mem_filter.mp hv_flt).2
+        cases h_wv : (getOrbit p fuel w).contains v with
+        | false => rfl
+        | true =>
+          have h_dw : (getOrbit p fuel d).contains w = true := by
+            rw [getOrbit_contains_symm_of_complete p darts h_all h_le d w]
+            exact hc
+          have h_dv : (getOrbit p fuel d).contains v = true :=
+            getOrbit_contains_trans_of_complete p darts h_all h_le h_dw h_wv
+          rw [h_dv] at hv_not_d
+          contradiction
+      | false =>
+        dsimp
+        have h_flt_len : (ds.filter (fun x => !((getOrbit p fuel d).contains x))).length ≤ steps := by
+          have h1 := filter_length_le (fun x => !((getOrbit p fuel d).contains x)) ds
+          dsimp at h_steps
+          omega
+        have hw_flt : w ∈ ds.filter (fun x => !((getOrbit p fuel d).contains x)) := by
+          rcases List.mem_cons.mp hw with rfl | hw_ds
+          · rw [getOrbit_contains_self p fuel w] at hc
+            contradiction
+          · apply List.mem_filter.mpr
+            refine ⟨hw_ds, ?_⟩
+            rw [getOrbit_contains_symm_of_complete p darts h_all h_le d w, hc]
+            rfl
+        exact ih _ h_flt_len hw_flt
+
+/-- On a complete dart list (`darts.length ≤ fuel`), for any dart `w : D`,
+    there is a unique canonical representative `v₀` in `canonicalOrbits p fuel darts` belonging to `w`'s orbit. -/
+theorem exists_singleton_filter_canonicalOrbits (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (w : D) :
+    ∃ v₀ : D,
+      (canonicalOrbits p fuel darts).filter (fun v => (getOrbit p fuel w).contains v) = [v₀] :=
+  exists_singleton_filter_canonicalOrbitsAux p darts h_all h_le darts.length darts (Nat.le_refl _) w (h_all w)
+
+theorem filter_append_eq (P : D → Bool) (l1 l2 : List D) :
+    (l1 ++ l2).filter P = l1.filter P ++ l2.filter P := by
+  induction l1 with
+  | nil => rfl
+  | cons x xs ih =>
+    dsimp [List.filter]
+    cases P x <;> simp [ih]
+
+theorem filter_reverse_length (P : D → Bool) (l : List D) :
+    (l.reverse.filter P).length = (l.filter P).length := by
+  induction l with
+  | nil => rfl
+  | cons x xs ih =>
+    rw [List.reverse_cons, filter_append_eq]
+    dsimp [List.filter]
+    cases P x <;> simp <;> omega
+
+/-- On a complete dart list (`darts.length ≤ fuel`), for any dart `w : D`,
+    filtering `(canonicalOrbits p fuel1 darts).reverse` by `(getOrbit p fuel w).contains` has length `1`. -/
+theorem filter_canonicalOrbits_reverse_length_eq_one (p : Perm D)
+    (darts : List D) (h_all : ∀ d : D, d ∈ darts)
+    {fuel1 fuel : Nat} (h_le1 : darts.length ≤ fuel1) (h_le : darts.length ≤ fuel) (w : D) :
+    (((canonicalOrbits p fuel1 darts).reverse).filter (fun v => (getOrbit p fuel w).contains v)).length = 1 := by
+  rw [filter_reverse_length]
+  have h_pred : (fun v => (getOrbit p fuel w).contains v) = (fun v => (getOrbit p fuel1 w).contains v) := by
+    funext v
+    rw [getOrbit_fuel_eq_of_complete p darts h_all w h_le,
+        getOrbit_fuel_eq_of_complete p darts h_all w h_le1]
+  rw [h_pred]
+  rcases exists_singleton_filter_canonicalOrbits p darts h_all h_le1 w with ⟨v₀, hv₀⟩
+  rw [hv₀]
+  rfl
 
 end Hypermap
