@@ -6239,189 +6239,6 @@ theorem findSymOutletRec_mem (line : Nat) (syms : List SymOutlet) {found : SymOu
       dsimp only at h_find
       exact List.mem_cons_of_mem _ (ih h_find)
 
-/-- Semantic leaf certificate for a cartwheel degree assignment `cartDeg`:
-    either (1) `cartDeg` has an exact reduced axle configuration (`HasExactReducedAxle`),
-    or (2) a refined state `st_red` matching `cartDeg` passes `reduceAxleRec` inside a hubcap split,
-    or (3) every member `(x, y, v)` of a hubcap leaf satisfies the linear programming bound
-       `500 + activeOutletSum ≤ (v + 500).toNat`,
-    or (4) `cartDeg` reduces by rotational/reflectional symmetry (`k < deg`, `eps ≤ 1`) to a
-       recorded ancestor condition list `found.conds` (`∀ c ∈ found.conds, 1 ≤ c.1 ≤ 2 * deg`). -/
-def SemanticCartLeaf (deg : Nat) (shiftedTable : List (List FastPosOut)) (cartDeg : Nat → Nat) : Prop :=
-  HasExactReducedAxle deg cartDeg ∨
-  (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
-  (∃ members : List (Nat × Nat × Int),
-    ∀ m ∈ members,
-      500 + activeOutletSum deg cartDeg
-        (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
-         else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1)
-        ≤ ((m.2.2 + 500).toNat : Int)) ∨
-  (∃ (k eps : Nat) (found : SymOutlet),
-    k < deg ∧ eps ≤ 1 ∧
-    (∀ c ∈ found.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) ∧
-    (∀ c ∈ found.conds, c.2.testBit (degBitIdx (symCartDeg deg k (!Nat.beq eps 0) cartDeg c.1)) = true))
-
-/-- Full Semantic Soundness of `verifyTreePureRec`:
-    combines `MatchesCartState31` preservation, `reduceAxleRec_sound`, `verifyHubcapMembersRec_sound`,
-    `extractCondsRec_sound`, and `symForcedRec_sound` across the entire `ProofTree`. -/
-theorem verifyTreePureRec_semantic_soundness (deg : Nat) (shiftedTable : List (List FastPosOut))
-    (t : ProofTree) (cartDeg : Nat → Nat) (h_deg1 : 1 ≤ deg) (h_deg : deg ≤ 11)
-    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true) :
-    ∀ (st lineno lev condV condM : Nat) (syms : List SymOutlet) (hs : HintStream),
-      MatchesCartState31 deg cartDeg st →
-      (∀ o ∈ syms, ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
-      (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true →
-      SemanticCartLeaf deg shiftedTable cartDeg := by
-  induction t with
-  | cond v m tTrue tFalse ihTrue ihFalse =>
-    intro st lineno lev condV condM syms hs h_match31 h_syms h_ok
-    rw [verifyTreePureRec_cond_eq] at h_ok
-    simp only [strictNat_eq] at h_ok
-    let maskTrue := condMaskNat m
-    let maskFalse := Nat.xor 31 maskTrue
-    let curLane := getLaneNat st v
-    let stTrue := setLaneNat st v (Nat.land curLane maskTrue)
-    let stFalse := setLaneNat st v (Nat.land curLane maskFalse)
-    let lev1 := Nat.add lev 1
-    let lineno1 := Nat.add lineno 1
-    let syms' :=
-      match extractCondsRec deg condV condM lev with
-      | none => syms
-      | some conds => { number := lineno, nolines := lev1, conds := conds } :: syms
-    have h_syms' : ∀ o ∈ syms', ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg := by
-      dsimp [syms']
-      cases h_ext : extractCondsRec deg condV condM lev with
-      | none => exact h_syms
-      | some conds =>
-        intro o ho
-        rcases List.mem_cons.mp ho with rfl | ho_tail
-        · exact extractCondsRec_sound deg condV condM lev h_ext
-        · exact h_syms o ho_tail
-    let condV' := setLaneNat (setLaneNat condV lev v) lev1 0
-    let condM' := setLaneNat (setLaneNat condM lev maskTrue) lev1 0
-    let resTrue := verifyTreePureRec deg shiftedTable tTrue stTrue lineno1 lev1 condV' condM' syms' hs
-    change (@Bool.rec (fun _ => Bool × Nat × HintStream) (false, resTrue.2.fst, resTrue.2.snd)
-      (verifyTreePureRec deg shiftedTable tFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd)
-      resTrue.fst).fst = true at h_ok
-    cases h_b : resTrue.fst with
-    | false =>
-      rw [h_b] at h_ok; dsimp at h_ok; contradiction
-    | true =>
-      rw [h_b] at h_ok; dsimp at h_ok
-      rcases matchesCartState31_cond_split deg cartDeg st v m h_deg h_match31 with h_mTrue | h_mFalse
-      · exact ihTrue stTrue lineno1 lev1 condV' condM' syms' hs h_mTrue h_syms' h_b
-      · exact ihFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd h_mFalse h_syms' h_ok
-  | reduce =>
-    intro st lineno lev condV condM syms hs h_match31 _ h_ok
-    change (let (ok, hs') := reduceAxleRec deg 64 [st] hs
-            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
-    simp only [strictNat_eq] at h_ok
-    exact Or.inl (reduceAxleRec_sound deg cartDeg h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok)
-  | hubcap members =>
-    intro st lineno lev condV condM syms hs h_match31 _ h_ok
-    change (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
-            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
-    simp only [strictNat_eq] at h_ok
-    have h_hub := verifyHubcapMembersRec_sound deg cartDeg h_deg st h_match31.1 shiftedTable h_table members hs h_ok
-    -- Either some member triggered a `reduceAxleRec` witness, or all members satisfy the activeOutletSum bound!
-    have h_split :
-        (∃ st_red hs_red, MatchesCartState deg cartDeg st_red ∧ (reduceAxleRec deg 64 [st_red] hs_red).1 = true) ∨
-        (∀ m ∈ members,
-          500 + activeOutletSum deg cartDeg
-            (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
-             else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1)
-            ≤ ((m.2.2 + 500).toNat : Int)) := by
-      clear h_ok
-      induction members with
-      | nil =>
-        right
-        intro m hm; cases hm
-      | cons m ms ih =>
-        rcases h_hub m List.mem_cons_self with h_red | h_b
-        · exact Or.inl h_red
-        · rcases ih (fun m' hm' => h_hub m' (List.mem_cons_of_mem _ hm')) with h_red | h_all
-          · exact Or.inl h_red
-          · right
-            intro m' hm'
-            rcases List.mem_cons.mp hm' with rfl | hm_tail
-            · exact h_b
-            · exact h_all m' hm_tail
-    rcases h_split with h_red | h_all
-    · exact Or.inr (Or.inl h_red)
-    · exact Or.inr (Or.inr (Or.inl ⟨members, h_all⟩))
-  | sym k eps lev_in line =>
-    intro st lineno lev condV condM syms hs h_match31 h_syms h_ok
-    change (let ok :=
-              Bool.rec false
-                (match findSymOutletRec line syms with
-                 | none => false
-                 | some found =>
-                   Bool.rec false
-                     (symForcedRec st (Nat.add k 1) deg (!Nat.beq eps 0) found.conds)
-                     (Nat.beq found.nolines (Nat.add lev_in 1)))
-                (!Nat.ble deg k && Nat.ble eps 1)
-            strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs)).1 = true at h_ok
-    simp only [strictNat_eq] at h_ok
-    cases h_ke : (!Nat.ble deg k && Nat.ble eps 1) with
-    | false =>
-      rw [h_ke] at h_ok; dsimp at h_ok; contradiction
-    | true =>
-      rw [h_ke] at h_ok; dsimp at h_ok
-      cases h_find : findSymOutletRec line syms with
-      | none =>
-        rw [h_find] at h_ok; contradiction
-      | some found =>
-        rw [h_find] at h_ok; dsimp at h_ok
-        cases h_nl : Nat.beq found.nolines (Nat.add lev_in 1) with
-        | false =>
-          rw [h_nl] at h_ok; dsimp at h_ok; contradiction
-        | true =>
-          rw [h_nl] at h_ok; dsimp at h_ok
-          rcases Bool.and_eq_true_iff.mp h_ke with ⟨hk_not, heps⟩
-          have hk_lt : k < deg :=
-            Classical.byContradiction fun h_ge => by
-              rw [Nat.ble_eq_true_of_le (by omega)] at hk_not
-              contradiction
-          have heps_le : eps ≤ 1 := Nat.le_of_ble_eq_true heps
-          have h_found_conds : ∀ c ∈ found.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg :=
-            h_syms found (findSymOutletRec_mem line syms h_find)
-          have h_shift_lt : Nat.add k 1 - 1 < deg := by
-            change (k + 1) - 1 < deg
-            omega
-          have h_forced := symForcedRec_sound deg cartDeg st (Nat.add k 1) (!Nat.beq eps 0)
-            found.conds h_deg1 h_shift_lt h_match31.1 h_found_conds h_ok
-          exact Or.inr (Or.inr (Or.inr ⟨k, eps, found, hk_lt, heps_le, h_found_conds, h_forced⟩))
-
-/-- Top-level Semantic Soundness of `verifyTree`:
-    keeps `deg` and `t` abstract so `getHintsForDeg deg` and `t` are never unfolded during elaboration. -/
-theorem verifyTree_semantic_soundness (configs : List Configuration) (deg : Nat)
-    (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet) (cartDeg : Nat → Nat)
-    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
-    (h_ver : verifyTree configs deg A_low A_upp t outs = true) :
-    SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg := by
-  have h_deg1 : 1 ≤ deg := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
-  have h_le11 : deg ≤ 11 := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
-  have h_syms0 : ∀ o ∈ ([] : List SymOutlet), ∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg :=
-    fun _ h => by cases h
-  exact verifyTreePureRec_semantic_soundness deg (getShiftedTableForDeg deg) t cartDeg
-    h_deg1 h_le11 (validFastPosOut_getShiftedTableForDeg deg h_deg)
-    (getInitStateForDeg deg) 2 0 0 0 [] ([], getHintsForDeg deg)
-    (matchesCartState31_getInitStateForDeg deg cartDeg h_deg) h_syms0 h_ver
-
-/-- Top-level Semantic Soundness of `DischargingTreesVerified`:
-    for every hub degree `deg ∈ {7, 8, 9, 10, 11}` and every cartwheel degree assignment `cartDeg : Nat → Nat`,
-    `DischargingTreesVerified configs` guarantees `SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg`. -/
-theorem dischargingTreesVerified_semantic_soundness (configs : List Configuration)
-    (h_trees : DischargingTreesVerified configs) (deg : Nat) (cartDeg : Nat → Nat)
-    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
-    SemanticCartLeaf deg (getShiftedTableForDeg deg) cartDeg := by
-  rcases h_trees with ⟨h7, h8, h9, h10, h11⟩
-  rcases h_deg with rfl | rfl | rfl | rfl | rfl
-  · exact verifyTree_semantic_soundness configs 7 (trivial_A_low 7) (trivial_A_upp 7) (present7 ()) (readOutlets 7 theRules) cartDeg (Or.inl rfl) h7
-  · exact verifyTree_semantic_soundness configs 8 (trivial_A_low 8) (trivial_A_upp 8) (present8 ()) (readOutlets 8 theRules) cartDeg (Or.inr (Or.inl rfl)) h8
-  · exact verifyTree_semantic_soundness configs 9 (trivial_A_low 9) (trivial_A_upp 9) (present9 ()) (readOutlets 9 theRules) cartDeg (Or.inr (Or.inr (Or.inl rfl))) h9
-  · exact verifyTree_semantic_soundness configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) h10
-  · exact verifyTree_semantic_soundness configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) cartDeg (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) h11
-
 /-!
 ### Stage L.1: Real Hypermap Cartwheel Instantiation (`spokeDart`, `cartDart`, `cartDegOfDart`, `dischargingTreesVerified_hypermap_soundness`)
 -/
@@ -6562,45 +6379,6 @@ theorem cartDart_fan3 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
   have h_mod : ((4 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 4) hi1 hi2
   rw [h_ne0, h_div, h_mod]
   rfl
-
-/-- Real-Hypermap Cartwheel Soundness of `DischargingTreesVerified` (Degrees 7–11):
-    for any hypermap `H`, fuel `fuel`, and hub dart `d0 : H.Dart` whose vertex degree
-    `deg = Hypermap.nodeDegree H d0 fuel` lies in `{7, 8, 9, 10, 11}`,
-    `DischargingTreesVerified configs` guarantees that the concrete hypermap cartwheel
-    degree assignment `cartDegOfDart H fuel deg d0` around `d0` satisfies `SemanticCartLeaf`:
-    1. `(Hubcap)` Every hub-cap member `(v1, v2, b)` has `∑_{po ∈ posOut(v1, v2), active} po.value ≤ -b - 1`
-       and `∑_{(v1, v2, b)} b > -20 * (6 - deg)`, or
-    2. `(Reduce)` The cartwheel around `d0` matches an exact axle degree reduction (`HasExactReducedAxle`), or
-    3. `(Sym)` The cartwheel around `d0` satisfies a reflected/rotated earlier branch condition (`symCartDeg`). -/
-theorem dischargingTreesVerified_hypermap_soundness (H : Hypermap) [DecidableEq H.Dart]
-    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
-    (fuel : Nat) (d0 : H.Dart)
-    (h_deg : Hypermap.nodeDegree H d0 fuel = 7 ∨
-             Hypermap.nodeDegree H d0 fuel = 8 ∨
-             Hypermap.nodeDegree H d0 fuel = 9 ∨
-             Hypermap.nodeDegree H d0 fuel = 10 ∨
-             Hypermap.nodeDegree H d0 fuel = 11) :
-    let deg := Hypermap.nodeDegree H d0 fuel
-    SemanticCartLeaf deg (getShiftedTableForDeg deg) (cartDegOfDart H fuel deg d0) :=
-  dischargingTreesVerified_semantic_soundness configs h_trees
-    (Hypermap.nodeDegree H d0 fuel)
-    (cartDegOfDart H fuel (Hypermap.nodeDegree H d0 fuel) d0)
-    h_deg
-
-/-- Primal–Dual Real-Hypermap Cartwheel Soundness on `H.dual` (Degrees 7–11):
-    for any dual vertex (primal face) `d0 : H.Dart` of degree `deg ∈ {7, 8, 9, 10, 11}` in `H.dual`,
-    `DischargingTreesVerified configs` guarantees `SemanticCartLeaf` for `cartDegOfDart H.dual fuel deg d0`. -/
-theorem dual_dischargingTreesVerified_hypermap_soundness (H : Hypermap) [DecidableEq H.Dart]
-    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
-    (fuel : Nat) (d0 : H.Dart)
-    (h_deg : Hypermap.nodeDegree H.dual d0 fuel = 7 ∨
-             Hypermap.nodeDegree H.dual d0 fuel = 8 ∨
-             Hypermap.nodeDegree H.dual d0 fuel = 9 ∨
-             Hypermap.nodeDegree H.dual d0 fuel = 10 ∨
-             Hypermap.nodeDegree H.dual d0 fuel = 11) :
-    let deg := Hypermap.nodeDegree H.dual d0 fuel
-    SemanticCartLeaf deg (getShiftedTableForDeg deg) (cartDegOfDart H.dual fuel deg d0) :=
-  dischargingTreesVerified_hypermap_soundness H.dual configs h_trees fuel d0 h_deg
 
 /-!
 ### Stage L.2: Degree-6 Discharging with Degree-5 and Degree-6 Neighbors (Primal & Dual)
@@ -7201,6 +6979,1170 @@ theorem dual_finalCharge_le_zero_of_deg_6_of_isBridgeless_of_orbitNetShift_nonpo
   have h_loopless : ∀ d ∈ getOrbit H.dual.node fuel u, Hypermap.sameVertex H.dual (H.dual.edge.f d) u fuel = false :=
     dual_loopless_orbit_of_isBridgeless H darts h_all h_le_b h_le h_bridge u
   exact finalCharge_le_zero_of_deg_6_of_orbitNetShift_nonpos H.dual darts h_all h_le u h_loopless h_deg6 h_net
+
+/-!
+### Stage M.1: `MatchesCartState31` Lifting through `narrowSWAR`, `checkBoundRec`, and `verifyHubcapMembersRec`
+-/
+
+/-- Narrowing a 6-bit lane by bitwise AND (`narrowSWAR st po = st &&& po.keep`) preserves `≤ 31`. -/
+theorem getLaneNat_narrowSWAR_le_31 {st : Nat} (po : FastPosOut) {p : Nat}
+    (h_le : getLaneNat st p ≤ 31) :
+    getLaneNat (narrowSWAR st po) p ≤ 31 := by
+  change getLaneNat (st &&& po.keep) p ≤ 31
+  rw [getLaneNat_and]
+  exact Nat.le_trans Nat.and_le_left h_le
+
+/-- Any active well-formed SWAR outlet preserves `MatchesCartState31` under `narrowSWAR`. -/
+theorem matchesCartState31_narrowSWAR_of_outletActive (deg : Nat) (cartDeg : Nat → Nat) (st : Nat) (po : FastPosOut)
+    (h_deg : deg ≤ 11)
+    (h_valid : validFastPosOut deg po = true)
+    (h_match31 : MatchesCartState31 deg cartDeg st)
+    (h_active : OutletActive deg cartDeg po = true) :
+    MatchesCartState31 deg cartDeg (narrowSWAR st po) :=
+  ⟨matchesCartState_narrowSWAR_of_outletActive deg cartDeg st po h_deg h_valid h_match31.1 h_active,
+   fun p hp1 hp2 => getLaneNat_narrowSWAR_le_31 po (h_match31.2 p hp1 hp2)⟩
+
+/-- `MatchesCartState31` lifting of `checkBoundLoopRec_sound`, collapsing any `reduceAxleRec` call
+    directly into `HasExactReducedAxle deg cartDeg`. -/
+theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11)
+    (cb : Nat → Nat → List FastPosOut → List FastPosOut → List FastPosOut → Nat → HintStream → Bool × HintStream)
+    (h_cb : ∀ (st' forcedIn' : Nat) (negBefore' rem' excluded' : List FastPosOut) (maxch' : Nat) (hs' : HintStream),
+      MatchesCartState31 deg cartDeg st' →
+      (∀ po ∈ negBefore', validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem', validFastPosOut deg po = true) →
+      (∀ ex ∈ excluded', OutletActive deg cartDeg ex = false) →
+      (cb st' forcedIn' negBefore' rem' excluded' maxch' hs').1 = true →
+      HasExactReducedAxle deg cartDeg ∨
+      (forcedIn' : Int) + activeOutletSum deg cartDeg negBefore' + activeOutletSum deg cartDeg rem' ≤ (maxch' : Int))
+    (st forcedch maxch : Nat) (h_match31 : MatchesCartState31 deg cartDeg st)
+    (rem : List FastPosOut) :
+    ∀ (allowedch : Nat) (negBefore curExcluded : List FastPosOut) (hs : HintStream),
+      allowedch = countPos rem →
+      (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem, validFastPosOut deg po = true) →
+      (∀ ex ∈ curExcluded, OutletActive deg cartDeg ex = false) →
+      (checkBoundLoopRec cb st forcedch maxch rem allowedch negBefore curExcluded hs).1 = true →
+      HasExactReducedAxle deg cartDeg ∨
+      (forcedch : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
+  induction rem with
+  | nil =>
+    intro allowedch negBefore curExcluded hs _ _ _ _ h_ok
+    rw [checkBoundLoopRec_nil] at h_ok
+    contradiction
+  | cons po subRem ih =>
+    intro allowedch negBefore curExcluded hs h_all h_neg h_rem h_excl h_ok
+    have h_po := h_rem po List.mem_cons_self
+    have h_sub : ∀ q ∈ subRem, validFastPosOut deg q = true :=
+      fun q hq => h_rem q (List.mem_cons_of_mem po hq)
+    rw [checkBoundLoopRec_cons_eq] at h_ok
+    simp only [strictNat_eq] at h_ok
+    cases h_pos : po.isPos with
+    | false =>
+      rw [h_pos] at h_ok
+      dsimp only at h_ok
+      have h_all' : allowedch = countPos subRem := by
+        simpa [countPos, h_pos] using h_all
+      have h_neg' : ∀ q ∈ po :: negBefore, validFastPosOut deg q = true ∧ q.isPos = false := by
+        intro q hq
+        rcases List.mem_cons.mp hq with rfl | hq_mem
+        · exact ⟨h_po, h_pos⟩
+        · exact h_neg q hq_mem
+      rcases ih allowedch (po :: negBefore) curExcluded hs h_all' h_neg' h_sub h_excl h_ok with h_red | h_bound
+      · exact Or.inl h_red
+      · right
+        simp only [activeOutletSum] at h_bound ⊢
+        omega
+    | true =>
+      rw [h_pos] at h_ok
+      dsimp only at h_ok
+      cases h_act : OutletActive deg cartDeg po with
+      | true =>
+        have h_match_next := matchesCartState31_narrowSWAR_of_outletActive deg cartDeg st po h_deg h_po h_match31 h_act
+        have h_no_excl := noExcludedForcedRec_eq_true deg cartDeg (narrowSWAR st po) h_match_next.1 curExcluded h_excl
+        rw [h_no_excl] at h_ok
+        dsimp only at h_ok
+        cases h_cb_ok : (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs).fst with
+        | false =>
+          rw [h_cb_ok] at h_ok; dsimp only at h_ok; contradiction
+        | true =>
+          rcases h_cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs
+            h_match_next h_neg h_sub h_excl h_cb_ok with h_red | h_bound
+          · exact Or.inl h_red
+          · right
+            simp only [Nat.add_eq, activeOutletSum, outletVal, h_act, h_pos, ↓reduceIte] at h_bound ⊢
+            omega
+      | false =>
+        let resSub :=
+          @Bool.rec (fun _ => Bool × HintStream)
+            (true, hs)
+            (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs)
+            (noExcludedForcedRec (narrowSWAR st po) curExcluded)
+        change (@Bool.rec (fun _ => Bool × HintStream)
+          (false, resSub.2)
+          (@Bool.rec (fun _ => Bool × HintStream)
+            (checkBoundLoopRec cb st forcedch maxch subRem (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2)
+            (true, resSub.2)
+            (Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch))
+          resSub.1).1 = true at h_ok
+        cases h_okSub : resSub.1 with
+        | false =>
+          rw [h_okSub] at h_ok; dsimp only at h_ok; contradiction
+        | true =>
+          rw [h_okSub] at h_ok; dsimp only at h_ok
+          have h_all' : Nat.sub allowedch 1 = countPos subRem := by
+            have : allowedch = 1 + countPos subRem := by simpa [countPos, h_pos] using h_all
+            simp only [Nat.sub_eq]
+            omega
+          cases h_ble : Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch with
+          | true =>
+            right
+            have h_le : (Nat.sub allowedch 1) + forcedch ≤ maxch := Nat.le_of_ble_eq_true h_ble
+            have h_neg_le : activeOutletSum deg cartDeg negBefore ≤ 0 :=
+              activeOutletSum_le_zero_of_all_neg deg cartDeg negBefore (fun q hq => (h_neg q hq).2)
+            have h_sub_le : activeOutletSum deg cartDeg subRem ≤ (countPos subRem : Int) :=
+              activeOutletSum_le_countPos deg cartDeg subRem
+            simp only [activeOutletSum, h_act, Bool.false_eq_true, ↓reduceIte]
+            omega
+          | false =>
+            rw [h_ble] at h_ok; dsimp only at h_ok
+            have h_excl' : ∀ ex ∈ po :: curExcluded, OutletActive deg cartDeg ex = false := by
+              intro ex hex
+              rcases List.mem_cons.mp hex with rfl | hex_mem
+              · exact h_act
+              · exact h_excl ex hex_mem
+            rcases ih (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2 h_all' h_neg h_sub h_excl' h_ok with h_red | h_bound
+            · exact Or.inl h_red
+            · right
+              simp only [activeOutletSum, h_act, Bool.false_eq_true, ↓reduceIte]
+              omega
+
+/-- `MatchesCartState31` lifting of `checkBoundRec_sound`:
+    whenever `(checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).1 = true`
+    on `st` satisfying `MatchesCartState31 deg cartDeg st`, either `HasExactReducedAxle deg cartDeg`
+    holds directly (via `reduceAxleRec_sound`), or the active outlet sum plus `forcedIn` is at most `maxch`. -/
+theorem checkBoundRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11) (fuel : Nat) :
+    ∀ (st forcedIn : Nat) (negBefore rem excluded : List FastPosOut) (maxch : Nat) (hs : HintStream),
+      MatchesCartState31 deg cartDeg st →
+      (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
+      (∀ po ∈ rem, validFastPosOut deg po = true) →
+      (∀ ex ∈ excluded, OutletActive deg cartDeg ex = false) →
+      (checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).1 = true →
+      HasExactReducedAxle deg cartDeg ∨
+      (forcedIn : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
+  induction fuel with
+  | zero =>
+    intro st forcedIn negBefore rem excluded maxch hs _ _ _ _ h_ok
+    rw [checkBoundRec_zero] at h_ok
+    contradiction
+  | succ fuel ih =>
+    intro st forcedIn negBefore rem excluded maxch hs h_match31 h_neg h_rem h_excl h_ok
+    rw [checkBoundRec_succ_eq] at h_ok
+    have h_fneg := filterNegAPS_sound deg cartDeg st h_deg h_match31.1 negBefore forcedIn h_neg
+    let forced1 := (filterNegAPS st negBefore forcedIn).1
+    let nextNegBefore := (filterNegAPS st negBefore forcedIn).2
+    have h_frem := filterRemAPS_sound deg cartDeg st h_deg h_match31.1 rem forced1 h_rem
+    let forcedch := (filterRemAPS st rem forced1).1
+    let allowedch := (filterRemAPS st rem forced1).2.1
+    let nextRem := (filterRemAPS st rem forced1).2.2
+    change (@Bool.rec (fun _ => Bool × HintStream)
+      (@Bool.rec (fun _ => Bool × HintStream)
+        (checkBoundLoopRec (checkBoundRec deg fuel) st forcedch maxch nextRem allowedch nextNegBefore excluded hs)
+        (reduceAxleRec deg 64 [st] hs)
+        (Nat.ble (Nat.add maxch 1) forcedch))
+      (true, hs)
+      (Nat.ble (Nat.add forcedch allowedch) maxch)).1 = true at h_ok
+    cases h_ble1 : Nat.ble (Nat.add forcedch allowedch) maxch with
+    | true =>
+      right
+      have h_le : forcedch + allowedch ≤ maxch := Nat.le_of_ble_eq_true h_ble1
+      have h_neg_le : activeOutletSum deg cartDeg nextNegBefore ≤ 0 :=
+        activeOutletSum_le_zero_of_all_neg deg cartDeg nextNegBefore (fun q hq => (h_fneg.1 q hq).2)
+      have h_rem_le : activeOutletSum deg cartDeg nextRem ≤ (countPos nextRem : Int) :=
+        activeOutletSum_le_countPos deg cartDeg nextRem
+      have h_all_eq : allowedch = countPos nextRem := h_frem.2.1
+      have h1 : (forcedIn : Int) + activeOutletSum deg cartDeg negBefore ≤
+          (forced1 : Int) + activeOutletSum deg cartDeg nextNegBefore := h_fneg.2
+      have h2 : (forced1 : Int) + activeOutletSum deg cartDeg rem ≤
+          (forcedch : Int) + activeOutletSum deg cartDeg nextRem := h_frem.2.2
+      omega
+    | false =>
+      rw [h_ble1] at h_ok; dsimp only at h_ok
+      cases h_ble2 : Nat.ble (Nat.add maxch 1) forcedch with
+      | true =>
+        rw [h_ble2] at h_ok; dsimp only at h_ok
+        exact Or.inl (reduceAxleRec_sound deg cartDeg h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok)
+      | false =>
+        rw [h_ble2] at h_ok; dsimp only at h_ok
+        rcases checkBoundLoopRec_sound31 deg cartDeg h_deg (checkBoundRec deg fuel) ih
+          st forcedch maxch h_match31 nextRem allowedch nextNegBefore excluded hs
+          h_frem.2.1 h_fneg.1 h_frem.1 h_excl h_ok with h_red | h_bound
+        · exact Or.inl h_red
+        · right
+          have h1 : (forcedIn : Int) + activeOutletSum deg cartDeg negBefore ≤
+              (forced1 : Int) + activeOutletSum deg cartDeg nextNegBefore := h_fneg.2
+          have h2 : (forced1 : Int) + activeOutletSum deg cartDeg rem ≤
+              (forcedch : Int) + activeOutletSum deg cartDeg nextRem := h_frem.2.2
+          omega
+
+/-- `MatchesCartState31` lifting of `verifyHubcapMembersRec_sound`:
+    whenever `(verifyHubcapMembersRec deg st shiftedTable members hs).1 = true` on `st`
+    satisfying `MatchesCartState31 deg cartDeg st`, either `HasExactReducedAxle deg cartDeg` holds,
+    or EVERY hubcap member `(x, y, v) ∈ members` satisfies the LP bound. -/
+theorem verifyHubcapMembersRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11)
+    (st : Nat) (h_match31 : MatchesCartState31 deg cartDeg st)
+    (shiftedTable : List (List FastPosOut))
+    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true)
+    (members : List (Nat × Nat × Int)) :
+    ∀ (hs : HintStream),
+      (verifyHubcapMembersRec deg st shiftedTable members hs).1 = true →
+      HasExactReducedAxle deg cartDeg ∨
+      ∀ m ∈ members,
+        500 + activeOutletSum deg cartDeg
+          (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+           else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤
+          ((m.2.2 + 500).toNat : Int) := by
+  induction members with
+  | nil =>
+    intro _ _
+    exact Or.inr (fun _ hm => by contradiction)
+  | cons m rest ih =>
+    intro hs h_ok
+    rw [verifyHubcapMembersRec_cons] at h_ok
+    rcases m with ⟨x, y, v⟩
+    dsimp only at h_ok
+    simp only [strictNat_eq] at h_ok
+    let outsX := lookupListRec [] shiftedTable x
+    let outsY := lookupListRec [] shiftedTable y
+    let initRem :=
+      @Bool.rec (fun _ => List FastPosOut)
+        outsX
+        (appendFastPosOut outsX outsY)
+        (!Nat.beq x y)
+    let resCB := checkBoundRec deg 20 st 500 [] initRem [] (v + 500).toNat hs
+    change (@Bool.rec (fun _ => Bool × HintStream) (false, resCB.2)
+      (verifyHubcapMembersRec deg st shiftedTable rest resCB.2) resCB.1).1 = true at h_ok
+    cases h_cb : resCB.1 with
+    | false =>
+      rw [h_cb] at h_ok; dsimp only at h_ok; contradiction
+    | true =>
+      rw [h_cb] at h_ok; dsimp only at h_ok
+      have h_init_valid : ∀ po ∈ initRem, validFastPosOut deg po = true := by
+        dsimp [initRem]
+        cases (!Nat.beq x y) with
+        | false =>
+          exact validFastPosOut_lookupListRec deg shiftedTable h_table x
+        | true =>
+          dsimp only
+          rw [appendFastPosOut_eq_append]
+          intro po hpo
+          rcases List.mem_append.mp hpo with hX | hY
+          · exact validFastPosOut_lookupListRec deg shiftedTable h_table x po hX
+          · exact validFastPosOut_lookupListRec deg shiftedTable h_table y po hY
+      rcases checkBoundRec_sound31 deg cartDeg h_deg 20 st 500 [] initRem [] (v + 500).toNat hs
+        h_match31 (by intro _ h; contradiction) h_init_valid (by intro _ h; contradiction) h_cb with h_red | h_bound
+      · exact Or.inl h_red
+      · rcases ih resCB.2 h_ok with h_red | h_rest
+        · exact Or.inl h_red
+        · right
+          intro m' hm'
+          rcases List.mem_cons.mp hm' with rfl | hm_rest
+          · dsimp only
+            have h_init_eq : initRem = (if Nat.beq x y then outsX else outsX ++ outsY) := by
+              dsimp [initRem]
+              cases Nat.beq x y with
+              | true => rfl
+              | false => exact appendFastPosOut_eq_append outsX outsY
+            rw [← h_init_eq]
+            simpa [activeOutletSum] using h_bound
+          · exact h_rest m' hm_rest
+
+/-!
+### Stage M.2: Computable RSST Hubcap Cover Validity & Hub Charge Arithmetic Bridge
+-/
+
+/-- Number of hubcap members `(x, y, v) ∈ members` incident to spoke `i` (`x == i || y == i`). -/
+def hubcapSpokeOcc : List (Nat × Nat × Int) → Nat → Nat
+  | [], _ => 0
+  | m :: rest, i => (if Nat.beq m.1 i || Nat.beq m.2.1 i then 1 else 0) + hubcapSpokeOcc rest i
+
+/-- RSST weight `w(m) ∈ {1, 2}` of a hubcap member `m = (x, y, v)` in `members`. -/
+def hubcapMemberWeight (members : List (Nat × Nat × Int)) (m : Nat × Nat × Int) : Nat :=
+  if Nat.beq (hubcapSpokeOcc members m.1) 1 then 2 else 1
+
+/-- Total weight of members in `l` incident to spoke `i` using weight function `w`. -/
+def hubcapSpokeWeightSum (w : Nat × Nat × Int → Nat) (i : Nat) : List (Nat × Nat × Int) → Nat
+  | [] => 0
+  | m :: rest =>
+    (if Nat.beq m.1 i || Nat.beq m.2.1 i then w m else 0) + hubcapSpokeWeightSum w i rest
+
+/-- Weighted sum of upper bounds `w(m) * v` over `m = (x, y, v) ∈ l`. -/
+def hubcapWeightedBoundSum (w : Nat × Nat × Int → Nat) : List (Nat × Nat × Int) → Int
+  | [] => 0
+  | m :: rest => (w m : Int) * m.2.2 + hubcapWeightedBoundSum w rest
+
+/-- Computable RSST Hubcap Cover Validity Predicate for hub degree `deg`:
+    1. Every member `(x, y, v) ∈ members` has `1 ≤ x, y ≤ deg` and `-500 ≤ v`.
+    2. Every spoke `i ∈ [1..deg]` is covered with total weight `2`.
+    3. The weighted sum of bounds is at most `20 * (deg - 6) + 1`. -/
+def validHubcapCover (deg : Nat) (members : List (Nat × Nat × Int)) : Bool :=
+  let w := hubcapMemberWeight members
+  members.all (fun m =>
+    Nat.ble 1 m.1 && Nat.ble m.1 deg &&
+    Nat.ble 1 m.2.1 && Nat.ble m.2.1 deg &&
+    decide (-500 ≤ m.2.2)) &&
+  (List.range' 1 deg).all (fun i =>
+    Nat.beq (hubcapSpokeWeightSum w i members) 2) &&
+  decide (hubcapWeightedBoundSum w members ≤ 20 * ((deg : Int) - 6) + 1)
+
+/-- Explicit non-vacuity lemma: the empty hubcap `[]` is never a valid cover for any `deg ≥ 1`. -/
+theorem not_validHubcapCover_nil (deg : Nat) (h_deg : 1 ≤ deg) :
+    validHubcapCover deg [] = false := by
+  rcases Nat.exists_eq_add_of_le h_deg with ⟨k, rfl⟩
+  have h_r : List.range' 1 (1 + k) = 1 :: List.range' 2 k := by
+    rw [Nat.add_comm 1 k]
+    rfl
+  simp [validHubcapCover, h_r, hubcapSpokeWeightSum]
+
+/-- Sum of an integer-valued function `f : Nat → Int` over a list of indices `idxs : List Nat`. -/
+def sumNatList (f : Nat → Int) : List Nat → Int
+  | [] => 0
+  | i :: rest => f i + sumNatList f rest
+
+theorem foldl_add_eq_add_sumNatList (f : Nat → Int) (l : List Nat) (init : Int) :
+    l.foldl (fun acc i => acc + f i) init = init + sumNatList f l := by
+  induction l generalizing init with
+  | nil => simp [sumNatList]
+  | cons i rest ih =>
+    simp only [List.foldl_cons, sumNatList]
+    rw [ih (init + f i)]
+    omega
+
+theorem sumNatList_add (f g : Nat → Int) (l : List Nat) :
+    sumNatList (fun i => f i + g i) l = sumNatList f l + sumNatList g l := by
+  induction l with
+  | nil => simp [sumNatList]
+  | cons i rest ih =>
+    simp only [sumNatList, ih]
+    omega
+
+theorem sumNatList_const_mul (c : Int) (f : Nat → Int) (l : List Nat) :
+    sumNatList (fun i => c * f i) l = c * sumNatList f l := by
+  induction l with
+  | nil => simp [sumNatList]
+  | cons i rest ih =>
+    simp only [sumNatList, ih, Int.mul_add]
+
+theorem sumNatList_congr {f g : Nat → Int} {l : List Nat} (h : ∀ i ∈ l, f i = g i) :
+    sumNatList f l = sumNatList g l := by
+  induction l with
+  | nil => rfl
+  | cons i rest ih =>
+    simp only [sumNatList]
+    rw [h i List.mem_cons_self, ih (fun j hj => h j (List.mem_cons_of_mem i hj))]
+
+theorem sumNatList_ite_beq_range' (f : Nat → Int) (x : Nat) :
+    ∀ (s n : Nat),
+      sumNatList (fun i => if Nat.beq x i then f i else 0) (List.range' s n) =
+        if s ≤ x ∧ x < s + n then f x else 0 := by
+  intro s n
+  induction n generalizing s with
+  | zero =>
+    simp only [List.range', sumNatList]
+    split
+    · omega
+    · rfl
+  | succ n ih =>
+    simp only [List.range'_succ, sumNatList, ih (s + 1)]
+    cases h_beq : Nat.beq x s with
+    | true =>
+      have hxs : x = s := Nat.beq_eq.mp h_beq
+      subst hxs
+      simp only [↓reduceIte]
+      have h_not : ¬(x + 1 ≤ x ∧ x < x + 1 + n) := by omega
+      have h_yes : x ≤ x ∧ x < x + (n + 1) := by omega
+      rw [if_neg h_not, if_pos h_yes]
+      omega
+    | false =>
+      have hxs : x ≠ s := fun h => by subst h; rw [Nat.beq_refl] at h_beq; contradiction
+      simp only [Bool.false_eq_true, ↓reduceIte, Int.zero_add]
+      by_cases h_in : s + 1 ≤ x ∧ x < s + 1 + n
+      · have h_in' : s ≤ x ∧ x < s + (n + 1) := by omega
+        rw [if_pos h_in, if_pos h_in']
+      · have h_in' : ¬(s ≤ x ∧ x < s + (n + 1)) := by omega
+        rw [if_neg h_in, if_neg h_in']
+
+theorem activeOutletSum_member_eq_sumNatList (deg : Nat) (cartDeg : Nat → Nat)
+    (shiftedTable : List (List FastPosOut)) {x y : Nat}
+    (hx1 : 1 ≤ x) (hx2 : x ≤ deg) (hy1 : 1 ≤ y) (hy2 : y ≤ deg) :
+    activeOutletSum deg cartDeg
+      (if Nat.beq x y then lookupListRec [] shiftedTable x
+       else lookupListRec [] shiftedTable x ++ lookupListRec [] shiftedTable y) =
+    sumNatList
+      (fun i => if Nat.beq x i || Nat.beq y i then
+        activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i) else 0)
+      (List.range' 1 deg) := by
+  let S := fun i => activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i)
+  cases hxy : Nat.beq x y with
+  | true =>
+    have h_eq : x = y := Nat.beq_eq.mp hxy
+    subst h_eq
+    simp only [Bool.or_self, ↓reduceIte]
+    rw [sumNatList_ite_beq_range' S x 1 deg, if_pos ⟨hx1, by omega⟩]
+  | false =>
+    have h_ne : x ≠ y := fun h => by subst h; rw [Nat.beq_refl] at hxy; contradiction
+    simp only [Bool.false_eq_true, ↓reduceIte, activeOutletSum_append]
+    have h_split :
+        sumNatList (fun i => if Nat.beq x i || Nat.beq y i then S i else 0) (List.range' 1 deg) =
+        sumNatList (fun i => (if Nat.beq x i then S i else 0) + (if Nat.beq y i then S i else 0)) (List.range' 1 deg) := by
+      apply sumNatList_congr
+      intro i _
+      cases hxi : Nat.beq x i with
+      | false => simp
+      | true =>
+        have h_xi : x = i := Nat.beq_eq.mp hxi
+        have hyi : Nat.beq y i = false := by
+          cases h_yi : Nat.beq y i with
+          | false => rfl
+          | true =>
+            have h_yi_eq : y = i := Nat.beq_eq.mp h_yi
+            omega
+        simp [hyi]
+    rw [h_split, sumNatList_add, sumNatList_ite_beq_range' S x 1 deg, sumNatList_ite_beq_range' S y 1 deg,
+        if_pos ⟨hx1, by omega⟩, if_pos ⟨hy1, by omega⟩]
+
+theorem sumNatList_hubcapSpokeWeightSum_le_weightedBoundSum
+    (deg : Nat) (cartDeg : Nat → Nat) (shiftedTable : List (List FastPosOut))
+    (w : Nat × Nat × Int → Nat) (l : List (Nat × Nat × Int))
+    (h_valid : ∀ m ∈ l, 1 ≤ m.1 ∧ m.1 ≤ deg ∧ 1 ≤ m.2.1 ∧ m.2.1 ≤ deg ∧ -500 ≤ m.2.2)
+    (h_bounds : ∀ m ∈ l,
+      500 + activeOutletSum deg cartDeg
+        (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+         else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤
+        ((m.2.2 + 500).toNat : Int)) :
+    sumNatList
+      (fun i => (hubcapSpokeWeightSum w i l : Int) *
+        activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i))
+      (List.range' 1 deg) ≤
+    hubcapWeightedBoundSum w l := by
+  let S := fun i => activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i)
+  induction l with
+  | nil =>
+    have h_zero :
+        sumNatList (fun i => (hubcapSpokeWeightSum w i [] : Int) * S i) (List.range' 1 deg) =
+        sumNatList (fun _ => 0) (List.range' 1 deg) := by
+      apply sumNatList_congr
+      intro i _
+      simp [hubcapSpokeWeightSum]
+    rw [h_zero]
+    have h_z2 : ∀ l' : List Nat, sumNatList (fun _ => 0) l' = 0 := by
+      intro l'; induction l' with
+      | nil => rfl
+      | cons _ _ ih => simp [sumNatList, ih]
+    rw [h_z2]
+    exact Int.le_refl 0
+  | cons m rest ih =>
+    have hm_val := h_valid m List.mem_cons_self
+    rcases hm_val with ⟨hx1, hx2, hy1, hy2, hv500⟩
+    have hm_b := h_bounds m List.mem_cons_self
+    have hm_le :
+        activeOutletSum deg cartDeg
+          (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+           else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤ m.2.2 := by
+      omega
+    rw [activeOutletSum_member_eq_sumNatList deg cartDeg shiftedTable hx1 hx2 hy1 hy2] at hm_le
+    have h_w_le := Int.mul_le_mul_of_nonneg_left hm_le (Int.natCast_nonneg (w m))
+    rw [← sumNatList_const_mul] at h_w_le
+    have h_ih := ih
+      (fun m' hm' => h_valid m' (List.mem_cons_of_mem m hm'))
+      (fun m' hm' => h_bounds m' (List.mem_cons_of_mem m hm'))
+    have h_step :
+        sumNatList (fun i => (hubcapSpokeWeightSum w i (m :: rest) : Int) * S i) (List.range' 1 deg) =
+        sumNatList (fun i => (w m : Int) * (if Nat.beq m.1 i || Nat.beq m.2.1 i then S i else 0)) (List.range' 1 deg) +
+        sumNatList (fun i => (hubcapSpokeWeightSum w i rest : Int) * S i) (List.range' 1 deg) := by
+      rw [← sumNatList_add]
+      apply sumNatList_congr
+      intro i _
+      dsimp only [hubcapSpokeWeightSum]
+      cases Nat.beq m.1 i || Nat.beq m.2.1 i <;> simp [Int.natCast_add, Int.add_mul]
+    rw [h_step]
+    dsimp [hubcapWeightedBoundSum]
+    dsimp [S] at h_w_le h_ih ⊢
+    omega
+
+/-- Fundamental RSST Hubcap Arithmetic Soundness Theorem:
+    whenever `validHubcapCover deg members = true` and every member `m ∈ members` satisfies
+    the verified `checkBoundRec` inequality, the hub's initial charge `10 * (6 - deg)` plus
+    the total active outlet sum across all spokes `1 .. deg` is at most `0`. -/
+theorem activeOutletSum_hub_le_of_validHubcapCover
+    (deg : Nat) (cartDeg : Nat → Nat) (shiftedTable : List (List FastPosOut))
+    (members : List (Nat × Nat × Int))
+    (h_cover : validHubcapCover deg members = true)
+    (h_bounds : ∀ m ∈ members,
+      500 + activeOutletSum deg cartDeg
+        (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+         else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤
+        ((m.2.2 + 500).toNat : Int)) :
+    10 * (6 - (deg : Int)) +
+      (List.range' 1 deg).foldl
+        (fun acc i => acc + activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i)) 0 ≤ 0 := by
+  rw [foldl_add_eq_add_sumNatList, Int.zero_add]
+  let w := hubcapMemberWeight members
+  let S := fun i => activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i)
+  dsimp [validHubcapCover] at h_cover
+  rcases Bool.and_eq_true_iff.mp h_cover with ⟨h_cov12, h_sum_le_b⟩
+  rcases Bool.and_eq_true_iff.mp h_cov12 with ⟨h_all_mem, h_all_spokes⟩
+  have h_sum_le : hubcapWeightedBoundSum w members ≤ 20 * ((deg : Int) - 6) + 1 :=
+    of_decide_eq_true h_sum_le_b
+  have h_valid : ∀ m ∈ members, 1 ≤ m.1 ∧ m.1 ≤ deg ∧ 1 ≤ m.2.1 ∧ m.2.1 ≤ deg ∧ -500 ≤ m.2.2 := by
+    intro m hm
+    have hm_b := List.all_eq_true.mp h_all_mem m hm
+    rcases Bool.and_eq_true_iff.mp hm_b with ⟨hb1234, hb5⟩
+    rcases Bool.and_eq_true_iff.mp hb1234 with ⟨hb123, hb4⟩
+    rcases Bool.and_eq_true_iff.mp hb123 with ⟨hb12, hb3⟩
+    rcases Bool.and_eq_true_iff.mp hb12 with ⟨hb1, hb2⟩
+    exact ⟨Nat.le_of_ble_eq_true hb1, Nat.le_of_ble_eq_true hb2,
+           Nat.le_of_ble_eq_true hb3, Nat.le_of_ble_eq_true hb4,
+           of_decide_eq_true hb5⟩
+  have h_le_wb := sumNatList_hubcapSpokeWeightSum_le_weightedBoundSum deg cartDeg shiftedTable w members h_valid h_bounds
+  have h_eq_two :
+      sumNatList (fun i => (hubcapSpokeWeightSum w i members : Int) * S i) (List.range' 1 deg) =
+      2 * sumNatList S (List.range' 1 deg) := by
+    rw [← sumNatList_const_mul]
+    apply sumNatList_congr
+    intro i hi
+    have hi_eq : hubcapSpokeWeightSum w i members = 2 :=
+      Nat.beq_eq.mp (List.all_eq_true.mp h_all_spokes i hi)
+    rw [hi_eq]
+    rfl
+  dsimp [S] at h_eq_two
+  omega
+
+/-- Computable structural validity check on `t : ProofTree` at hub degree `deg` with remaining depth budget `maxLev`:
+    - Every `ProofTree.cond v m tTrue tFalse` has `maxLev ≥ 1` and `1 ≤ v ≤ 5 * deg`.
+    - Every `ProofTree.hubcap members` satisfies `validHubcapCover deg members = true`. -/
+def validProofTree (deg : Nat) : Nat → ProofTree → Bool
+  | _, ProofTree.reduce => true
+  | _, ProofTree.sym _ _ _ _ => true
+  | _, ProofTree.hubcap members => validHubcapCover deg members
+  | 0, ProofTree.cond _ _ _ _ => false
+  | maxLev + 1, ProofTree.cond v _ tTrue tFalse =>
+    Nat.ble 1 v && Nat.ble v (Nat.mul 5 deg) &&
+    validProofTree deg maxLev tTrue &&
+    validProofTree deg maxLev tFalse
+
+set_option maxRecDepth 2000000 in
+theorem validProofTree_present7 : validProofTree 7 58 (present7 ()) = true := by decide
+
+set_option maxRecDepth 2000000 in
+theorem validProofTree_present8 : validProofTree 8 58 (present8 ()) = true := by decide
+
+set_option maxRecDepth 2000000 in
+theorem validProofTree_present9 : validProofTree 9 58 (present9 ()) = true := by decide
+
+set_option maxRecDepth 2000000 in
+theorem validProofTree_present10 : validProofTree 10 58 (present10 ()) = true := by decide
+
+set_option maxRecDepth 2000000 in
+theorem validProofTree_present11 : validProofTree 11 58 (present11 ()) = true := by decide
+
+/-!
+### Stage M.3: Non-Vacuous 2-Way `CoreCartLeaf` & Elimination of `ProofTree.sym`
+-/
+
+/-- Non-vacuous 2-way core leaf certificate for a cartwheel degree assignment `cartDeg`:
+    either (1) `cartDeg` has an exact reduced axle configuration (`HasExactReducedAxle`),
+    or (2) `cartDeg` satisfies all LP bounds of a structurally valid RSST hubcap cover
+       (`validHubcapCover deg members = true`). -/
+def CoreCartLeaf (deg : Nat) (shiftedTable : List (List FastPosOut)) (cartDeg : Nat → Nat) : Prop :=
+  HasExactReducedAxle deg cartDeg ∨
+  (∃ members : List (Nat × Nat × Int),
+    validHubcapCover deg members = true ∧
+    ∀ m ∈ members,
+      500 + activeOutletSum deg cartDeg
+        (if Nat.beq m.1 m.2.1 then lookupListRec [] shiftedTable m.1
+         else lookupListRec [] shiftedTable m.1 ++ lookupListRec [] shiftedTable m.2.1) ≤
+        ((m.2.2 + 500).toNat : Int))
+
+/-- Every `CoreCartLeaf` either has an exact reduced axle configuration (`HasExactReducedAxle`)
+    or satisfies the non-positive hub charge inequality
+    `10 * (6 - deg) + ∑_{i=1..deg} activeOutletSum(i) ≤ 0`. -/
+theorem coreCartLeaf_reducible_or_hub_sum_le_zero
+    (deg : Nat) (shiftedTable : List (List FastPosOut)) (cartDeg : Nat → Nat)
+    (h_core : CoreCartLeaf deg shiftedTable cartDeg) :
+    HasExactReducedAxle deg cartDeg ∨
+    10 * (6 - (deg : Int)) +
+      (List.range' 1 deg).foldl
+        (fun acc i => acc + activeOutletSum deg cartDeg (lookupListRec [] shiftedTable i)) 0 ≤ 0 := by
+  rcases h_core with h_red | ⟨members, h_cover, h_bounds⟩
+  · exact Or.inl h_red
+  · exact Or.inr (activeOutletSum_hub_le_of_validHubcapCover deg cartDeg shiftedTable members h_cover h_bounds)
+
+/-- A cartwheel degree assignment `cd` satisfies the condition prefix stored in lanes `0 .. lev - 1`
+    of `(condV, condM)` if for every `i < lev`, the bitmask in lane `i` of `condM` has the bit
+    for `cd (getLaneNat condV i)` set. -/
+def SatisfiesPrefix (cd : Nat → Nat) (condV condM lev : Nat) : Prop :=
+  ∀ i < lev, (getLaneNat condM i).testBit (degBitIdx (cd (getLaneNat condV i))) = true
+
+theorem extractCondsRec_eq_none_of_getLaneNat_zero (deg condV condM lev : Nat)
+    (h_zero : getLaneNat condV lev = 0) :
+    extractCondsRec deg condV condM lev = none := by
+  rw [extractCondsRec_eq_loop]
+  cases lev with
+  | zero =>
+    change (strictNat (getLaneNat condV 0) fun n =>
+      @Bool.rec (fun _ => Option (List (Nat × Nat))) none
+        (some ((n, getLaneNat condM 0) :: []))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = none
+    rw [strictNat_eq, h_zero]
+    rfl
+  | succ i =>
+    change (strictNat (Nat.add i 1) fun idx =>
+      strictNat (getLaneNat condV idx) fun n =>
+      @Bool.rec (fun _ => Option (List (Nat × Nat))) none
+        (extractCondsLoop deg condV condM i ((n, getLaneNat condM idx) :: []))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = none
+    rw [strictNat_eq, strictNat_eq]
+    have h_idx : Nat.add i 1 = i + 1 := rfl
+    rw [h_idx, h_zero]
+    rfl
+
+theorem extractCondsLoop_sublist (deg condV condM : Nat) :
+    ∀ (k : Nat) (acc res : List (Nat × Nat)),
+      extractCondsLoop deg condV condM k acc = some res →
+      (∀ c ∈ acc, c ∈ res) ∧
+      (∀ j ≤ k, (getLaneNat condV j, getLaneNat condM j) ∈ res) := by
+  intro k
+  induction k with
+  | zero =>
+    intro acc res h_some
+    change (strictNat (getLaneNat condV 0) fun n =>
+      @Bool.rec (fun _ => Option (List (Nat × Nat))) none
+        (some ((n, getLaneNat condM 0) :: acc))
+        (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = some res at h_some
+    rw [strictNat_eq] at h_some
+    let n := getLaneNat condV 0
+    cases h_b : (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)) with
+    | false => rw [h_b] at h_some; contradiction
+    | true =>
+      rw [h_b] at h_some
+      dsimp only at h_some
+      injection h_some with h_eq
+      subst h_eq
+      refine ⟨fun c hc => List.mem_cons_of_mem _ hc, ?_⟩
+      intro j hj
+      have hj0 : j = 0 := by omega
+      subst hj0
+      exact List.mem_cons_self
+  | succ i ih =>
+    intro acc res h_some
+    unfold extractCondsLoop at h_some
+    dsimp only at h_some
+    rw [strictNat_eq, strictNat_eq] at h_some
+    let idx := Nat.add i 1
+    let n := getLaneNat condV idx
+    change (@Bool.rec (fun _ => Option (List (Nat × Nat))) none
+      (extractCondsLoop deg condV condM i ((n, getLaneNat condM idx) :: acc))
+      (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg))) = some res at h_some
+    cases h_b : (Nat.ble 1 n && Nat.ble n (Nat.mul 2 deg)) with
+    | false => rw [h_b] at h_some; contradiction
+    | true =>
+      rw [h_b] at h_some
+      dsimp only at h_some
+      have ⟨h_acc, h_le⟩ := ih ((n, getLaneNat condM idx) :: acc) res h_some
+      refine ⟨fun c hc => h_acc c (List.mem_cons_of_mem _ hc), ?_⟩
+      intro j hj
+      by_cases hji : j ≤ i
+      · exact h_le j hji
+      · have hj_eq : j = idx := by change j = i + 1; omega
+        subst hj_eq
+        exact h_acc _ List.mem_cons_self
+
+theorem satisfiesPrefix_of_extractCondsRec (deg condV condM lev : Nat)
+    {conds : List (Nat × Nat)} (h_some : extractCondsRec deg condV condM lev = some conds)
+    (cd : Nat → Nat)
+    (h_sat : ∀ c ∈ conds, c.2.testBit (degBitIdx (cd c.1)) = true) :
+    SatisfiesPrefix cd condV condM (lev + 1) := by
+  rw [extractCondsRec_eq_loop] at h_some
+  have ⟨_, h_mem⟩ := extractCondsLoop_sublist deg condV condM lev [] conds h_some
+  intro j hj
+  exact h_sat (getLaneNat condV j, getLaneNat condM j) (h_mem j (by omega))
+
+theorem satisfiesPrefix_cond_iff (cd : Nat → Nat) (condV condM lev v maskTrue : Nat)
+    (h_lev : lev + 1 < 60) :
+    SatisfiesPrefix cd
+      (setLaneNat (setLaneNat condV lev v) (Nat.add lev 1) 0)
+      (setLaneNat (setLaneNat condM lev maskTrue) (Nat.add lev 1) 0)
+      lev ↔
+    SatisfiesPrefix cd condV condM lev := by
+  constructor <;> intro h i hi
+  · have hi60 : i < 60 := by omega
+    have hi_ne1 : i ≠ Nat.add lev 1 := by change i ≠ lev + 1; omega
+    have hi_ne0 : i ≠ lev := by omega
+    have h_i := h i hi
+    rw [getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 i hi60 hi_ne1,
+        getLaneNat_setLaneNat_ne _ lev maskTrue i hi60 hi_ne0,
+        getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 i hi60 hi_ne1,
+        getLaneNat_setLaneNat_ne _ lev v i hi60 hi_ne0] at h_i
+    exact h_i
+  · have hi60 : i < 60 := by omega
+    have hi_ne1 : i ≠ Nat.add lev 1 := by change i ≠ lev + 1; omega
+    have hi_ne0 : i ≠ lev := by omega
+    rw [getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 i hi60 hi_ne1,
+        getLaneNat_setLaneNat_ne _ lev maskTrue i hi60 hi_ne0,
+        getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 i hi60 hi_ne1,
+        getLaneNat_setLaneNat_ne _ lev v i hi60 hi_ne0]
+    exact h i hi
+
+theorem satisfiesPrefix_cond_succ_iff (cd : Nat → Nat) (condV condM lev v maskTrue : Nat)
+    (h_lev : lev + 1 < 60) (hv64 : v < 64) :
+    SatisfiesPrefix cd
+      (setLaneNat (setLaneNat condV lev v) (Nat.add lev 1) 0)
+      (setLaneNat (setLaneNat condM lev maskTrue) (Nat.add lev 1) 0)
+      (Nat.add lev 1) ↔
+    (SatisfiesPrefix cd condV condM lev ∧
+     maskTrue.testBit (degBitIdx (cd v)) = true) := by
+  let condV' := setLaneNat (setLaneNat condV lev v) (Nat.add lev 1) 0
+  let condM' := setLaneNat (setLaneNat condM lev maskTrue) (Nat.add lev 1) 0
+  have h_lev60 : lev < 60 := by omega
+  have h_ne1 : lev ≠ Nat.add lev 1 := by change lev ≠ lev + 1; omega
+  have h_v_eq : getLaneNat condV' lev = v := by
+    dsimp [condV']
+    rw [getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 lev h_lev60 h_ne1,
+        getLaneNat_setLaneNat_self condV lev v h_lev60 hv64]
+  have h_m_tb : (getLaneNat condM' lev).testBit (degBitIdx (cd v)) = maskTrue.testBit (degBitIdx (cd v)) := by
+    dsimp [condM']
+    rw [getLaneNat_setLaneNat_ne _ (Nat.add lev 1) 0 lev h_lev60 h_ne1,
+        testBit_getLaneNat_setLaneNat_self condM lev maskTrue h_lev60 (degBitIdx_lt_6 _)]
+  constructor
+  · intro h
+    refine ⟨(satisfiesPrefix_cond_iff cd condV condM lev v maskTrue h_lev).mp (fun i hi => h i (by change i < lev + 1; omega)), ?_⟩
+    have h_at := h lev (by change lev < lev + 1; omega)
+    rw [h_v_eq, h_m_tb] at h_at
+    exact h_at
+  · rintro ⟨h_pre, h_tb⟩ i hi
+    have hi_le : i ≤ lev := by change i < lev + 1 at hi; omega
+    by_cases hi_lt : i < lev
+    · exact (satisfiesPrefix_cond_iff cd condV condM lev v maskTrue h_lev).mpr h_pre i hi_lt
+    · have hi_eq : i = lev := by omega
+      subst hi_eq
+      rw [h_v_eq, h_m_tb]
+      exact h_tb
+
+theorem matchesCartState31_cond_true (deg : Nat) (cartDeg : Nat → Nat) (st v : Nat) (m : Int)
+    (h_deg : deg ≤ 11) (h_match31 : MatchesCartState31 deg cartDeg st)
+    (h_true : (condMaskNat m).testBit (degBitIdx (cartDeg v)) = true) :
+    MatchesCartState31 deg cartDeg (setLaneNat st v (Nat.land (getLaneNat st v) (condMaskNat m))) := by
+  refine ⟨?_, ?_⟩
+  · intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    by_cases hpv : p = v
+    · subst hpv
+      rw [testBit_getLaneNat_setLaneNat_self _ _ _ hp60 (degBitIdx_lt_6 _)]
+      change ((getLaneNat st p) &&& (condMaskNat m)).testBit (degBitIdx (cartDeg p)) = true
+      rw [Nat.testBit_and, h_match31.1 p hp1 hp2, h_true]
+      rfl
+    · rw [testBit_getLaneNat_setLaneNat_ne _ _ _ p hp60 hpv (degBitIdx_lt_6 _)]
+      exact h_match31.1 p hp1 hp2
+  · intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    change getLaneNat (setLaneNat st v (getLaneNat st v &&& condMaskNat m)) p ≤ 31
+    by_cases hpv : p = v
+    · subst hpv
+      have h_le : getLaneNat st p &&& condMaskNat m ≤ 31 :=
+        Nat.le_trans Nat.and_le_left (h_match31.2 p hp1 hp2)
+      rw [getLaneNat_setLaneNat_self st p (getLaneNat st p &&& condMaskNat m) hp60 (by omega)]
+      exact h_le
+    · rw [getLaneNat_setLaneNat_ne st v (getLaneNat st v &&& condMaskNat m) p hp60 hpv]
+      exact h_match31.2 p hp1 hp2
+
+theorem matchesCartState31_cond_false (deg : Nat) (cartDeg : Nat → Nat) (st v : Nat) (m : Int)
+    (h_deg : deg ≤ 11) (h_match31 : MatchesCartState31 deg cartDeg st)
+    (h_false : (condMaskNat m).testBit (degBitIdx (cartDeg v)) = false) :
+    MatchesCartState31 deg cartDeg (setLaneNat st v (Nat.land (getLaneNat st v) (Nat.xor 31 (condMaskNat m)))) := by
+  refine ⟨?_, ?_⟩
+  · intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    by_cases hpv : p = v
+    · subst hpv
+      rw [testBit_getLaneNat_setLaneNat_self _ _ _ hp60 (degBitIdx_lt_6 _)]
+      change ((getLaneNat st p) &&& (31 ^^^ condMaskNat m)).testBit (degBitIdx (cartDeg p)) = true
+      rw [Nat.testBit_and, Nat.testBit_xor, h_match31.1 p hp1 hp2, testBit_31_degBitIdx, h_false]
+      rfl
+    · rw [testBit_getLaneNat_setLaneNat_ne _ _ _ p hp60 hpv (degBitIdx_lt_6 _)]
+      exact h_match31.1 p hp1 hp2
+  · intro p hp1 hp2
+    have hp60 : p < 60 := by omega
+    change getLaneNat (setLaneNat st v (getLaneNat st v &&& Nat.xor 31 (condMaskNat m))) p ≤ 31
+    by_cases hpv : p = v
+    · subst hpv
+      have h_le : getLaneNat st p &&& Nat.xor 31 (condMaskNat m) ≤ 31 :=
+        Nat.le_trans Nat.and_le_left (h_match31.2 p hp1 hp2)
+      rw [getLaneNat_setLaneNat_self st p (getLaneNat st p &&& Nat.xor 31 (condMaskNat m)) hp60 (by omega)]
+      exact h_le
+    · rw [getLaneNat_setLaneNat_ne st v (getLaneNat st v &&& Nat.xor 31 (condMaskNat m)) p hp60 hpv]
+      exact h_match31.2 p hp1 hp2
+
+/-- Master Top-Down Traversal Soundness of `verifyTreePureRec` (Eliminating `ProofTree.sym`):
+    Tracks the three invariants (`SymTableSound`, `SiblingSound`, `PrefixSound`) across
+    both branches of every `ProofTree.cond` node, proving that every `ProofTree.sym` leaf
+    reduces to a previously verified `CoreCartLeaf` subtree via dihedral symmetry. -/
+theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List FastPosOut))
+    (P : (Nat → Nat) → Prop)
+    (h_deg1 : 1 ≤ deg) (h_deg : deg ≤ 11)
+    (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true)
+    (h_leaf : ∀ cd, CoreCartLeaf deg shiftedTable cd → P cd)
+    (h_sym : ∀ (cd : Nat → Nat) (k : Nat) (refl : Bool) (conds : List (Nat × Nat)),
+      k < deg →
+      (∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
+      (∀ c ∈ conds, c.2.testBit (degBitIdx (symCartDeg deg k refl cd c.1)) = true) →
+      (∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') →
+      P cd)
+    (t : ProofTree) :
+    ∀ (maxLev st lineno lev condV condM : Nat) (syms : List SymOutlet) (hs : HintStream),
+      validProofTree deg maxLev t = true →
+      lev + maxLev < 60 →
+      (∀ o ∈ syms, (∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) ∧
+        (∀ cd', (∀ c ∈ o.conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd')) →
+      (∀ conds, extractCondsRec deg condV condM lev = some conds →
+        ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') →
+      (∀ cd', SatisfiesPrefix cd' condV condM lev → P cd' ∨ MatchesCartState31 deg cd' st) →
+      (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true →
+      ∀ cd, SatisfiesPrefix cd condV condM lev → P cd := by
+  induction t with
+  | reduce =>
+    intro maxLev st lineno lev condV condM syms hs _ _ _ _ h_pref h_ok cd h_cd
+    rcases h_pref cd h_cd with hP | h_match31
+    · exact hP
+    · change (let (ok, hs') := reduceAxleRec deg 64 [st] hs
+              strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+      simp only [strictNat_eq] at h_ok
+      exact h_leaf cd (Or.inl (reduceAxleRec_sound deg cd h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok))
+  | hubcap members =>
+    intro maxLev st lineno lev condV condM syms hs h_valid _ _ _ h_pref h_ok cd h_cd
+    have h_cover : validHubcapCover deg members = true := by
+      cases maxLev <;> exact h_valid
+    rcases h_pref cd h_cd with hP | h_match31
+    · exact hP
+    · change (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
+              strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
+      simp only [strictNat_eq] at h_ok
+      rcases verifyHubcapMembersRec_sound31 deg cd h_deg st h_match31 shiftedTable h_table members hs h_ok with h_red | h_bounds
+      · exact h_leaf cd (Or.inl h_red)
+      · exact h_leaf cd (Or.inr ⟨members, h_cover, h_bounds⟩)
+  | sym k eps lev_in line =>
+    intro maxLev st lineno lev condV condM syms hs _ _ h_syms _ h_pref h_ok cd h_cd
+    rcases h_pref cd h_cd with hP | h_match31
+    · exact hP
+    · change (let ok :=
+                Bool.rec false
+                  (match findSymOutletRec line syms with
+                   | none => false
+                   | some found =>
+                     Bool.rec false
+                       (symForcedRec st (Nat.add k 1) deg (!Nat.beq eps 0) found.conds)
+                       (Nat.beq found.nolines (Nat.add lev_in 1)))
+                  (!Nat.ble deg k && Nat.ble eps 1)
+              strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs)).1 = true at h_ok
+      simp only [strictNat_eq] at h_ok
+      cases h_ke : (!Nat.ble deg k && Nat.ble eps 1) with
+      | false =>
+        rw [h_ke] at h_ok; dsimp at h_ok; contradiction
+      | true =>
+        rw [h_ke] at h_ok; dsimp at h_ok
+        cases h_find : findSymOutletRec line syms with
+        | none =>
+          rw [h_find] at h_ok; contradiction
+        | some found =>
+          rw [h_find] at h_ok; dsimp at h_ok
+          cases h_nl : Nat.beq found.nolines (Nat.add lev_in 1) with
+          | false =>
+            rw [h_nl] at h_ok; dsimp at h_ok; contradiction
+          | true =>
+            rw [h_nl] at h_ok; dsimp at h_ok
+            rcases Bool.and_eq_true_iff.mp h_ke with ⟨hk_not, _⟩
+            have hk_lt : k < deg :=
+              Classical.byContradiction fun h_ge => by
+                rw [Nat.ble_eq_true_of_le (by omega)] at hk_not
+                contradiction
+            have ⟨h_found_conds, h_found_P⟩ := h_syms found (findSymOutletRec_mem line syms h_find)
+            have h_shift_lt : Nat.add k 1 - 1 < deg := by
+              change (k + 1) - 1 < deg
+              omega
+            have h_forced := symForcedRec_sound deg cd st (Nat.add k 1) (!Nat.beq eps 0)
+              found.conds h_deg1 h_shift_lt h_match31.1 h_found_conds h_ok
+            exact h_sym cd k (!Nat.beq eps 0) found.conds hk_lt h_found_conds h_forced h_found_P
+  | cond v m tTrue tFalse ihTrue ihFalse =>
+    intro maxLev st lineno lev condV condM syms hs h_valid h_lev_max h_syms h_sib h_pref h_ok
+    cases maxLev with
+    | zero =>
+      dsimp [validProofTree] at h_valid
+      contradiction
+    | succ maxLev' =>
+      dsimp [validProofTree] at h_valid
+      rcases Bool.and_eq_true_iff.mp h_valid with ⟨h_v123, h_val_false⟩
+      rcases Bool.and_eq_true_iff.mp h_v123 with ⟨h_v12, h_val_true⟩
+      rcases Bool.and_eq_true_iff.mp h_v12 with ⟨hv1_b, hv2_b⟩
+      have hv1 : 1 ≤ v := Nat.le_of_ble_eq_true hv1_b
+      have hv2 : v ≤ 5 * deg := Nat.le_of_ble_eq_true hv2_b
+      have hv64 : v < 64 := by omega
+      have h_lev1 : lev + 1 < 60 := by omega
+      rw [verifyTreePureRec_cond_eq] at h_ok
+      simp only [strictNat_eq] at h_ok
+      let maskTrue := condMaskNat m
+      let maskFalse := Nat.xor 31 maskTrue
+      let curLane := getLaneNat st v
+      let stTrue := setLaneNat st v (Nat.land curLane maskTrue)
+      let stFalse := setLaneNat st v (Nat.land curLane maskFalse)
+      let lev1 := Nat.add lev 1
+      let lineno1 := Nat.add lineno 1
+      let syms' :=
+        match extractCondsRec deg condV condM lev with
+        | none => syms
+        | some conds => { number := lineno, nolines := lev1, conds := conds } :: syms
+      have h_syms' : ∀ o ∈ syms', (∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) ∧
+          (∀ cd', (∀ c ∈ o.conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') := by
+        dsimp [syms']
+        cases h_ext : extractCondsRec deg condV condM lev with
+        | none => exact h_syms
+        | some conds =>
+          intro o ho
+          rcases List.mem_cons.mp ho with rfl | ho_tail
+          · exact ⟨extractCondsRec_sound deg condV condM lev h_ext, h_sib conds h_ext⟩
+          · exact h_syms o ho_tail
+      let condV' := setLaneNat (setLaneNat condV lev v) lev1 0
+      let condM' := setLaneNat (setLaneNat condM lev maskTrue) lev1 0
+      let resTrue := verifyTreePureRec deg shiftedTable tTrue stTrue lineno1 lev1 condV' condM' syms' hs
+      change (@Bool.rec (fun _ => Bool × Nat × HintStream) (false, resTrue.2.fst, resTrue.2.snd)
+        (verifyTreePureRec deg shiftedTable tFalse stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd)
+        resTrue.fst).fst = true at h_ok
+      cases h_b : resTrue.fst with
+      | false =>
+        rw [h_b] at h_ok; dsimp at h_ok; contradiction
+      | true =>
+        rw [h_b] at h_ok; dsimp at h_ok
+        have h_sib_true : ∀ conds, extractCondsRec deg condV' condM' lev1 = some conds →
+            ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd' := by
+          intro conds h_some
+          have h_z : getLaneNat condV' lev1 = 0 :=
+            getLaneNat_setLaneNat_self _ lev1 0 h_lev1 (by omega)
+          rw [extractCondsRec_eq_none_of_getLaneNat_zero deg condV' condM' lev1 h_z] at h_some
+          contradiction
+        have h_pref_true : ∀ cd', SatisfiesPrefix cd' condV' condM' lev1 → P cd' ∨ MatchesCartState31 deg cd' stTrue := by
+          intro cd' h_sat1
+          rcases (satisfiesPrefix_cond_succ_iff cd' condV condM lev v maskTrue h_lev1 hv64).mp h_sat1 with ⟨h_sat0, h_tb⟩
+          rcases h_pref cd' h_sat0 with hP | h_match31
+          · exact Or.inl hP
+          · exact Or.inr (matchesCartState31_cond_true deg cd' st v m h_deg h_match31 h_tb)
+        have h_true_all : ∀ cd', SatisfiesPrefix cd' condV' condM' lev1 → P cd' :=
+          ihTrue maxLev' stTrue lineno1 lev1 condV' condM' syms' hs
+            h_val_true (by change (lev + 1) + maxLev' < 60; omega) h_syms' h_sib_true h_pref_true h_b
+        have h_sib_false : ∀ conds, extractCondsRec deg condV' condM' lev = some conds →
+            ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd' := by
+          intro conds h_some cd' h_sat
+          exact h_true_all cd' (satisfiesPrefix_of_extractCondsRec deg condV' condM' lev h_some cd' h_sat)
+        have h_pref_false : ∀ cd', SatisfiesPrefix cd' condV' condM' lev → P cd' ∨ MatchesCartState31 deg cd' stFalse := by
+          intro cd' h_sat0'
+          have h_sat0 : SatisfiesPrefix cd' condV condM lev :=
+            (satisfiesPrefix_cond_iff cd' condV condM lev v maskTrue h_lev1).mp h_sat0'
+          rcases h_pref cd' h_sat0 with hP | h_match31
+          · exact Or.inl hP
+          · cases h_bit : maskTrue.testBit (degBitIdx (cd' v)) with
+            | true =>
+              have h_sat1 : SatisfiesPrefix cd' condV' condM' lev1 :=
+                (satisfiesPrefix_cond_succ_iff cd' condV condM lev v maskTrue h_lev1 hv64).mpr ⟨h_sat0, h_bit⟩
+              exact Or.inl (h_true_all cd' h_sat1)
+            | false =>
+              exact Or.inr (matchesCartState31_cond_false deg cd' st v m h_deg h_match31 h_bit)
+        have h_false_all : ∀ cd', SatisfiesPrefix cd' condV' condM' lev → P cd' :=
+          ihFalse maxLev' stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd
+            h_val_false (by omega) h_syms' h_sib_false h_pref_false h_ok
+        intro cd h_cd
+        exact h_false_all cd ((satisfiesPrefix_cond_iff cd condV condM lev v maskTrue h_lev1).mpr h_cd)
+
+/-- A family `ℱ : (Nat → Nat) → Prop` of cartwheel degree assignments at hub degree `deg`
+    is closed under dihedral symmetries (`k < deg` rotations and `refl : Bool` reflections)
+    on the first two rings (`1 ≤ p ≤ 2 * deg`). -/
+def DihedralClosedFamily (deg : Nat) (ℱ : (Nat → Nat) → Prop) : Prop :=
+  ∀ (cd : Nat → Nat) (k : Nat) (refl : Bool),
+    k < deg → ℱ cd → ∃ cd', ℱ cd' ∧ ∀ p, 1 ≤ p → p ≤ 2 * deg → cd' p = symCartDeg deg k refl cd p
+
+/-- Inductive dihedral orbit of a cartwheel degree assignment `cartDeg` at hub degree `deg`
+    under rotational shifts (`k < deg`) and reflections (`refl : Bool`). -/
+inductive InDihedralOrbit (deg : Nat) (cartDeg : Nat → Nat) : (Nat → Nat) → Prop
+  | base : InDihedralOrbit deg cartDeg cartDeg
+  | step {cd : Nat → Nat} (k : Nat) (refl : Bool) :
+      k < deg → InDihedralOrbit deg cartDeg cd →
+      InDihedralOrbit deg cartDeg (symCartDeg deg k refl cd)
+
+theorem dihedralClosedFamily_inDihedralOrbit (deg : Nat) (cartDeg : Nat → Nat) :
+    DihedralClosedFamily deg (InDihedralOrbit deg cartDeg) :=
+  fun cd k refl hk h_in => ⟨symCartDeg deg k refl cd, .step k refl hk h_in, fun _ _ _ => rfl⟩
+
+/-- Top-level `verifyTree` Core Soundness (with `ProofTree.sym` eliminated):
+    for any dihedral-closed family `ℱ` of cartwheel degree assignments (`DihedralClosedFamily deg ℱ`)
+    that is non-empty (`∃ cd₀, ℱ cd₀`), if `validProofTree deg 58 t = true` and
+    `verifyTree configs deg A_low A_upp t outs = true` for `deg ∈ {7, 8, 9, 10, 11}`,
+    then there exists a member `cd ∈ ℱ` satisfying the 2-way `CoreCartLeaf` certificate
+    (`HasExactReducedAxle` or `validHubcapCover` LP bound). -/
+theorem verifyTree_core_soundness (configs : List Configuration) (deg : Nat)
+    (A_low A_upp : Array Nat) (t : ProofTree) (outs : Array Outlet)
+    (ℱ : (Nat → Nat) → Prop) (h_closed : DihedralClosedFamily deg ℱ)
+    {cd0 : Nat → Nat} (h_cd0 : ℱ cd0)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
+    (h_valid : validProofTree deg 58 t = true)
+    (h_ver : verifyTree configs deg A_low A_upp t outs = true) :
+    ∃ cd, ℱ cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd := by
+  have h_deg1 : 1 ≤ deg := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
+  have h_le11 : deg ≤ 11 := by rcases h_deg with rfl | rfl | rfl | rfl | rfl <;> omega
+  let shiftedTable := getShiftedTableForDeg deg
+  let P : (Nat → Nat) → Prop := fun cd => ℱ cd → ∃ cd', ℱ cd' ∧ CoreCartLeaf deg shiftedTable cd'
+  have h_leaf : ∀ cd, CoreCartLeaf deg shiftedTable cd → P cd :=
+    fun cd h_core h_F => ⟨cd, h_F, h_core⟩
+  have h_sym : ∀ (cd : Nat → Nat) (k : Nat) (refl : Bool) (conds : List (Nat × Nat)),
+      k < deg →
+      (∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) →
+      (∀ c ∈ conds, c.2.testBit (degBitIdx (symCartDeg deg k refl cd c.1)) = true) →
+      (∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') →
+      P cd := by
+    intro cd k refl conds hk h_conds h_forced h_all_P h_F
+    rcases h_closed cd k refl hk h_F with ⟨cd', h_F', h_eq⟩
+    have h_sat' : ∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true := by
+      intro c hc
+      rcases h_conds c hc with ⟨hc1, hc2⟩
+      rw [h_eq c.1 hc1 hc2]
+      exact h_forced c hc
+    exact h_all_P cd' h_sat' h_F'
+  have h_syms0 : ∀ o ∈ ([] : List SymOutlet), (∀ c ∈ o.conds, 1 ≤ c.1 ∧ c.1 ≤ 2 * deg) ∧
+      (∀ cd', (∀ c ∈ o.conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') :=
+    fun _ h => by cases h
+  have h_sib0 : ∀ conds, extractCondsRec deg 0 0 0 = some conds →
+      ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd' := by
+    intro conds h_some
+    rw [extractCondsRec_eq_none_of_getLaneNat_zero deg 0 0 0 rfl] at h_some
+    contradiction
+  have h_pref0 : ∀ cd', SatisfiesPrefix cd' 0 0 0 → P cd' ∨ MatchesCartState31 deg cd' (getInitStateForDeg deg) :=
+    fun cd' _ => Or.inr (matchesCartState31_getInitStateForDeg deg cd' h_deg)
+  have h_sat0 : SatisfiesPrefix cd0 0 0 0 := fun _ hi => by omega
+  exact verifyTreePureRec_sound_of_pred deg shiftedTable P h_deg1 h_le11
+    (validFastPosOut_getShiftedTableForDeg deg h_deg) h_leaf h_sym t
+    58 (getInitStateForDeg deg) 2 0 0 0 [] ([], getHintsForDeg deg)
+    h_valid (by omega) h_syms0 h_sib0 h_pref0 h_ver cd0 h_sat0 h_cd0
+
+/-- Top-level `DischargingTreesVerified` Core Soundness (with `ProofTree.sym` eliminated):
+    for every hub degree `deg ∈ {7, 8, 9, 10, 11}` and any dihedral-closed family `ℱ`
+    containing `cd0`, `DischargingTreesVerified configs` guarantees that some `cd ∈ ℱ`
+    satisfies the non-vacuous 2-way `CoreCartLeaf deg (getShiftedTableForDeg deg) cd`. -/
+theorem dischargingTreesVerified_core_soundness (configs : List Configuration)
+    (h_trees : DischargingTreesVerified configs) (deg : Nat)
+    (ℱ : (Nat → Nat) → Prop) (h_closed : DihedralClosedFamily deg ℱ)
+    {cd0 : Nat → Nat} (h_cd0 : ℱ cd0)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    ∃ cd, ℱ cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd := by
+  rcases h_trees with ⟨h7, h8, h9, h10, h11⟩
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · exact verifyTree_core_soundness configs 7 (trivial_A_low 7) (trivial_A_upp 7) (present7 ()) (readOutlets 7 theRules) ℱ h_closed h_cd0 (Or.inl rfl) validProofTree_present7 h7
+  · exact verifyTree_core_soundness configs 8 (trivial_A_low 8) (trivial_A_upp 8) (present8 ()) (readOutlets 8 theRules) ℱ h_closed h_cd0 (Or.inr (Or.inl rfl)) validProofTree_present8 h8
+  · exact verifyTree_core_soundness configs 9 (trivial_A_low 9) (trivial_A_upp 9) (present9 ()) (readOutlets 9 theRules) ℱ h_closed h_cd0 (Or.inr (Or.inr (Or.inl rfl))) validProofTree_present9 h9
+  · exact verifyTree_core_soundness configs 10 (trivial_A_low 10) (trivial_A_upp 10) (present10 ()) (readOutlets 10 theRules) ℱ h_closed h_cd0 (Or.inr (Or.inr (Or.inr (Or.inl rfl)))) validProofTree_present10 h10
+  · exact verifyTree_core_soundness configs 11 (trivial_A_low 11) (trivial_A_upp 11) (present11 ()) (readOutlets 11 theRules) ℱ h_closed h_cd0 (Or.inr (Or.inr (Or.inr (Or.inr rfl)))) validProofTree_present11 h11
+
+/-- Dihedral Orbit Core Soundness for any cartwheel degree assignment `cartDeg : Nat → Nat`:
+    `DischargingTreesVerified configs` guarantees that some member `cd ∈ InDihedralOrbit deg cartDeg`
+    satisfies `CoreCartLeaf deg (getShiftedTableForDeg deg) cd` (and hence either `HasExactReducedAxle`
+    or `10 * (6 - deg) + ∑_{i=1..deg} activeOutletSum(i) ≤ 0`). -/
+theorem dischargingTreesVerified_orbit_core_soundness (configs : List Configuration)
+    (h_trees : DischargingTreesVerified configs) (deg : Nat) (cartDeg : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    ∃ cd, InDihedralOrbit deg cartDeg cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd :=
+  dischargingTreesVerified_core_soundness configs h_trees deg
+    (InDihedralOrbit deg cartDeg) (dihedralClosedFamily_inDihedralOrbit deg cartDeg)
+    InDihedralOrbit.base h_deg
+
+/-- Orientation-aware `i`-th spoke dart (`1 ≤ i ≤ deg`) around hub dart `d0` in hypermap `H`:
+    iterates `H.node.f` when `refl = false` and `H.node.inv` (`H.node.symm`) when `refl = true`. -/
+def spokeDartOriented (H : Hypermap) (refl : Bool) (d0 : H.Dart) (i : Nat) : H.Dart :=
+  if refl then Hypermap.Perm.iter H.node.symm (i - 1) d0
+  else Hypermap.Perm.iter H.node (i - 1) d0
+
+/-- Orientation-aware cartwheel position map `0 ≤ p ≤ 5 * deg` around hub dart `d0` in hypermap `H`. -/
+def cartDartOriented (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) (p : Nat) : H.Dart :=
+  if p == 0 then d0
+  else
+    let ringIdx := (p - 1) / deg
+    let s := spokeDartOriented H refl d0 ((p - 1) % deg + 1)
+    if ringIdx == 0 then ruleVertexDart H refl (H.edge.f s) 0
+    else if ringIdx == 1 then ruleVertexDart H refl (H.edge.f s) 5
+    else if ringIdx == 2 then ruleVertexDart H refl (H.edge.f s) 12
+    else if ringIdx == 3 then ruleVertexDart H refl (H.edge.f s) 13
+    else if refl then H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f s))))))
+    else H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f s))))))
+
+/-- Orientation-aware cartwheel degree assignment `Nat → Nat` around hub dart `d0` in hypermap `H`. -/
+def cartDegOriented (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (refl : Bool) (d0 : H.Dart) (p : Nat) : Nat :=
+  Hypermap.nodeDegree H (cartDartOriented H deg refl d0 p) fuel
+
+@[simp] theorem spokeDartOriented_false (H : Hypermap) (d0 : H.Dart) (i : Nat) :
+    spokeDartOriented H false d0 i = spokeDart H d0 i := rfl
+
+@[simp] theorem cartDartOriented_false (H : Hypermap) (deg : Nat) (d0 : H.Dart) (p : Nat) :
+    cartDartOriented H deg false d0 p = cartDart H deg d0 p := rfl
+
+@[simp] theorem cartDegOriented_false (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (d0 : H.Dart) (p : Nat) :
+    cartDegOriented H fuel deg false d0 p = cartDegOfDart H fuel deg d0 p := rfl
+
+/-- The dihedral family of cartwheel degree assignments around a hub vertex `u : H.Dart` of degree `deg`:
+    includes all rotational/reflectional cartwheel views `cartDegOriented H fuel deg refl d0`
+    for `d0 ∈ getOrbit H.node fuel u` and `refl : Bool`, closed under `symCartDeg deg k refl` (`k < deg`). -/
+inductive HypermapHubFamily (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (u : H.Dart) : (Nat → Nat) → Prop
+  | of_orbit {d0 : H.Dart} (refl : Bool) :
+      d0 ∈ getOrbit H.node fuel u →
+      HypermapHubFamily H fuel deg u (cartDegOriented H fuel deg refl d0)
+  | sym {cd : Nat → Nat} (k : Nat) (refl : Bool) :
+      k < deg → HypermapHubFamily H fuel deg u cd →
+      HypermapHubFamily H fuel deg u (symCartDeg deg k refl cd)
+
+theorem dihedralClosedFamily_hypermapHubFamily (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (u : H.Dart) :
+    DihedralClosedFamily deg (HypermapHubFamily H fuel deg u) :=
+  fun cd k refl hk h_in => ⟨symCartDeg deg k refl cd, .sym k refl hk h_in, fun _ _ _ => rfl⟩
+
+/-- Real-Hypermap Core Soundness of `DischargingTreesVerified` (Degrees 7–11, `ProofTree.sym` eliminated):
+    for any hypermap `H`, fuel `fuel`, and hub dart `u : H.Dart` whose vertex degree
+    `deg = Hypermap.nodeDegree H u fuel` lies in `{7, 8, 9, 10, 11}`,
+    `DischargingTreesVerified configs` guarantees that some member `cd ∈ HypermapHubFamily H fuel deg u`
+    satisfies the non-vacuous 2-way `CoreCartLeaf deg (getShiftedTableForDeg deg) cd`
+    (and hence either `HasExactReducedAxle deg cd` or `10 * (6 - deg) + ∑_{i=1..deg} activeOutletSum(i) ≤ 0`). -/
+theorem dischargingTreesVerified_hypermap_core_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
+    (fuel : Nat) (u : H.Dart)
+    (h_deg : Hypermap.nodeDegree H u fuel = 7 ∨
+             Hypermap.nodeDegree H u fuel = 8 ∨
+             Hypermap.nodeDegree H u fuel = 9 ∨
+             Hypermap.nodeDegree H u fuel = 10 ∨
+             Hypermap.nodeDegree H u fuel = 11) :
+    let deg := Hypermap.nodeDegree H u fuel
+    ∃ cd, HypermapHubFamily H fuel deg u cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd := by
+  let deg := Hypermap.nodeDegree H u fuel
+  have h_u_mem : u ∈ getOrbit H.node fuel u :=
+    List.contains_iff_mem.mp (Hypermap.getOrbit_contains_self H.node fuel u)
+  exact dischargingTreesVerified_core_soundness configs h_trees deg
+    (HypermapHubFamily H fuel deg u) (dihedralClosedFamily_hypermapHubFamily H fuel deg u)
+    (HypermapHubFamily.of_orbit false h_u_mem) h_deg
+
+/-- Primal–Dual Real-Hypermap Core Soundness on `H.dual` (Degrees 7–11, `ProofTree.sym` eliminated):
+    for any dual vertex (primal face) `u : H.Dart` of degree `deg ∈ {7, 8, 9, 10, 11}` in `H.dual`,
+    `DischargingTreesVerified configs` guarantees that some member `cd ∈ HypermapHubFamily H.dual fuel deg u`
+    satisfies the non-vacuous 2-way `CoreCartLeaf deg (getShiftedTableForDeg deg) cd`. -/
+theorem dual_dischargingTreesVerified_hypermap_core_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
+    (fuel : Nat) (u : H.Dart)
+    (h_deg : Hypermap.nodeDegree H.dual u fuel = 7 ∨
+             Hypermap.nodeDegree H.dual u fuel = 8 ∨
+             Hypermap.nodeDegree H.dual u fuel = 9 ∨
+             Hypermap.nodeDegree H.dual u fuel = 10 ∨
+             Hypermap.nodeDegree H.dual u fuel = 11) :
+    let deg := Hypermap.nodeDegree H.dual u fuel
+    ∃ cd, HypermapHubFamily H.dual fuel deg u cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd :=
+  dischargingTreesVerified_hypermap_core_soundness H.dual configs h_trees fuel u h_deg
 
 end Discharging
 end Math
