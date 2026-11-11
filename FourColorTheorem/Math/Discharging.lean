@@ -6278,21 +6278,21 @@ theorem spokeDart_mem_getOrbit_of_complete (H : Hypermap) [DecidableEq H.Dart]
 /-- Maps each RSST cartwheel position `0 ≤ p ≤ 5 * deg` around hub dart `d0` in hypermap `H`
     to its representative vertex dart, matching the 5 concentric cartwheel rings of `getAdjMat` / `doFan` / `doOutlet`:
     - `p = 0`: hub dart `d0`
-    - `1 ≤ p ≤ deg` (`ringIdx = 0`, spoke `i`): `ruleVertexDart H false (H.edge.f s_i) 0` (`= H.edge.f s_i`)
-    - `deg + 1 ≤ p ≤ 2 * deg` (`ringIdx = 1`, hat `deg + i`): `ruleVertexDart H false (H.edge.f s_i) 5`
-    - `2 * deg + 1 ≤ p ≤ 3 * deg` (`ringIdx = 2`, 1st fan `2 * deg + i`): `ruleVertexDart H false (H.edge.f s_i) 12`
-    - `3 * deg + 1 ≤ p ≤ 4 * deg` (`ringIdx = 3`, 2nd fan `3 * deg + i`): `ruleVertexDart H false (H.edge.f s_i) 13`
-    - `4 * deg + 1 ≤ p ≤ 5 * deg` (`ringIdx ≥ 4`, 3rd fan `4 * deg + i`): `H.edge.f (H.node.inv^5 (H.edge.f s_i))`. -/
+    - `1 ≤ p ≤ deg` (`ringIdx = 0`, spoke `i`): `ruleVertexDart H true (H.edge.f s_i) 0` (`= H.edge.f s_i`)
+    - `deg + 1 ≤ p ≤ 2 * deg` (`ringIdx = 1`, hat `deg + i`): `ruleVertexDart H true (H.edge.f s_i) 5`
+    - `2 * deg + 1 ≤ p ≤ 3 * deg` (`ringIdx = 2`, 1st fan `2 * deg + i`): `ruleVertexDart H true (H.edge.f s_i) 12`
+    - `3 * deg + 1 ≤ p ≤ 4 * deg` (`ringIdx = 3`, 2nd fan `3 * deg + i`): `ruleVertexDart H true (H.edge.f s_i) 13`
+    - `4 * deg + 1 ≤ p ≤ 5 * deg` (`ringIdx ≥ 4`, 3rd fan `4 * deg + i`): `H.edge.f (H.node.f^5 (H.edge.f s_i))`. -/
 def cartDart (H : Hypermap) (deg : Nat) (d0 : H.Dart) (p : Nat) : H.Dart :=
   if p == 0 then d0
   else
     let ringIdx := (p - 1) / deg
     let s := spokeDart H d0 ((p - 1) % deg + 1)
-    if ringIdx == 0 then ruleVertexDart H false (H.edge.f s) 0
-    else if ringIdx == 1 then ruleVertexDart H false (H.edge.f s) 5
-    else if ringIdx == 2 then ruleVertexDart H false (H.edge.f s) 12
-    else if ringIdx == 3 then ruleVertexDart H false (H.edge.f s) 13
-    else H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f s))))))
+    if ringIdx == 0 then ruleVertexDart H true (H.edge.f s) 0
+    else if ringIdx == 1 then ruleVertexDart H true (H.edge.f s) 5
+    else if ringIdx == 2 then ruleVertexDart H true (H.edge.f s) 12
+    else if ringIdx == 3 then ruleVertexDart H true (H.edge.f s) 13
+    else H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f s))))))
 
 /-- Concrete cartwheel degree assignment `Nat → Nat` around hub dart `d0` in hypermap `H`. -/
 def cartDegOfDart (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (d0 : H.Dart) (p : Nat) : Nat :=
@@ -6333,10 +6333,10 @@ theorem cartDart_spoke (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
   rw [h_ne0, h_div, h_mod]
   rfl
 
-/-- For `1 ≤ i ≤ deg`, cartwheel hat position `deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 5`. -/
+/-- For `1 ≤ i ≤ deg`, cartwheel hat position `deg + i` maps to `ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 5`. -/
 theorem cartDart_hat (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
     (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
-    cartDart H deg d0 (deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 5 := by
+    cartDart H deg d0 (deg + i) = ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 5 := by
   dsimp [cartDart]
   have h_ne0 : (deg + i == 0) = false := beq_false_of_ne (by omega)
   have h_div : ((deg + i) - 1) / deg = 1 := by
@@ -6346,10 +6346,10 @@ theorem cartDart_hat (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
   rw [h_ne0, h_div, h_mod]
   rfl
 
-/-- For `1 ≤ i ≤ deg`, 1st fan position `2 * deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 12`. -/
+/-- For `1 ≤ i ≤ deg`, 1st fan position `2 * deg + i` maps to `ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 12`. -/
 theorem cartDart_fan1 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
     (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
-    cartDart H deg d0 (2 * deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 12 := by
+    cartDart H deg d0 (2 * deg + i) = ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 12 := by
   dsimp [cartDart]
   have h_ne0 : (2 * deg + i == 0) = false := beq_false_of_ne (by omega)
   have h_div : ((2 * deg + i) - 1) / deg = 2 := ringIdx_of_mul_add (k := 2) hi1 hi2
@@ -6357,10 +6357,10 @@ theorem cartDart_fan1 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
   rw [h_ne0, h_div, h_mod]
   rfl
 
-/-- For `1 ≤ i ≤ deg`, 2nd fan position `3 * deg + i` maps to `ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 13`. -/
+/-- For `1 ≤ i ≤ deg`, 2nd fan position `3 * deg + i` maps to `ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 13`. -/
 theorem cartDart_fan2 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
     (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
-    cartDart H deg d0 (3 * deg + i) = ruleVertexDart H false (H.edge.f (spokeDart H d0 i)) 13 := by
+    cartDart H deg d0 (3 * deg + i) = ruleVertexDart H true (H.edge.f (spokeDart H d0 i)) 13 := by
   dsimp [cartDart]
   have h_ne0 : (3 * deg + i == 0) = false := beq_false_of_ne (by omega)
   have h_div : ((3 * deg + i) - 1) / deg = 3 := ringIdx_of_mul_add (k := 3) hi1 hi2
@@ -6368,11 +6368,11 @@ theorem cartDart_fan2 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
   rw [h_ne0, h_div, h_mod]
   rfl
 
-/-- For `1 ≤ i ≤ deg`, 3rd fan position `4 * deg + i` maps to `H.edge.f (H.node.inv^5 (H.edge.f (spokeDart H d0 i)))`. -/
+/-- For `1 ≤ i ≤ deg`, 3rd fan position `4 * deg + i` maps to `H.edge.f (H.node.f^5 (H.edge.f (spokeDart H d0 i)))`. -/
 theorem cartDart_fan3 (H : Hypermap) (deg : Nat) (d0 : H.Dart) {i : Nat}
     (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
     cartDart H deg d0 (4 * deg + i) =
-      H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f (spokeDart H d0 i))))))) := by
+      H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f (spokeDart H d0 i))))))) := by
   dsimp [cartDart]
   have h_ne0 : (4 * deg + i == 0) = false := beq_false_of_ne (by omega)
   have h_div : ((4 * deg + i) - 1) / deg = 4 := ringIdx_of_mul_add (k := 4) hi1 hi2
@@ -8070,12 +8070,12 @@ def cartDartOriented (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) (p :
   else
     let ringIdx := (p - 1) / deg
     let s := spokeDartOriented H refl d0 ((p - 1) % deg + 1)
-    if ringIdx == 0 then ruleVertexDart H refl (H.edge.f s) 0
-    else if ringIdx == 1 then ruleVertexDart H refl (H.edge.f s) 5
-    else if ringIdx == 2 then ruleVertexDart H refl (H.edge.f s) 12
-    else if ringIdx == 3 then ruleVertexDart H refl (H.edge.f s) 13
-    else if refl then H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f s))))))
-    else H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f s))))))
+    if ringIdx == 0 then ruleVertexDart H (!refl) (H.edge.f s) 0
+    else if ringIdx == 1 then ruleVertexDart H (!refl) (H.edge.f s) 5
+    else if ringIdx == 2 then ruleVertexDart H (!refl) (H.edge.f s) 12
+    else if ringIdx == 3 then ruleVertexDart H (!refl) (H.edge.f s) 13
+    else if refl then H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f s))))))
+    else H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f s))))))
 
 /-- Orientation-aware cartwheel degree assignment `Nat → Nat` around hub dart `d0` in hypermap `H`. -/
 def cartDegOriented (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (refl : Bool) (d0 : H.Dart) (p : Nat) : Nat :=
@@ -8090,59 +8090,1154 @@ def cartDegOriented (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (refl :
 @[simp] theorem cartDegOriented_false (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (d0 : H.Dart) (p : Nat) :
     cartDegOriented H fuel deg false d0 p = cartDegOfDart H fuel deg d0 p := rfl
 
-/-- The dihedral family of cartwheel degree assignments around a hub vertex `u : H.Dart` of degree `deg`:
-    includes all rotational/reflectional cartwheel views `cartDegOriented H fuel deg refl d0`
-    for `d0 ∈ getOrbit H.node fuel u` and `refl : Bool`, closed under `symCartDeg deg k refl` (`k < deg`). -/
-inductive HypermapHubFamily (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (u : H.Dart) : (Nat → Nat) → Prop
-  | of_orbit {d0 : H.Dart} (refl : Bool) :
-      d0 ∈ getOrbit H.node fuel u →
-      HypermapHubFamily H fuel deg u (cartDegOriented H fuel deg refl d0)
-  | sym {cd : Nat → Nat} (k : Nat) (refl : Bool) :
-      k < deg → HypermapHubFamily H fuel deg u cd →
-      HypermapHubFamily H fuel deg u (symCartDeg deg k refl cd)
+@[simp] theorem cartDartOriented_zero (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) :
+    cartDartOriented H deg refl d0 0 = d0 := rfl
 
-theorem dihedralClosedFamily_hypermapHubFamily (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (u : H.Dart) :
-    DihedralClosedFamily deg (HypermapHubFamily H fuel deg u) :=
-  fun cd k refl hk h_in => ⟨symCartDeg deg k refl cd, .sym k refl hk h_in, fun _ _ _ => rfl⟩
+@[simp] theorem cartDegOriented_zero (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (refl : Bool) (d0 : H.Dart) :
+    cartDegOriented H fuel deg refl d0 0 = Hypermap.nodeDegree H d0 fuel := rfl
+
+theorem cartDartOriented_spoke (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDartOriented H deg refl d0 i = H.edge.f (spokeDartOriented H refl d0 i) := by
+  dsimp [cartDartOriented]
+  have h_ne0 : (i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : (i - 1) / deg = 0 := by simpa using ringIdx_of_mul_add (k := 0) hi1 hi2
+  have h_mod : (i - 1) % deg + 1 = i := by simpa using spokeIdx_of_mul_add (k := 0) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+theorem cartDartOriented_hat (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDartOriented H deg refl d0 (deg + i) =
+      ruleVertexDart H (!refl) (H.edge.f (spokeDartOriented H refl d0 i)) 5 := by
+  dsimp [cartDartOriented]
+  have h_ne0 : (deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((deg + i) - 1) / deg = 1 := by simpa using ringIdx_of_mul_add (k := 1) hi1 hi2
+  have h_mod : ((deg + i) - 1) % deg + 1 = i := by simpa using spokeIdx_of_mul_add (k := 1) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+theorem cartDartOriented_fan1 (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDartOriented H deg refl d0 (2 * deg + i) =
+      ruleVertexDart H (!refl) (H.edge.f (spokeDartOriented H refl d0 i)) 12 := by
+  dsimp [cartDartOriented]
+  have h_ne0 : (2 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((2 * deg + i) - 1) / deg = 2 := ringIdx_of_mul_add (k := 2) hi1 hi2
+  have h_mod : ((2 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 2) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+theorem cartDartOriented_fan2 (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDartOriented H deg refl d0 (3 * deg + i) =
+      ruleVertexDart H (!refl) (H.edge.f (spokeDartOriented H refl d0 i)) 13 := by
+  dsimp [cartDartOriented]
+  have h_ne0 : (3 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((3 * deg + i) - 1) / deg = 3 := ringIdx_of_mul_add (k := 3) hi1 hi2
+  have h_mod : ((3 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 3) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+theorem cartDartOriented_fan3 (H : Hypermap) (deg : Nat) (refl : Bool) (d0 : H.Dart) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    cartDartOriented H deg refl d0 (4 * deg + i) =
+      if refl then H.edge.f (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.node.inv (H.edge.f (spokeDartOriented H refl d0 i)))))))
+      else H.edge.f (H.node.f (H.node.f (H.node.f (H.node.f (H.node.f (H.edge.f (spokeDartOriented H refl d0 i))))))) := by
+  dsimp [cartDartOriented]
+  have h_ne0 : (4 * deg + i == 0) = false := beq_false_of_ne (by omega)
+  have h_div : ((4 * deg + i) - 1) / deg = 4 := ringIdx_of_mul_add (k := 4) hi1 hi2
+  have h_mod : ((4 * deg + i) - 1) % deg + 1 = i := spokeIdx_of_mul_add (k := 4) hi1 hi2
+  rw [h_ne0, h_div, h_mod]
+  rfl
+
+/-!
+### Stage N.1: Triangulation Face-Step & Hat-Reflection Identities
+-/
+
+/-- `H.face.f d = H.node.inv (H.edge.f d)`. -/
+theorem face_f_eq_node_inv_edge_f (H : Hypermap) (d : H.Dart) :
+    H.face.f d = H.node.inv (H.edge.f d) := by
+  rw [Hypermap.face_eq_node_inv_edge_inv, Hypermap.edge_inv_eq_edge]
+
+/-- On a complete dart list (`darts.length ≤ fuel`), `Hypermap.faceDegree H d fuel = 3`
+    implies `H.face.f (H.face.f (H.face.f d)) = d`. -/
+theorem face_f_three_of_faceDegree_eq_three (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {d : H.Dart}
+    (h_tri : Hypermap.faceDegree H d fuel = 3) :
+    H.face.f (H.face.f (H.face.f d)) = d := by
+  have h_per := Hypermap.perm_iter_length_getOrbit_eq_self_of_complete H.face darts h_all h_le d
+  change Hypermap.Perm.iter H.face (Hypermap.faceDegree H d fuel) d = d at h_per
+  rw [h_tri] at h_per
+  exact h_per
+
+/-- Fundamental Triangulation Face-Step Identity:
+    if `H.face.f^3 = id` at `H.edge.f (H.node.f s)`, then
+    `H.edge.f (H.node.inv (H.edge.f s)) = H.node.f (H.edge.f (H.node.f s))`. -/
+theorem edge_node_inv_edge_eq_node_f_edge_node_f (H : Hypermap)
+    (h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x) (s : H.Dart) :
+    H.edge.f (H.node.inv (H.edge.f s)) = H.node.f (H.edge.f (H.node.f s)) := by
+  have h_fen := Hypermap.face_edge_node_id H s
+  have h_ff : H.face.f (H.face.f s) = H.edge.f (H.node.f s) := by
+    have h1 := congrArg (fun x => H.face.f (H.face.f x)) h_fen
+    dsimp at h1
+    rw [h_tri3 (H.edge.f (H.node.f s))] at h1
+    exact h1.symm
+  rw [face_f_eq_node_inv_edge_f, face_f_eq_node_inv_edge_f] at h_ff
+  have h2 := congrArg H.node.f h_ff
+  rw [H.node.right_inv] at h2
+  exact h2
+
+/-- Triangulation Hat-Reflection Dart Identity:
+    if `H.face.f^3 = id` everywhere on `H`, then for every spoke dart `s : H.Dart`,
+    `ruleVertexDart H true (H.edge.f s) 5 = H.node.f (ruleVertexDart H false (H.edge.f (H.node.f s)) 5)`. -/
+theorem hat_dart_true_eq_node_f_false (H : Hypermap)
+    (h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x) (s : H.Dart) :
+    ruleVertexDart H true (H.edge.f s) 5 =
+      H.node.f (ruleVertexDart H false (H.edge.f (H.node.f s)) 5) := by
+  dsimp [ruleVertexDart, ruleRot]
+  let y := H.node.f (H.edge.f (H.node.f s))
+  have h1 : H.node.inv (H.edge.f s) = H.edge.f y := by
+    have h_step := edge_node_inv_edge_eq_node_f_edge_node_f H h_tri3 s
+    have h_e := congrArg H.edge.f h_step
+    rw [H.edge_involution] at h_e
+    exact h_e
+  rw [h1]
+  exact edge_node_inv_edge_eq_node_f_edge_node_f H h_tri3 y
+
+/-- Inverse form of the Triangulation Hat-Reflection Dart Identity:
+    `H.node.inv (ruleVertexDart H true (H.edge.f s) 5) = ruleVertexDart H false (H.edge.f (H.node.f s)) 5`. -/
+theorem node_inv_hat_dart_true_eq_false (H : Hypermap)
+    (h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x) (s : H.Dart) :
+    H.node.inv (ruleVertexDart H true (H.edge.f s) 5) =
+      ruleVertexDart H false (H.edge.f (H.node.f s)) 5 := by
+  rw [hat_dart_true_eq_node_f_false H h_tri3 s, H.node.left_inv]
+
+/-- On a complete dart list (`darts.length ≤ fuel`), `H.node.f d` and `d` have the same `nodeDegree`. -/
+theorem nodeDegree_node_f_eq_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d : H.Dart) :
+    Hypermap.nodeDegree H (H.node.f d) fuel = Hypermap.nodeDegree H d fuel := by
+  have hd_mem : d ∈ getOrbit H.node fuel d :=
+    List.contains_iff_mem.mp (Hypermap.getOrbit_contains_self H.node fuel d)
+  have hfd_mem : H.node.f d ∈ getOrbit H.node fuel d :=
+    Hypermap.getOrbit_closed_under_f_of_complete H.node darts h_all h_le hd_mem
+  exact nodeDegree_eq_of_mem_getOrbit H darts h_all h_le hfd_mem
+
+/-- Unified Triangulation Hat-Reflection Degree Identity:
+    for any orientation `r0 : Bool` and spoke dart `s : H.Dart` on a complete triangulated hypermap,
+    `nodeDegree` at `ruleVertexDart H (!r0) (H.edge.f s) 5` equals
+    `nodeDegree` at `ruleVertexDart H r0 (H.edge.f (ruleRot H r0 s)) 5`. -/
+theorem nodeDegree_hat_refl_eq_of_triangulation (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x)
+    (r0 : Bool) (s : H.Dart) :
+    Hypermap.nodeDegree H (ruleVertexDart H (!r0) (H.edge.f s) 5) fuel =
+      Hypermap.nodeDegree H (ruleVertexDart H r0 (H.edge.f (ruleRot H r0 s)) 5) fuel := by
+  cases r0 with
+  | false =>
+    change Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f s) 5) fuel =
+      Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f (H.node.f s)) 5) fuel
+    rw [hat_dart_true_eq_node_f_false H h_tri3 s]
+    exact nodeDegree_node_f_eq_of_complete H darts h_all h_le _
+  | true =>
+    change Hypermap.nodeDegree H (ruleVertexDart H false (H.edge.f s) 5) fuel =
+      Hypermap.nodeDegree H (ruleVertexDart H true (H.edge.f (H.node.inv s)) 5) fuel
+    have h_eq := hat_dart_true_eq_node_f_false H h_tri3 (H.node.inv s)
+    rw [H.node.right_inv] at h_eq
+    rw [h_eq]
+    exact (nodeDegree_node_f_eq_of_complete H darts h_all h_le _).symm
+
+/-!
+### Stage N.2: Pure `RealHypermapHubFamily` Dihedral Closure & Spoke-Sum Decomposition of `orbitNetShift`
+-/
+
+/-- Orientation-selected vertex permutation (`H.node` for `refl = false`, `H.node.symm` for `refl = true`). -/
+def nodePermOriented (H : Hypermap) (refl : Bool) : Perm H.Dart :=
+  if refl then H.node.symm else H.node
+
+theorem spokeDartOriented_eq_iter (H : Hypermap) (refl : Bool) (d0 : H.Dart) (i : Nat) :
+    spokeDartOriented H refl d0 i = Hypermap.Perm.iter (nodePermOriented H refl) (i - 1) d0 := by
+  cases refl <;> rfl
+
+theorem ruleRot_eq_nodePermOriented_f (H : Hypermap) (refl : Bool) (d : H.Dart) :
+    ruleRot H refl d = (nodePermOriented H refl).f d := by
+  cases refl <;> rfl
+
+theorem perm_iter_nodePermOriented_not (H : Hypermap) (refl : Bool) (m : Nat) (d : H.Dart) :
+    Hypermap.Perm.iter (nodePermOriented H (!refl)) m d =
+      Hypermap.Perm.iter (nodePermOriented H refl).symm m d := by
+  cases refl <;> rfl
+
+theorem perm_iter_symm_of_iter {D : Type} (q : Perm D) {m n : Nat} (hm : m ≤ n) (x : D) :
+    Hypermap.Perm.iter q.symm m (Hypermap.Perm.iter q n x) =
+      Hypermap.Perm.iter q (n - m) x := by
+  have h_it := Hypermap.Perm.iter_add q m (n - m) x
+  rw [Nat.add_sub_of_le hm] at h_it
+  rw [h_it]
+  exact Hypermap.Perm.iter_symm_left_inv q m (Hypermap.Perm.iter q (n - m) x)
+
+theorem perm_iter_nodePermOriented_mem_getOrbit_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool) (n : Nat) :
+    Hypermap.Perm.iter (nodePermOriented H refl) n d0 ∈ getOrbit H.node fuel u := by
+  induction n with
+  | zero => exact hd0
+  | succ n ih =>
+    rw [Hypermap.Perm.iter_succ]
+    cases refl with
+    | false =>
+      exact Hypermap.getOrbit_closed_under_f_of_complete H.node darts h_all h_le ih
+    | true =>
+      exact Hypermap.getOrbit_closed_under_inv_of_complete H.node darts h_all h_le ih
+
+/-- If `d0 ∈ getOrbit H.node fuel u`, then every oriented spoke `spokeDartOriented H refl d0 i`
+    also belongs to `getOrbit H.node fuel u`. -/
+theorem spokeDartOriented_mem_getOrbit_of_complete (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool) (i : Nat) :
+    spokeDartOriented H refl d0 i ∈ getOrbit H.node fuel u := by
+  rw [spokeDartOriented_eq_iter]
+  exact perm_iter_nodePermOriented_mem_getOrbit_of_complete H darts h_all h_le hd0 refl (i - 1)
+
+/-- Periodicity of `nodePermOriented H refl` on any dart `d0 ∈ getOrbit H.node fuel u`
+    of degree `deg = Hypermap.nodeDegree H u fuel`. -/
+theorem perm_iter_nodePermOriented_deg_eq_self (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool) :
+    Hypermap.Perm.iter (nodePermOriented H refl) (Hypermap.nodeDegree H u fuel) d0 = d0 := by
+  have h_closes_u := Hypermap.orbitClosesWithin_mono H.node u u
+    (Hypermap.orbitClosesWithin_of_complete H.node darts h_all u) h_le
+  have h_len : (getOrbit H.node fuel d0).length = Hypermap.nodeDegree H u fuel :=
+    Hypermap.getOrbit_length_eq_of_mem H.node fuel h_closes_u hd0
+  rw [← h_len]
+  cases refl with
+  | false =>
+    exact Hypermap.perm_iter_length_getOrbit_eq_self_of_complete H.node darts h_all h_le d0
+  | true =>
+    exact Hypermap.perm_iter_symm_length_getOrbit_eq_self_of_complete H.node darts h_all h_le d0
+
+/-- Rotational shift of `spokeDartOriented`: shifting spoke index `i ∈ 1..deg` by `k < deg`
+    around `d0` is identical to taking spoke `i` around `spokeDartOriented H refl d0 (k + 1)`. -/
+theorem spokeDartOriented_shiftCartPos_eq (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool)
+    (k : Nat) {i : Nat}
+    (hi1 : 1 ≤ i) (hi2 : i ≤ Hypermap.nodeDegree H u fuel) :
+    let deg := Hypermap.nodeDegree H u fuel
+    spokeDartOriented H refl (spokeDartOriented H refl d0 (k + 1)) i =
+      spokeDartOriented H refl d0 (shiftCartPos deg k i) := by
+  intro deg0
+  rw [spokeDartOriented_eq_iter, spokeDartOriented_eq_iter, spokeDartOriented_eq_iter]
+  have hk_sub : k + 1 - 1 = k := by omega
+  rw [hk_sub, ← Hypermap.Perm.iter_add]
+  unfold shiftCartPos
+  have h_mod : Nat.mod (Nat.sub i 1) deg0 = i - 1 := by
+    change (i - 1) % deg0 = i - 1
+    exact Nat.mod_eq_of_lt (by omega)
+  rw [h_mod]
+  cases h_ble : Nat.ble deg0 (Nat.add k (i - 1)) with
+  | false =>
+    dsimp
+    have h_eq : i + k - 1 = i - 1 + k := by omega
+    rw [h_eq]
+  | true =>
+    dsimp
+    have h_ge : deg0 ≤ k + (i - 1) := Nat.le_of_ble_eq_true h_ble
+    have h_per : Hypermap.Perm.iter (nodePermOriented H refl) deg0 d0 = d0 :=
+      perm_iter_nodePermOriented_deg_eq_self H darts h_all h_le hd0 refl
+    have h_split : i - 1 + k = (i + k - deg0 - 1) + deg0 := by omega
+    rw [h_split, Hypermap.Perm.iter_add, h_per]
+
+/-- `shiftCartPos deg k (ringIdx * deg + i)` preserves the ring index `ringIdx` and shifts the spoke `i`. -/
+theorem shiftCartPos_mul_add {deg k ringIdx i : Nat} (hi1 : 1 ≤ i) (hi2 : i ≤ deg) :
+    shiftCartPos deg k (ringIdx * deg + i) = ringIdx * deg + shiftCartPos deg k i := by
+  unfold shiftCartPos
+  have h_mod1 : Nat.mod (Nat.sub (ringIdx * deg + i) 1) deg = i - 1 := by
+    have h := spokeIdx_of_mul_add (deg := deg) (k := ringIdx) (i := i) hi1 hi2
+    change (ringIdx * deg + i - 1) % deg = i - 1
+    omega
+  have h_mod2 : Nat.mod (Nat.sub i 1) deg = i - 1 := by
+    change (i - 1) % deg = i - 1
+    exact Nat.mod_eq_of_lt (by omega)
+  rw [h_mod1, h_mod2]
+  cases h_ble : Nat.ble deg (Nat.add k (i - 1)) with
+  | false =>
+    dsimp
+    change ringIdx * deg + i + k = ringIdx * deg + (i + k)
+    omega
+  | true =>
+    dsimp
+    have h_ge : deg ≤ k + (i - 1) := Nat.le_of_ble_eq_true h_ble
+    change ringIdx * deg + i + k - deg = ringIdx * deg + (i + k - deg)
+    omega
+
+/-- Rotational shift of `cartDartOriented`: for any `1 ≤ p ≤ 5 * deg`, shifting `p` by `k < deg`
+    around `d0` gives the exact same dart as `p` around `spokeDartOriented H refl d0 (k + 1)`. -/
+theorem cartDartOriented_shiftCartPos_eq (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool)
+    {k p : Nat} (hk : k < Hypermap.nodeDegree H u fuel) (hp1 : 1 ≤ p) :
+    let deg := Hypermap.nodeDegree H u fuel
+    cartDartOriented H deg refl (spokeDartOriented H refl d0 (k + 1)) p =
+      cartDartOriented H deg refl d0 (shiftCartPos deg k p) := by
+  intro deg0
+  have h_deg_pos : 1 ≤ deg0 := by omega
+  let ringIdx := (p - 1) / deg0
+  let i := (p - 1) % deg0 + 1
+  have hi1 : 1 ≤ i := by omega
+  have hi2 : i ≤ deg0 := by
+    have := Nat.mod_lt (p - 1) (by omega : 0 < deg0)
+    omega
+  have hp_eq : p = ringIdx * deg0 + i := by
+    have h_dm := Nat.div_add_mod (p - 1) deg0
+    dsimp [ringIdx, i]
+    rw [Nat.mul_comm]
+    omega
+  have h_sh_eq : shiftCartPos deg0 k p = ringIdx * deg0 + shiftCartPos deg0 k i := by
+    conv => lhs; rw [hp_eq]
+    exact shiftCartPos_mul_add hi1 hi2
+  have h_sh_bnds := shiftCartPos_bounds h_deg_pos hk hi1 (by omega : i ≤ 2 * deg0)
+  have h_sh_i_le : shiftCartPos deg0 k i ≤ deg0 := by
+    unfold shiftCartPos
+    have h_mod : Nat.mod (Nat.sub i 1) deg0 = i - 1 := by
+      change (i - 1) % deg0 = i - 1
+      exact Nat.mod_eq_of_lt (by omega)
+    rw [h_mod]
+    cases h_ble : Nat.ble deg0 (Nat.add k (i - 1)) with
+    | false =>
+      dsimp
+      have h_lt : k + (i - 1) < deg0 := by
+        cases Classical.em (deg0 ≤ k + (i - 1)) with
+        | inl h_ge =>
+          have h_tr : Nat.ble deg0 (Nat.add k (i - 1)) = true := Nat.ble_eq_true_of_le h_ge
+          rw [h_ble] at h_tr; contradiction
+        | inr h_lt => omega
+      change i + k ≤ deg0
+      omega
+    | true =>
+      dsimp
+      change i + k - deg0 ≤ deg0
+      omega
+  have h_sh_pos : 1 ≤ shiftCartPos deg0 k p := by
+    rw [h_sh_eq]
+    have := h_sh_bnds.1
+    omega
+  dsimp [cartDartOriented]
+  have hp0 : (p == 0) = false := beq_false_of_ne (by omega)
+  have hshp0 : (shiftCartPos deg0 k p == 0) = false := beq_false_of_ne (by omega)
+  have h_div_sh : (shiftCartPos deg0 k p - 1) / deg0 = ringIdx := by
+    rw [h_sh_eq]
+    exact ringIdx_of_mul_add h_sh_bnds.1 h_sh_i_le
+  have h_mod_sh : (shiftCartPos deg0 k p - 1) % deg0 + 1 = shiftCartPos deg0 k i := by
+    rw [h_sh_eq]
+    exact spokeIdx_of_mul_add h_sh_bnds.1 h_sh_i_le
+  rw [hp0, hshp0, h_div_sh, h_mod_sh]
+  dsimp
+  have h_spk : spokeDartOriented H refl (spokeDartOriented H refl d0 (k + 1)) i =
+      spokeDartOriented H refl d0 (shiftCartPos deg0 k i) :=
+    spokeDartOriented_shiftCartPos_eq H darts h_all h_le hd0 refl k hi1 hi2
+  rw [show (p - 1) % deg0 + 1 = i from rfl, h_spk]
+
+/-- Reflectional invariance of `cartDegOriented` on `1 ≤ p ≤ 2 * deg` for any triangulated hypermap:
+    reflecting `(r0, d1)` via `reflCartPos deg p` agrees with `(!r0, spokeDartOriented H r0 d1 deg)`. -/
+theorem cartDegOriented_reflCartPos_eq (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x)
+    {u d1 : H.Dart} (hd1 : d1 ∈ getOrbit H.node fuel u) (r0 : Bool)
+    {p : Nat} (h_deg : 1 ≤ Hypermap.nodeDegree H u fuel)
+    (hp1 : 1 ≤ p) (hp2 : p ≤ 2 * Hypermap.nodeDegree H u fuel) :
+    let deg := Hypermap.nodeDegree H u fuel
+    cartDegOriented H fuel deg (!r0) (spokeDartOriented H r0 d1 deg) p =
+      cartDegOriented H fuel deg r0 d1 (reflCartPos deg p) := by
+  intro deg0
+  let d2 := spokeDartOriented H r0 d1 deg0
+  have h_spk_d2 : ∀ i, 1 ≤ i → i ≤ deg0 →
+      spokeDartOriented H (!r0) d2 i =
+        Hypermap.Perm.iter (nodePermOriented H r0) (deg0 - i) d1 := by
+    intro i hi1 hi2
+    dsimp [d2]
+    rw [spokeDartOriented_eq_iter, spokeDartOriented_eq_iter, perm_iter_nodePermOriented_not]
+    have h_le_deg : i - 1 ≤ deg0 - 1 := by omega
+    rw [perm_iter_symm_of_iter (nodePermOriented H r0) h_le_deg d1]
+    have h_sub_eq : deg0 - 1 - (i - 1) = deg0 - i := by omega
+    rw [h_sub_eq]
+  by_cases hp_le : p ≤ deg0
+  · -- Case 1: Spokes (`1 ≤ p ≤ deg0`)
+    have h_refl_p : reflCartPos deg0 p = deg0 - p + 1 := by
+      unfold reflCartPos
+      have h_ble : Nat.ble p deg0 = true := Nat.ble_eq_true_of_le hp_le
+      rw [h_ble]
+      rfl
+    rw [h_refl_p]
+    dsimp [cartDegOriented]
+    rw [cartDartOriented_spoke H deg0 (!r0) d2 hp1 hp_le,
+        cartDartOriented_spoke H deg0 r0 d1 (by omega) (by omega),
+        h_spk_d2 p hp1 hp_le, spokeDartOriented_eq_iter]
+    have h_sub : deg0 - p + 1 - 1 = deg0 - p := by omega
+    rw [h_sub]
+  · -- Case 2: Hats (`deg0 + 1 ≤ p ≤ 2 * deg0`)
+    let i := p - deg0
+    have hi1 : 1 ≤ i := by omega
+    have hi2 : i ≤ deg0 := by omega
+    have hp_eq : p = deg0 + i := by omega
+    by_cases hp_lt2 : p < 2 * deg0
+    · -- Subcase 2a: Interior Hats (`1 ≤ i < deg0`)
+      have hi_lt : i < deg0 := by omega
+      have h_refl_p : reflCartPos deg0 p = deg0 + (deg0 - i) := by
+        unfold reflCartPos
+        have h_ble1 : Nat.ble p deg0 = false := by
+          cases h : Nat.ble p deg0 with
+          | false => rfl
+          | true => have := Nat.le_of_ble_eq_true h; omega
+        have h_ble2 : Nat.ble (Nat.mul 2 deg0) p = false := by
+          cases h : Nat.ble (Nat.mul 2 deg0) p with
+          | false => rfl
+          | true =>
+            have h_le2 : 2 * deg0 ≤ p := Nat.le_of_ble_eq_true h
+            omega
+        rw [h_ble1, h_ble2]
+        dsimp
+        change 3 * deg0 - p = deg0 + (deg0 - i)
+        omega
+      rw [h_refl_p, hp_eq]
+      dsimp [cartDegOriented]
+      rw [cartDartOriented_hat H deg0 (!r0) d2 hi1 hi2,
+          cartDartOriented_hat H deg0 r0 d1 (by omega) (by omega),
+          Bool.not_not, h_spk_d2 i hi1 hi2]
+      have h_iter_step : Hypermap.Perm.iter (nodePermOriented H r0) (deg0 - i) d1 =
+          ruleRot H r0 (spokeDartOriented H r0 d1 (deg0 - i)) := by
+        rw [spokeDartOriented_eq_iter, ruleRot_eq_nodePermOriented_f, ← Hypermap.Perm.iter_succ]
+        have h_s : deg0 - i - 1 + 1 = deg0 - i := by omega
+        rw [h_s]
+      rw [h_iter_step]
+      exact (nodeDegree_hat_refl_eq_of_triangulation H darts h_all h_le h_tri3 r0 _).symm
+    · -- Subcase 2b: Fixed Hat (`p = 2 * deg0`, `i = deg0`)
+      have hp_2deg : p = 2 * deg0 := by omega
+      have hi_deg : i = deg0 := by omega
+      have h_refl_p : reflCartPos deg0 p = deg0 + deg0 := by
+        unfold reflCartPos
+        have h_ble1 : Nat.ble p deg0 = false := by
+          cases h : Nat.ble p deg0 with
+          | false => rfl
+          | true => have := Nat.le_of_ble_eq_true h; omega
+        have h_ble2 : Nat.ble (Nat.mul 2 deg0) p = true := by
+          apply Nat.ble_eq_true_of_le
+          change 2 * deg0 ≤ p
+          omega
+        rw [h_ble1, h_ble2]
+        dsimp
+        change 2 * deg0 = deg0 + deg0
+        omega
+      rw [h_refl_p, show p = deg0 + deg0 by omega]
+      dsimp [cartDegOriented]
+      rw [cartDartOriented_hat H deg0 (!r0) d2 h_deg (Nat.le_refl deg0),
+          cartDartOriented_hat H deg0 r0 d1 h_deg (Nat.le_refl deg0),
+          Bool.not_not, h_spk_d2 deg0 h_deg (Nat.le_refl deg0), Nat.sub_self]
+      dsimp [Hypermap.Perm.iter]
+      have h_per : Hypermap.Perm.iter (nodePermOriented H r0) deg0 d1 = d1 :=
+        perm_iter_nodePermOriented_deg_eq_self H darts h_all h_le hd1 r0
+      have h_d1_rot : d1 = ruleRot H r0 (spokeDartOriented H r0 d1 deg0) := by
+        rw [spokeDartOriented_eq_iter, ruleRot_eq_nodePermOriented_f, ← Hypermap.Perm.iter_succ]
+        have h_s : deg0 - 1 + 1 = deg0 := by omega
+        rw [h_s, h_per]
+      have h_lhs : Hypermap.nodeDegree H (ruleVertexDart H r0 (H.edge.f d1) 5) fuel =
+          Hypermap.nodeDegree H (ruleVertexDart H r0 (H.edge.f (ruleRot H r0 (spokeDartOriented H r0 d1 deg0))) 5) fuel :=
+        congrArg (fun x => Hypermap.nodeDegree H (ruleVertexDart H r0 (H.edge.f x) 5) fuel) h_d1_rot
+      rw [h_lhs]
+      exact (nodeDegree_hat_refl_eq_of_triangulation H darts h_all h_le h_tri3 r0 _).symm
+
+/-- Pure Real-Hypermap Hub Family (`Zero` synthetic `.sym` constructors!):
+    contains **only** genuine hypermap cartwheel degree functions `cartDegOriented H fuel deg refl d0`
+    for `d0 ∈ getOrbit H.node fuel u` and `refl : Bool`. -/
+def RealHypermapHubFamily (H : Hypermap) [DecidableEq H.Dart] (fuel deg : Nat) (u : H.Dart)
+    (cd : Nat → Nat) : Prop :=
+  ∃ d0 ∈ getOrbit H.node fuel u, ∃ refl : Bool,
+    cd = cartDegOriented H fuel deg refl d0
+
+/-- On any complete triangulated hypermap (`∀ d ∈ darts, Hypermap.faceDegree H d fuel = 3`),
+    `RealHypermapHubFamily H fuel deg u` (`deg = Hypermap.nodeDegree H u fuel`) is unconditionally
+    closed under the full dihedral group `DihedralClosedFamily deg`! -/
+theorem dihedralClosedFamily_realHypermapHubFamily (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri : ∀ d ∈ darts, Hypermap.faceDegree H d fuel = 3) (u : H.Dart) :
+    let deg := Hypermap.nodeDegree H u fuel
+    DihedralClosedFamily deg (RealHypermapHubFamily H fuel deg u) := by
+  intro deg0 cd k refl hk h_in
+  rcases h_in with ⟨d0, hd0, r0, rfl⟩
+  have h_deg_pos : 1 ≤ deg0 := by omega
+  have h_tri3 : ∀ x : H.Dart, H.face.f (H.face.f (H.face.f x)) = x :=
+    fun x => face_f_three_of_faceDegree_eq_three H darts h_all h_le (h_tri x (h_all x))
+  let d1 := spokeDartOriented H r0 d0 (k + 1)
+  have hd1 : d1 ∈ getOrbit H.node fuel u :=
+    spokeDartOriented_mem_getOrbit_of_complete H darts h_all h_le hd0 r0 (k + 1)
+  cases refl with
+  | false =>
+    refine ⟨cartDegOriented H fuel deg0 r0 d1, ⟨d1, hd1, r0, rfl⟩, ?_⟩
+    intro p hp1 hp2
+    dsimp [symCartDeg, symCartPos, cartDegOriented]
+    have h_sh : cartDartOriented H deg0 r0 (spokeDartOriented H r0 d0 (k + 1)) p =
+        cartDartOriented H deg0 r0 d0 (shiftCartPos deg0 k p) :=
+      cartDartOriented_shiftCartPos_eq H darts h_all h_le hd0 r0 hk hp1
+    rw [h_sh]
+  | true =>
+    let d_refl := spokeDartOriented H r0 d0 deg0
+    have hd_refl : d_refl ∈ getOrbit H.node fuel u :=
+      spokeDartOriented_mem_getOrbit_of_complete H darts h_all h_le hd0 r0 deg0
+    let d2 := spokeDartOriented H (!r0) d_refl (k + 1)
+    have hd2 : d2 ∈ getOrbit H.node fuel u :=
+      spokeDartOriented_mem_getOrbit_of_complete H darts h_all h_le hd_refl (!r0) (k + 1)
+    refine ⟨cartDegOriented H fuel deg0 (!r0) d2, ⟨d2, hd2, !r0, rfl⟩, ?_⟩
+    intro p hp1 hp2
+    dsimp [symCartDeg, symCartPos]
+    have h_sh_bnds := shiftCartPos_bounds h_deg_pos hk hp1 hp2
+    have h_sh : cartDartOriented H deg0 (!r0) (spokeDartOriented H (!r0) d_refl (k + 1)) p =
+        cartDartOriented H deg0 (!r0) d_refl (shiftCartPos deg0 k p) :=
+      cartDartOriented_shiftCartPos_eq H darts h_all h_le hd_refl (!r0) hk hp1
+    have h_sh_deg : cartDegOriented H fuel deg0 (!r0) d2 p =
+        cartDegOriented H fuel deg0 (!r0) d_refl (shiftCartPos deg0 k p) := by
+      dsimp [cartDegOriented, d2]
+      rw [h_sh]
+    rw [h_sh_deg]
+    exact cartDegOriented_reflCartPos_eq H darts h_all h_le h_tri3 hd0 r0 h_deg_pos h_sh_bnds.1 h_sh_bnds.2
 
 /-- Real-Hypermap Core Soundness of `DischargingTreesVerified` (Degrees 7–11, `ProofTree.sym` eliminated):
-    for any hypermap `H`, fuel `fuel`, and hub dart `u : H.Dart` whose vertex degree
-    `deg = Hypermap.nodeDegree H u fuel` lies in `{7, 8, 9, 10, 11}`,
-    `DischargingTreesVerified configs` guarantees that some member `cd ∈ HypermapHubFamily H fuel deg u`
-    satisfies the non-vacuous 2-way `CoreCartLeaf deg (getShiftedTableForDeg deg) cd`
-    (and hence either `HasExactReducedAxle deg cd` or `10 * (6 - deg) + ∑_{i=1..deg} activeOutletSum(i) ≤ 0`). -/
+    on any complete triangulated hypermap `H` (`∀ d ∈ darts, Hypermap.faceDegree H d fuel = 3`),
+    for any hub dart `u : H.Dart` whose vertex degree `deg = Hypermap.nodeDegree H u fuel` lies in `{7, 8, 9, 10, 11}`,
+    `DischargingTreesVerified configs` guarantees that **some actual spoke dart `d0 ∈ getOrbit H.node fuel u`
+    and orientation `refl : Bool`** satisfies the non-vacuous 2-way
+    `CoreCartLeaf deg (getShiftedTableForDeg deg) (cartDegOriented H fuel deg refl d0)`. -/
 theorem dischargingTreesVerified_hypermap_core_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_tri : ∀ d ∈ darts, Hypermap.faceDegree H d fuel = 3)
     (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
-    (fuel : Nat) (u : H.Dart)
+    (u : H.Dart)
     (h_deg : Hypermap.nodeDegree H u fuel = 7 ∨
              Hypermap.nodeDegree H u fuel = 8 ∨
              Hypermap.nodeDegree H u fuel = 9 ∨
              Hypermap.nodeDegree H u fuel = 10 ∨
              Hypermap.nodeDegree H u fuel = 11) :
     let deg := Hypermap.nodeDegree H u fuel
-    ∃ cd, HypermapHubFamily H fuel deg u cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd := by
+    ∃ d0 ∈ getOrbit H.node fuel u, ∃ refl : Bool,
+      CoreCartLeaf deg (getShiftedTableForDeg deg) (cartDegOriented H fuel deg refl d0) := by
   let deg := Hypermap.nodeDegree H u fuel
   have h_u_mem : u ∈ getOrbit H.node fuel u :=
     List.contains_iff_mem.mp (Hypermap.getOrbit_contains_self H.node fuel u)
-  exact dischargingTreesVerified_core_soundness configs h_trees deg
-    (HypermapHubFamily H fuel deg u) (dihedralClosedFamily_hypermapHubFamily H fuel deg u)
-    (HypermapHubFamily.of_orbit false h_u_mem) h_deg
+  rcases dischargingTreesVerified_core_soundness configs h_trees deg
+    (RealHypermapHubFamily H fuel deg u)
+    (dihedralClosedFamily_realHypermapHubFamily H darts h_all h_le h_tri u)
+    ⟨u, h_u_mem, false, rfl⟩ h_deg with ⟨cd, ⟨d0, hd0, refl, rfl⟩, h_leaf⟩
+  exact ⟨d0, hd0, refl, h_leaf⟩
 
 /-- Primal–Dual Real-Hypermap Core Soundness on `H.dual` (Degrees 7–11, `ProofTree.sym` eliminated):
+    on any complete cubic primal hypermap (`∀ d ∈ darts, Hypermap.nodeDegree H d fuel = 3`, so `H.dual` is a triangulation),
     for any dual vertex (primal face) `u : H.Dart` of degree `deg ∈ {7, 8, 9, 10, 11}` in `H.dual`,
-    `DischargingTreesVerified configs` guarantees that some member `cd ∈ HypermapHubFamily H.dual fuel deg u`
-    satisfies the non-vacuous 2-way `CoreCartLeaf deg (getShiftedTableForDeg deg) cd`. -/
+    `DischargingTreesVerified configs` guarantees that **some actual dual spoke `d0 ∈ getOrbit H.dual.node fuel u`
+    and orientation `refl : Bool`** satisfies `CoreCartLeaf deg (getShiftedTableForDeg deg) (cartDegOriented H.dual fuel deg refl d0)`. -/
 theorem dual_dischargingTreesVerified_hypermap_core_soundness (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel)
+    (h_cubic : ∀ d ∈ darts, Hypermap.nodeDegree H d fuel = 3)
     (configs : List Configuration) (h_trees : DischargingTreesVerified configs)
-    (fuel : Nat) (u : H.Dart)
+    (u : H.Dart)
     (h_deg : Hypermap.nodeDegree H.dual u fuel = 7 ∨
              Hypermap.nodeDegree H.dual u fuel = 8 ∨
              Hypermap.nodeDegree H.dual u fuel = 9 ∨
              Hypermap.nodeDegree H.dual u fuel = 10 ∨
              Hypermap.nodeDegree H.dual u fuel = 11) :
     let deg := Hypermap.nodeDegree H.dual u fuel
-    ∃ cd, HypermapHubFamily H.dual fuel deg u cd ∧ CoreCartLeaf deg (getShiftedTableForDeg deg) cd :=
-  dischargingTreesVerified_hypermap_core_soundness H.dual configs h_trees fuel u h_deg
+    ∃ d0 ∈ getOrbit H.dual.node fuel u, ∃ refl : Bool,
+      CoreCartLeaf deg (getShiftedTableForDeg deg) (cartDegOriented H.dual fuel deg refl d0) := by
+  have h_tri_dual : ∀ d ∈ darts, Hypermap.faceDegree H.dual d fuel = 3 := by
+    intro d hd
+    have h_closes := Hypermap.orbitClosesWithin_mono H.node d d
+      (Hypermap.orbitClosesWithin_of_complete H.node darts h_all d) h_le
+    dsimp [Hypermap.faceDegree, Hypermap.dual]
+    rw [Hypermap.getOrbit_symm_length_eq H.node fuel d h_closes]
+    exact h_cubic d hd
+  exact dischargingTreesVerified_hypermap_core_soundness H.dual darts h_all h_le h_tri_dual configs h_trees u h_deg
+
+/-- Mapping `fun i => Hypermap.Perm.iter p (i - 1) d0` over `List.range' a n` (`1 ≤ a`)
+    equals `Hypermap.iterList p (Hypermap.Perm.iter p (a - 1) d0) n`. -/
+theorem map_range'_perm_iter_eq_iterList {D : Type} (p : Perm D) (d0 : D) :
+    ∀ (n a : Nat), 1 ≤ a →
+      (List.range' a n).map (fun i => Hypermap.Perm.iter p (i - 1) d0) =
+        Hypermap.iterList p (Hypermap.Perm.iter p (a - 1) d0) n
+  | 0, _, _ => rfl
+  | n + 1, a, ha => by
+    dsimp [List.range', Hypermap.iterList]
+    rw [map_range'_perm_iter_eq_iterList p d0 n (a + 1) (by omega)]
+    have h_step : Hypermap.Perm.iter p (a + 1 - 1) d0 = p.f (Hypermap.Perm.iter p (a - 1) d0) := by
+      have h_eq : a + 1 - 1 = (a - 1) + 1 := by omega
+      rw [h_eq, Hypermap.Perm.iter_succ]
+    rw [h_step]
+
+/-- Mapping `spokeDartOriented H refl d0` over `List.range' 1 deg` equals
+    `Hypermap.iterList (nodePermOriented H refl) d0 deg`. -/
+theorem map_range'_spokeDartOriented_eq_iterList (H : Hypermap) (refl : Bool) (d0 : H.Dart) (deg : Nat) :
+    (List.range' 1 deg).map (spokeDartOriented H refl d0) =
+      Hypermap.iterList (nodePermOriented H refl) d0 deg := by
+  have h_fn : spokeDartOriented H refl d0 = fun i => Hypermap.Perm.iter (nodePermOriented H refl) (i - 1) d0 := by
+    funext i
+    exact spokeDartOriented_eq_iter H refl d0 i
+  rw [h_fn]
+  simpa using map_range'_perm_iter_eq_iterList (nodePermOriented H refl) d0 deg 1 (Nat.le_refl 1)
+
+theorem foldl_add_reverse {α : Type} (l : List α) (f : α → Int) :
+    l.reverse.foldl (fun acc x => acc + f x) 0 =
+      l.foldl (fun acc x => acc + f x) 0 := by
+  induction l with
+  | nil => rfl
+  | cons a rest ih =>
+    rw [List.reverse_cons, List.foldl_append, List.foldl_cons, List.foldl_nil,
+        foldl_add_cons, ih]
+    omega
+
+/-- Spoke-Sum Decomposition of `orbitNetShift`:
+    for any dart `d0 ∈ getOrbit H.node fuel u` and orientation `refl : Bool` on a complete dart list,
+    `orbitNetShift H fuel u` equals the sum of `netDartShift H fuel (spokeDartOriented H refl d0 i)`
+    over `i ∈ List.range' 1 (Hypermap.nodeDegree H u fuel)`. -/
+theorem orbitNetShift_eq_spokeDartOriented_foldl (H : Hypermap) [DecidableEq H.Dart]
+    (darts : List H.Dart) (h_all : ∀ x : H.Dart, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) {u d0 : H.Dart}
+    (hd0 : d0 ∈ getOrbit H.node fuel u) (refl : Bool) :
+    let deg := Hypermap.nodeDegree H u fuel
+    orbitNetShift H fuel u =
+      (List.range' 1 deg).foldl (fun acc i => acc + netDartShift H fuel (spokeDartOriented H refl d0 i)) 0 := by
+  intro deg0
+  dsimp [orbitNetShift]
+  rw [← foldl_add_map (List.range' 1 deg0) (spokeDartOriented H refl d0) (netDartShift H fuel),
+      map_range'_spokeDartOriented_eq_iterList]
+  have h_closes_u := Hypermap.orbitClosesWithin_mono H.node u u
+    (Hypermap.orbitClosesWithin_of_complete H.node darts h_all u) h_le
+  have h_closes_d0 := Hypermap.orbitClosesWithin_mono H.node d0 d0
+    (Hypermap.orbitClosesWithin_of_complete H.node darts h_all d0) h_le
+  have h_len_d0 : (getOrbit H.node fuel d0).length = deg0 :=
+    Hypermap.getOrbit_length_eq_of_mem H.node fuel h_closes_u hd0
+  have h_len_oriented : (getOrbit (nodePermOriented H refl) fuel d0).length = deg0 := by
+    cases refl with
+    | false => exact h_len_d0
+    | true =>
+      dsimp [nodePermOriented]
+      rw [Hypermap.getOrbit_symm_length_eq H.node fuel d0 h_closes_d0]
+      exact h_len_d0
+  have h_rev := Hypermap.getOrbit_eq_reverse_iterList_of_complete (nodePermOriented H refl) darts h_all h_le d0
+  rw [h_len_oriented] at h_rev
+  have h_iter_eq : Hypermap.iterList (nodePermOriented H refl) d0 deg0 =
+      (getOrbit (nodePermOriented H refl) fuel d0).reverse := by
+    rw [h_rev, List.reverse_reverse]
+  rw [h_iter_eq, foldl_add_reverse]
+  have h_nodup_u : (getOrbit H.node fuel u).Nodup := Hypermap.getOrbit_nodup H.node fuel u
+  have h_nodup_or : (getOrbit (nodePermOriented H refl) fuel d0).Nodup :=
+    Hypermap.getOrbit_nodup (nodePermOriented H refl) fuel d0
+  apply nodup_foldl_add_eq_of_iff_mem (netDartShift H fuel) h_nodup_u h_nodup_or
+  intro x
+  have h_iff_d0 : x ∈ getOrbit H.node fuel u ↔ x ∈ getOrbit H.node fuel d0 :=
+    (Hypermap.mem_getOrbit_iff_of_mem H.node fuel h_closes_u hd0 x).symm
+  rw [h_iff_d0]
+  cases refl with
+  | false => exact Iff.rfl
+  | true =>
+    dsimp [nodePermOriented]
+    exact (Hypermap.mem_getOrbit_symm_perm_iff H.node fuel d0 x h_closes_d0).symm
+
+/-!
+### Stage N.3: Declarative Rule-to-`FastPosOut` Compilation & SWAR Elimination (`compiledOutletsForSpoke`, `activeOutletSum_eq_compiledOutletsSum`)
+-/
+
+/-- Computable validity check for an RSST degree bound `bnd = (low, upp)`:
+    after normalizing `upp = 9 ↦ 12` and `low = 0 ↦ upp`, `5 ≤ low ≤ 9` and (`upp ≤ 8` or `upp = 12`). -/
+def validRSSTBound (bnd : Nat × Nat) : Bool :=
+  let upp := if bnd.2 == 9 then 12 else bnd.2
+  let low := if bnd.1 == 0 then upp else bnd.1
+  decide (5 ≤ low) && decide (low ≤ 9) && (decide (upp ≤ 8) || decide (upp == 12))
+
+/-- 5-bit forbidden degree mask (`0..31`) associated with an RSST bound `bnd = (low, upp)`:
+    bit `0..4` is set iff degree `5..9` fails `degMatchesBound`. -/
+def forbidMaskOfBound (bnd : Nat × Nat) : Nat :=
+  (if degMatchesBound 5 bnd then 0 else 1) |||
+  (if degMatchesBound 6 bnd then 0 else 2) |||
+  (if degMatchesBound 7 bnd then 0 else 4) |||
+  (if degMatchesBound 8 bnd then 0 else 8) |||
+  (if degMatchesBound 9 bnd then 0 else 16)
+
+theorem testBit_forbidMaskOfBound_zero (bnd : Nat × Nat) :
+    (forbidMaskOfBound bnd).testBit 0 = !degMatchesBound 5 bnd := by
+  dsimp [forbidMaskOfBound]
+  cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+    cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+    cases degMatchesBound 9 bnd <;> decide
+
+theorem testBit_forbidMaskOfBound_one (bnd : Nat × Nat) :
+    (forbidMaskOfBound bnd).testBit 1 = !degMatchesBound 6 bnd := by
+  dsimp [forbidMaskOfBound]
+  cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+    cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+    cases degMatchesBound 9 bnd <;> decide
+
+theorem testBit_forbidMaskOfBound_two (bnd : Nat × Nat) :
+    (forbidMaskOfBound bnd).testBit 2 = !degMatchesBound 7 bnd := by
+  dsimp [forbidMaskOfBound]
+  cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+    cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+    cases degMatchesBound 9 bnd <;> decide
+
+theorem testBit_forbidMaskOfBound_three (bnd : Nat × Nat) :
+    (forbidMaskOfBound bnd).testBit 3 = !degMatchesBound 8 bnd := by
+  dsimp [forbidMaskOfBound]
+  cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+    cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+    cases degMatchesBound 9 bnd <;> decide
+
+theorem testBit_forbidMaskOfBound_four (bnd : Nat × Nat) :
+    (forbidMaskOfBound bnd).testBit 4 = !degMatchesBound 9 bnd := by
+  dsimp [forbidMaskOfBound]
+  cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+    cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+    cases degMatchesBound 9 bnd <;> decide
+
+theorem testBit_forbidMaskOfBound_of_ge_5 (bnd : Nat × Nat) {i : Nat} (hi : 5 ≤ i) :
+    (forbidMaskOfBound bnd).testBit i = false := by
+  have h31 : forbidMaskOfBound bnd &&& 31 = forbidMaskOfBound bnd := by
+    dsimp [forbidMaskOfBound]
+    cases degMatchesBound 5 bnd <;> cases degMatchesBound 6 bnd <;>
+      cases degMatchesBound 7 bnd <;> cases degMatchesBound 8 bnd <;>
+      cases degMatchesBound 9 bnd <;> decide
+  have h31_tb : (31 : Nat).testBit i = false := by
+    have h_eq : (31 : Nat) = 2 ^ 5 - 1 := rfl
+    rw [h_eq, Nat.testBit_two_pow_sub_one]
+    exact decide_eq_false (by omega)
+  rw [← h31, Nat.testBit_and, h31_tb, Bool.and_false]
+
+/-- For any valid RSST bound `bnd` and any degree `d ≥ 9`, `degMatchesBound d bnd = degMatchesBound 9 bnd`. -/
+theorem degMatchesBound_eq_degMatchesBound_9_of_ge_9 {bnd : Nat × Nat} {d : Nat}
+    (h_val : validRSSTBound bnd = true) (hd : 9 ≤ d) :
+    degMatchesBound d bnd = degMatchesBound 9 bnd := by
+  dsimp [validRSSTBound, degMatchesBound] at h_val ⊢
+  let upp := if bnd.2 == 9 then 12 else bnd.2
+  let low := if bnd.1 == 0 then upp else bnd.1
+  change (decide (5 ≤ low) && decide (low ≤ 9) && (decide (upp ≤ 8) || decide (upp == 12))) = true at h_val
+  rcases Bool.and_eq_true_iff.mp h_val with ⟨h_low, h_upp⟩
+  rcases Bool.and_eq_true_iff.mp h_low with ⟨_, h_low9⟩
+  have h_le9 : low ≤ 9 := of_decide_eq_true h_low9
+  have h_led : low ≤ d := by omega
+  change (decide (low ≤ d) && (decide (upp == 12) || decide (d ≤ upp))) =
+    (decide (low ≤ 9) && (decide (upp == 12) || decide (9 ≤ upp)))
+  rw [decide_eq_true h_led, decide_eq_true h_le9]
+  rcases Bool.or_eq_true_iff.mp h_upp with h_u8 | h_u12
+  · have hu8 : upp ≤ 8 := of_decide_eq_true h_u8
+    have hd_not : ¬ d ≤ upp := by omega
+    have h9_not : ¬ 9 ≤ upp := by omega
+    rw [decide_eq_false hd_not, decide_eq_false h9_not]
+  · have hu12 : (upp == 12) = true := of_decide_eq_true h_u12
+    rw [decide_eq_true hu12]
+    rfl
+
+/-- Exact equivalence between `!(forbidMaskOfBound bnd).testBit (degBitIdx d)` and `degMatchesBound d bnd`
+    for all valid RSST bounds `bnd` and all vertex degrees `d ≥ 5`. -/
+theorem not_testBit_forbidMaskOfBound_eq_degMatchesBound {bnd : Nat × Nat} {d : Nat}
+    (h_val : validRSSTBound bnd = true) (hd : 5 ≤ d) :
+    (!(forbidMaskOfBound bnd).testBit (degBitIdx d)) = degMatchesBound d bnd := by
+  by_cases hd5 : d = 5
+  · subst hd5
+    change (!(forbidMaskOfBound bnd).testBit 0) = degMatchesBound 5 bnd
+    rw [testBit_forbidMaskOfBound_zero, Bool.not_not]
+  · by_cases hd6 : d = 6
+    · subst hd6
+      change (!(forbidMaskOfBound bnd).testBit 1) = degMatchesBound 6 bnd
+      rw [testBit_forbidMaskOfBound_one, Bool.not_not]
+    · by_cases hd7 : d = 7
+      · subst hd7
+        change (!(forbidMaskOfBound bnd).testBit 2) = degMatchesBound 7 bnd
+        rw [testBit_forbidMaskOfBound_two, Bool.not_not]
+      · by_cases hd8 : d = 8
+        · subst hd8
+          change (!(forbidMaskOfBound bnd).testBit 3) = degMatchesBound 8 bnd
+          rw [testBit_forbidMaskOfBound_three, Bool.not_not]
+        · have hd9 : 9 ≤ d := by omega
+          have h_idx : degBitIdx d = 4 := by
+            dsimp [degBitIdx]
+            have hle5 : ¬ d ≤ 5 := by omega
+            have h6 : (d == 6) = false := beq_false_of_ne hd6
+            have h7 : (d == 7) = false := beq_false_of_ne hd7
+            have h8 : (d == 8) = false := beq_false_of_ne hd8
+            rw [if_neg hle5, h6, h7, h8]
+            rfl
+          rw [h_idx, testBit_forbidMaskOfBound_four, Bool.not_not,
+              degMatchesBound_eq_degMatchesBound_9_of_ge_9 h_val hd9]
+
+/-- Declarative 360-bit forbidden mask constructed from a list of `(pos, bnd)` conditions. -/
+def forbidOfConds : List (Nat × (Nat × Nat)) → Nat
+  | [] => 0
+  | (p, bnd) :: rest =>
+    Nat.lor (Nat.shiftLeft (forbidMaskOfBound bnd) (Nat.mul p 6)) (forbidOfConds rest)
+
+theorem testBit_shiftLeft_forbidMaskOfBound (bnd : Nat × Nat) (q p : Nat) {i : Nat} (hi : i < 6) :
+    (Nat.shiftLeft (forbidMaskOfBound bnd) (Nat.mul q 6)).testBit (p * 6 + i) =
+      (if p == q then (forbidMaskOfBound bnd).testBit i else false) := by
+  change ((forbidMaskOfBound bnd) <<< (q * 6)).testBit (p * 6 + i) =
+    (if p == q then (forbidMaskOfBound bnd).testBit i else false)
+  rw [Nat.testBit_shiftLeft]
+  by_cases hpq : p = q
+  · subst hpq
+    have h_ge : decide (p * 6 ≤ p * 6 + i) = true := decide_eq_true (by omega)
+    have h_sub : p * 6 + i - p * 6 = i := by omega
+    rw [beq_self_eq_true, h_ge, h_sub]
+    simp
+  · have h_beq : (p == q) = false := beq_false_of_ne hpq
+    rw [h_beq]
+    by_cases h_ge : q * 6 ≤ p * 6 + i
+    · have h_dec : decide (q * 6 ≤ p * 6 + i) = true := decide_eq_true h_ge
+      have h_ge5 : 5 ≤ p * 6 + i - q * 6 := by omega
+      rw [h_dec, testBit_forbidMaskOfBound_of_ge_5 bnd h_ge5]
+      rfl
+    · have h_dec : decide (q * 6 ≤ p * 6 + i) = false := decide_eq_false h_ge
+      rw [h_dec]
+      rfl
+
+theorem list_all_and {α : Type} (l : List α) (f g : α → Bool) :
+    l.all (fun x => f x && g x) = (l.all f && l.all g) := by
+  induction l with
+  | nil => rfl
+  | cons a rest ih =>
+    dsimp [List.all]
+    rw [ih]
+    cases f a <;> cases g a <;> cases rest.all f <;> cases rest.all g <;> rfl
+
+theorem list_all_beq_point {l : List Nat} {q : Nat} (hq : q ∈ l) (f : Nat → Bool) :
+    l.all (fun p => if p == q then f p else true) = f q := by
+  cases hfq : f q with
+  | true =>
+    apply List.all_eq_true.mpr
+    intro p _
+    cases hpq : (p == q) with
+    | false => rfl
+    | true =>
+      have h_eq : p = q := eq_of_beq hpq
+      subst h_eq
+      exact hfq
+  | false =>
+    cases h_all : l.all (fun p => if p == q then f p else true) with
+    | false => rfl
+    | true =>
+      have h_q := List.all_eq_true.mp h_all q hq
+      rw [beq_self_eq_true, hfq] at h_q
+      contradiction
+
+/-- Exact characterization of `OutletActive deg cd po` when `po.forbid = forbidOfConds conds`:
+    under `∀ p ∈ 1..5*deg, 5 ≤ cd p`, `OutletActive deg cd po` equals `conds.all (fun c => degMatchesBound (cd c.1) c.2)`. -/
+theorem outletActive_of_forbid_eq_forbidOfConds (deg : Nat) (cd : Nat → Nat) (po : FastPosOut)
+    (conds : List (Nat × (Nat × Nat)))
+    (h_forbid : po.forbid = forbidOfConds conds)
+    (h_conds : ∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 5 * deg ∧ validRSSTBound c.2 = true)
+    (h_min5 : ∀ p, 1 ≤ p → p ≤ 5 * deg → 5 ≤ cd p) :
+    OutletActive deg cd po = conds.all (fun c => degMatchesBound (cd c.1) c.2) := by
+  have h_eq_all : OutletActive deg cd po =
+      (List.range' 1 (5 * deg)).all (fun p => !(forbidOfConds conds).testBit (p * 6 + degBitIdx (cd p))) := by
+    dsimp [OutletActive]
+    rw [h_forbid]
+    congr 1
+    funext p
+    rw [testBit_getLaneNat (forbidOfConds conds) p (degBitIdx_lt_6 (cd p))]
+  rw [h_eq_all]
+  clear h_eq_all h_forbid po
+  induction conds with
+  | nil =>
+    dsimp [forbidOfConds, List.all]
+    apply List.all_eq_true.mpr
+    intro p _
+    rw [Nat.zero_testBit]
+    rfl
+  | cons c rest ih =>
+    rcases c with ⟨q, bnd⟩
+    have hc_head := h_conds (q, bnd) List.mem_cons_self
+    rcases hc_head with ⟨hq1, hq2, h_val_bnd⟩
+    have h_rest_conds : ∀ c' ∈ rest, 1 ≤ c'.1 ∧ c'.1 ≤ 5 * deg ∧ validRSSTBound c'.2 = true :=
+      fun c' hc' => h_conds c' (List.mem_cons_of_mem (q, bnd) hc')
+    have h_step_fn : (fun p => !(forbidOfConds ((q, bnd) :: rest)).testBit (p * 6 + degBitIdx (cd p))) =
+        (fun p => (if p == q then !(forbidMaskOfBound bnd).testBit (degBitIdx (cd p)) else true) &&
+          !(forbidOfConds rest).testBit (p * 6 + degBitIdx (cd p))) := by
+      funext p
+      have h_or : (forbidOfConds ((q, bnd) :: rest)).testBit (p * 6 + degBitIdx (cd p)) =
+          ((Nat.shiftLeft (forbidMaskOfBound bnd) (Nat.mul q 6)).testBit (p * 6 + degBitIdx (cd p)) ||
+            (forbidOfConds rest).testBit (p * 6 + degBitIdx (cd p))) := by
+        dsimp [forbidOfConds]
+        exact Nat.testBit_or _ _ _
+      rw [h_or, Bool.not_or, testBit_shiftLeft_forbidMaskOfBound bnd q p (degBitIdx_lt_6 (cd p))]
+      cases (p == q) <;> rfl
+    rw [h_step_fn, list_all_and, ih h_rest_conds]
+    have hq_mem : q ∈ List.range' 1 (5 * deg) :=
+      List.mem_range'.mpr ⟨q - 1, by omega, by omega⟩
+    rw [list_all_beq_point hq_mem]
+    have h_m := not_testBit_forbidMaskOfBound_eq_degMatchesBound h_val_bnd (h_min5 q hq1 hq2)
+    dsimp [List.all]
+    rw [h_m]
+
+/-- Computable counterpart to `lookupListRec`. -/
+def lookupListPure {a : Type} (d : a) : List a → Nat → a
+  | [], _ => d
+  | x :: _, 0 => x
+  | _ :: xs, n + 1 => lookupListPure d xs n
+
+theorem lookupListRec_eq_pure {a : Type} (d : a) (l : List a) (idx : Nat) :
+    lookupListRec d l idx = lookupListPure d l idx := by
+  induction l generalizing idx with
+  | nil => rfl
+  | cons x xs ih =>
+    cases idx with
+    | zero => rfl
+    | succ n => exact ih n
+
+/-- Pure pattern-matching lookup for `U[z]` (`z ∈ 0..16`) from `Rules.lean`. -/
+def ruleU : Nat → Nat
+  | 3 | 7 => 1
+  | 5 | 9 | 11 => 3
+  | 6 => 2
+  | 8 => 4
+  | 10 => 8
+  | 14 => 5
+  | 15 => 6
+  | 16 => 15
+  | _ => 0
+
+/-- Pure pattern-matching lookup for `V[z]` (`z ∈ 0..16`) from `Rules.lean`. -/
+def ruleV : Nat → Nat
+  | 2 | 6 | 15 | 16 => 1
+  | 4 | 8 | 10 => 2
+  | 7 => 3
+  | 9 => 5
+  | 11 => 9
+  | 12 => 4
+  | 13 => 12
+  | _ => 0
+
+/-- Pure triangle third-vertex lookup (`63` if `(u, v)` is not a directed edge of `(x, y, z)`). -/
+def pureTriAdj (x y z u v : Nat) : Nat :=
+  if u == x && v == y then z
+  else if u == y && v == z then x
+  else if u == z && v == x then y
+  else 63
+
+/-- Pure spoke-sector triangle lookup around spoke `i ∈ 1..deg` with fan degree `k` (`0` or `5..8`). -/
+def pureSpokeAdj (deg i k u v : Nat) : Nat :=
+  let h := if i == 1 then deg else i - 1
+  let a := deg + h
+  let b := deg + i
+  let c := 2 * deg + i
+  let d := 3 * deg + i
+  let e := 4 * deg + i
+  let r1 := pureTriAdj 0 h i u v
+  if r1 != 63 then r1
+  else
+    let r2 := pureTriAdj i h a u v
+    if r2 != 63 then r2
+    else if k == 5 then pureTriAdj i a b u v
+    else if k == 6 then
+      let r3 := pureTriAdj i a c u v
+      if r3 != 63 then r3 else pureTriAdj i c b u v
+    else if k == 7 then
+      let r3 := pureTriAdj i a c u v
+      if r3 != 63 then r3
+      else
+        let r4 := pureTriAdj i c d u v
+        if r4 != 63 then r4 else pureTriAdj i d b u v
+    else if k == 8 then
+      let r3 := pureTriAdj i a c u v
+      if r3 != 63 then r3
+      else
+        let r4 := pureTriAdj i c d u v
+        if r4 != 63 then r4
+        else
+          let r5 := pureTriAdj i d e u v
+          if r5 != 63 then r5 else pureTriAdj i e b u v
+    else 63
+
+/-- Look up the exact degree (`0` if not fixed) of spoke `i` in `fanDeg`. -/
+def lookupFanDeg (i : Nat) : List (Nat × Nat) → Nat
+  | [] => 0
+  | (p, d) :: rest => if p == i then d else lookupFanDeg i rest
+
+/-- Pure cartwheel adjacency lookup across all spokes `i ∈ 1..deg`. -/
+def pureCartAdj (deg : Nat) (fanDeg : List (Nat × Nat)) (u v : Nat) : Nat :=
+  (List.range' 1 deg).foldl (fun acc i =>
+    if acc != 63 then acc
+    else pureSpokeAdj deg i (lookupFanDeg i fanDeg) u v) 63
+
+/-- Look up the cartwheel position of rule vertex `z` in `phi`. -/
+def lookupPhi (z : Nat) : List (Nat × Nat) → Nat
+  | [] => 0
+  | (k, v) :: rest => if k == z then v else lookupPhi z rest
+
+/-- Normalize an RSST bound `(low1, upp1)` by mapping `upp1 = 9 ↦ 12` and `low1 = 0 ↦ upp1`. -/
+def normRSSTBound (bnd : Nat × Nat) : Nat × Nat :=
+  let upp := if bnd.2 == 9 then 12 else bnd.2
+  let low := if bnd.1 == 0 then upp else bnd.1
+  (low, upp)
+
+/-- Pure compilation of `r.triples` into shifted cartwheel `(pos, (low, upp))` conditions at spoke `x`. -/
+def compileRuleTriples (deg x : Nat) (inv : Bool) :
+    List (Nat × (Nat × Nat)) → List (Nat × Nat) → List (Nat × Nat) → List (Nat × (Nat × Nat))
+  | [], _, _ => []
+  | (z, bnd) :: rest, phi, fanDeg =>
+    let nb := normRSSTBound bnd
+    let u := lookupPhi (if inv then ruleV z else ruleU z) phi
+    let v := lookupPhi (if inv then ruleU z else ruleV z) phi
+    let pos_i := pureCartAdj deg fanDeg u v
+    let phi' := (z, pos_i) :: phi
+    let fanDeg' := if pos_i ≤ deg && nb.1 == nb.2 then (pos_i, nb.1) :: fanDeg else fanDeg
+    (shiftCartPos deg (x - 1) pos_i, nb) :: compileRuleTriples deg x inv rest phi' fanDeg'
+
+/-- Pure compilation of a single oriented RSST `RawRule` (`isPos`: inflow `+1` vs outflow `-1`;
+    `inv`: unreflected `false` vs reflected `true`) at hub degree `deg` and spoke `x`. -/
+def compileRuleOutlet (deg x : Nat) (isPos inv : Bool) (r : RawRule) :
+    Option (Bool × List (Nat × (Nat × Nat))) :=
+  let bHub := normRSSTBound (if isPos then r.b1 else r.b0)
+  let bSpk := normRSSTBound (if isPos then r.b0 else r.b1)
+  if decide (bHub.1 ≤ deg) && decide (deg ≤ bHub.2) then
+    let phi0 := if isPos then [(0, 1), (1, 0)] else [(0, 0), (1, 1)]
+    let fan0 := if bSpk.1 == bSpk.2 then [(1, bSpk.1)] else []
+    let headCond := (shiftCartPos deg (x - 1) 1, bSpk)
+    some (isPos, headCond :: compileRuleTriples deg x inv r.triples phi0 fan0)
+  else
+    none
+
+/-- Pure compilation of all outlets generated by a single `r : RawRule` at hub degree `deg` and spoke `x`. -/
+def compileRuleAllOutlets (deg x : Nat) (r : RawRule) : List (Bool × List (Nat × (Nat × Nat))) :=
+  (match compileRuleOutlet deg x true false r with | some o => [o] | none => []) ++
+  (match compileRuleOutlet deg x false false r with | some o => [o] | none => []) ++
+  (if r.invert then
+    (match compileRuleOutlet deg x true true r with | some o => [o] | none => []) ++
+    (match compileRuleOutlet deg x false true r with | some o => [o] | none => [])
+   else [])
+
+/-- Declarative list of `(isPos, conds)` pairs compiled directly from `theRules` at spoke `x`. -/
+def compiledOutletsForSpoke (deg x : Nat) : List (Bool × List (Nat × (Nat × Nat))) :=
+  theRules.foldr (fun r acc => compileRuleAllOutlets deg x r ++ acc) []
+
+/-- Declarative activation predicate for a compiled outlet `co = (isPos, conds)` on `cd`. -/
+def compiledOutletActive (cd : Nat → Nat) (co : Bool × List (Nat × (Nat × Nat))) : Bool :=
+  co.2.all (fun c => degMatchesBound (cd c.1) c.2)
+
+/-- Declarative sum of signed outlet values (`+1` or `-1`) over a list of compiled outlets. -/
+def compiledOutletsSum (cd : Nat → Nat) : List (Bool × List (Nat × (Nat × Nat))) → Int
+  | [] => 0
+  | co :: rest =>
+    (if compiledOutletActive cd co then (if co.1 then 1 else -1) else 0) +
+      compiledOutletsSum cd rest
+
+/-- Computable validity check for a condition list `conds` at hub degree `deg`. -/
+def validCondList (deg : Nat) (conds : List (Nat × (Nat × Nat))) : Bool :=
+  conds.all (fun c => decide (1 ≤ c.1) && decide (c.1 ≤ 5 * deg) && validRSSTBound c.2)
+
+/-- Computable structural equivalence check between a SWAR `List FastPosOut` and a declarative
+    `List (Bool × List (Nat × (Nat × Nat)))` at hub degree `deg`. -/
+def matchesCompiledOutlets (deg : Nat) : List FastPosOut → List (Bool × List (Nat × (Nat × Nat))) → Bool
+  | [], [] => true
+  | po :: pos, co :: cos =>
+    (po.isPos == co.1) &&
+    (po.forbid == forbidOfConds co.2) &&
+    validCondList deg co.2 &&
+    matchesCompiledOutlets deg pos cos
+  | _, _ => false
+
+/-- Computable verification that every spoke `x ∈ 1..deg` in `getShiftedTableForDeg deg`
+    matches `compiledOutletsForSpoke deg x`. -/
+def validCompiledShiftedTable (deg : Nat) : Bool :=
+  (List.range' 1 deg).all (fun x =>
+    matchesCompiledOutlets deg
+      (lookupListPure [] (getShiftedTableForDeg deg) x)
+      (compiledOutletsForSpoke deg x))
+
+set_option maxRecDepth 200000 in
+theorem validCompiledShiftedTable_7 : validCompiledShiftedTable 7 = true := by decide
+
+set_option maxRecDepth 200000 in
+theorem validCompiledShiftedTable_8 : validCompiledShiftedTable 8 = true := by decide
+
+set_option maxRecDepth 200000 in
+theorem validCompiledShiftedTable_9 : validCompiledShiftedTable 9 = true := by decide
+
+set_option maxRecDepth 200000 in
+theorem validCompiledShiftedTable_10 : validCompiledShiftedTable 10 = true := by decide
+
+set_option maxRecDepth 200000 in
+theorem validCompiledShiftedTable_11 : validCompiledShiftedTable 11 = true := by decide
+
+theorem validCompiledShiftedTable_getShiftedTableForDeg (deg : Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11) :
+    validCompiledShiftedTable deg = true := by
+  rcases h_deg with rfl | rfl | rfl | rfl | rfl
+  · exact validCompiledShiftedTable_7
+  · exact validCompiledShiftedTable_8
+  · exact validCompiledShiftedTable_9
+  · exact validCompiledShiftedTable_10
+  · exact validCompiledShiftedTable_11
+
+theorem validCondList_sound (deg : Nat) (conds : List (Nat × (Nat × Nat)))
+    (h_val : validCondList deg conds = true) :
+    ∀ c ∈ conds, 1 ≤ c.1 ∧ c.1 ≤ 5 * deg ∧ validRSSTBound c.2 = true := by
+  intro c hc
+  have h_c := List.all_eq_true.mp h_val c hc
+  rcases Bool.and_eq_true_iff.mp h_c with ⟨h12, h3⟩
+  rcases Bool.and_eq_true_iff.mp h12 with ⟨h1, h2⟩
+  exact ⟨of_decide_eq_true h1, of_decide_eq_true h2, h3⟩
+
+/-- Inductive soundness of `matchesCompiledOutlets`: when `matchesCompiledOutlets deg pos cos = true`
+    and `∀ p ∈ 1..5*deg, 5 ≤ cd p`, `activeOutletSum deg cd pos = compiledOutletsSum cd cos`. -/
+theorem activeOutletSum_eq_of_matchesCompiledOutlets (deg : Nat) (cd : Nat → Nat)
+    (pos : List FastPosOut) (cos : List (Bool × List (Nat × (Nat × Nat))))
+    (h_match : matchesCompiledOutlets deg pos cos = true)
+    (h_min5 : ∀ p, 1 ≤ p → p ≤ 5 * deg → 5 ≤ cd p) :
+    activeOutletSum deg cd pos = compiledOutletsSum cd cos := by
+  induction pos generalizing cos with
+  | nil =>
+    cases cos with
+    | nil => rfl
+    | cons _ _ => contradiction
+  | cons po pos ih =>
+    cases cos with
+    | nil => contradiction
+    | cons co cos =>
+      dsimp [matchesCompiledOutlets] at h_match
+      rcases Bool.and_eq_true_iff.mp h_match with ⟨h123, h_rest⟩
+      rcases Bool.and_eq_true_iff.mp h123 with ⟨h12, h_val_conds⟩
+      rcases Bool.and_eq_true_iff.mp h12 with ⟨h_pos_eq, h_forbid_eq⟩
+      have h_isPos : po.isPos = co.1 := eq_of_beq h_pos_eq
+      have h_forbid : po.forbid = forbidOfConds co.2 := eq_of_beq h_forbid_eq
+      have h_act : OutletActive deg cd po = compiledOutletActive cd co :=
+        outletActive_of_forbid_eq_forbidOfConds deg cd po co.2 h_forbid
+          (validCondList_sound deg co.2 h_val_conds) h_min5
+      dsimp [activeOutletSum, compiledOutletsSum, outletVal]
+      rw [h_act, h_isPos, ih cos h_rest]
+
+/-- Exact SWAR-to-Declarative Equivalence for `activeOutletSum` (Degrees 7–11):
+    for any hub degree `deg ∈ {7, 8, 9, 10, 11}`, any spoke index `1 ≤ x ≤ deg`,
+    and any cartwheel degree assignment `cd` with `∀ p ∈ 1..5*deg, 5 ≤ cd p`,
+    the SWAR sum `activeOutletSum deg cd (lookupListRec [] (getShiftedTableForDeg deg) x)`
+    equals the declarative rule-bound sum `compiledOutletsSum cd (compiledOutletsForSpoke deg x)`. -/
+theorem activeOutletSum_eq_compiledOutletsSum (deg x : Nat) (cd : Nat → Nat)
+    (h_deg : deg = 7 ∨ deg = 8 ∨ deg = 9 ∨ deg = 10 ∨ deg = 11)
+    (hx1 : 1 ≤ x) (hx2 : x ≤ deg)
+    (h_min5 : ∀ p, 1 ≤ p → p ≤ 5 * deg → 5 ≤ cd p) :
+    activeOutletSum deg cd (lookupListRec [] (getShiftedTableForDeg deg) x) =
+      compiledOutletsSum cd (compiledOutletsForSpoke deg x) := by
+  have h_tab := validCompiledShiftedTable_getShiftedTableForDeg deg h_deg
+  have hx_mem : x ∈ List.range' 1 deg := List.mem_range'.mpr ⟨x - 1, by omega, by omega⟩
+  have h_match := List.all_eq_true.mp h_tab x hx_mem
+  rw [lookupListRec_eq_pure]
+  exact activeOutletSum_eq_of_matchesCompiledOutlets deg cd
+    (lookupListPure [] (getShiftedTableForDeg deg) x)
+    (compiledOutletsForSpoke deg x) h_match h_min5
 
 end Discharging
 end Math

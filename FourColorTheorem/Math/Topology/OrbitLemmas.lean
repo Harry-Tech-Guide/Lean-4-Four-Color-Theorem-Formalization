@@ -1547,4 +1547,131 @@ theorem getOrbit_closed_under_inv_of_complete (p : Perm D)
   getOrbit_closed_under_inv p fuel d
     (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le) x hx
 
+/-- The length of `getOrbitAux p start current acc fuel` is strictly greater than `acc.length`. -/
+theorem getOrbitAux_length_gt (p : Perm D) (start current : D) (acc : List D) (fuel : Nat) :
+    acc.length < (getOrbitAux p start current acc fuel).length := by
+  induction fuel generalizing current acc with
+  | zero =>
+    dsimp [getOrbitAux]
+    omega
+  | succ f ih =>
+    dsimp [getOrbitAux]
+    split
+    · simp
+    · have h := ih (p.f current) (current :: acc)
+      simp only [List.length_cons] at h
+      omega
+
+/-- Periodicity of `getOrbitAux`: iterating `p` by `(getOrbitAux ...).length - acc.length` from `current` returns `start`. -/
+theorem perm_iter_length_sub_getOrbitAux (p : Perm D) (start current : D) (acc : List D) (fuel : Nat)
+    (h_closes : orbitClosesWithin p start current fuel) :
+    Perm.iter p ((getOrbitAux p start current acc fuel).length - acc.length) current = start := by
+  induction fuel generalizing current acc with
+  | zero => contradiction
+  | succ f ih =>
+    dsimp [getOrbitAux]
+    by_cases h_hit : p.f current = start
+    · have hbeq : (p.f current == start) = true := by
+        change (if p.f current = start then true else false) = true
+        rw [h_hit]; simp
+      rw [hbeq]
+      dsimp
+      rw [Nat.add_sub_cancel_left]
+      exact h_hit
+    · have hbeq : (p.f current == start) = false := by
+        change (if p.f current = start then true else false) = false
+        rw [if_neg h_hit]
+      rw [hbeq]
+      dsimp
+      rcases h_closes with h_now | h_later
+      · exact False.elim (h_hit h_now)
+      · have h_gt := getOrbitAux_length_gt p start (p.f current) (current :: acc) f
+        have h_sub : (getOrbitAux p start (p.f current) (current :: acc) f).length - acc.length =
+            ((getOrbitAux p start (p.f current) (current :: acc) f).length - (current :: acc).length) + 1 := by
+          simp only [List.length_cons] at h_gt ⊢
+          omega
+        rw [h_sub, Perm.iter_succ_right]
+        exact ih (p.f current) (current :: acc) h_later
+
+/-- Orbit Periodicity Theorem: if `orbitClosesWithin p d d fuel` holds, iterating `p`
+    by `(getOrbit p fuel d).length` returns `d`. -/
+theorem perm_iter_length_getOrbit_eq_self (p : Perm D) (fuel : Nat) (d : D)
+    (h_closes : orbitClosesWithin p d d fuel) :
+    Perm.iter p (getOrbit p fuel d).length d = d := by
+  simpa [getOrbit] using perm_iter_length_sub_getOrbitAux p d d [] fuel h_closes
+
+/-- Inverse Orbit Periodicity Theorem: if `orbitClosesWithin p d d fuel` holds, iterating `p.symm`
+    by `(getOrbit p fuel d).length` returns `d`. -/
+theorem perm_iter_symm_length_getOrbit_eq_self (p : Perm D) (fuel : Nat) (d : D)
+    (h_closes : orbitClosesWithin p d d fuel) :
+    Perm.iter p.symm (getOrbit p fuel d).length d = d := by
+  have h_per := perm_iter_length_getOrbit_eq_self p fuel d h_closes
+  have h_inv := Perm.iter_symm_left_inv p (getOrbit p fuel d).length d
+  rw [h_per] at h_inv
+  exact h_inv
+
+/-- On a complete dart list (`darts.length ≤ fuel`), iterating `p` by `(getOrbit p fuel d).length` returns `d`. -/
+theorem perm_iter_length_getOrbit_eq_self_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ x : D, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d : D) :
+    Perm.iter p (getOrbit p fuel d).length d = d :=
+  perm_iter_length_getOrbit_eq_self p fuel d
+    (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le)
+
+/-- On a complete dart list (`darts.length ≤ fuel`), iterating `p.symm` by `(getOrbit p fuel d).length` returns `d`. -/
+theorem perm_iter_symm_length_getOrbit_eq_self_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ x : D, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d : D) :
+    Perm.iter p.symm (getOrbit p fuel d).length d = d :=
+  perm_iter_symm_length_getOrbit_eq_self p fuel d
+    (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le)
+
+/-- Exact list decomposition of `getOrbitAux` as `(iterList p current m).reverse ++ acc`. -/
+theorem getOrbitAux_eq_reverse_iterList_append (p : Perm D) (start current : D) (acc : List D) (fuel : Nat)
+    (h_closes : orbitClosesWithin p start current fuel) :
+    getOrbitAux p start current acc fuel =
+      (iterList p current ((getOrbitAux p start current acc fuel).length - acc.length)).reverse ++ acc := by
+  induction fuel generalizing current acc with
+  | zero => contradiction
+  | succ f ih =>
+    dsimp [getOrbitAux]
+    by_cases h_hit : p.f current = start
+    · have hbeq : (p.f current == start) = true := by
+        change (if p.f current = start then true else false) = true
+        rw [h_hit]; simp
+      rw [hbeq]
+      dsimp
+      rw [Nat.add_sub_cancel_left]
+      rfl
+    · have hbeq : (p.f current == start) = false := by
+        change (if p.f current = start then true else false) = false
+        rw [if_neg h_hit]
+      rw [hbeq]
+      dsimp
+      rcases h_closes with h_now | h_later
+      · exact False.elim (h_hit h_now)
+      · have h_gt := getOrbitAux_length_gt p start (p.f current) (current :: acc) f
+        have h_sub : (getOrbitAux p start (p.f current) (current :: acc) f).length - acc.length =
+            ((getOrbitAux p start (p.f current) (current :: acc) f).length - (current :: acc).length) + 1 := by
+          simp only [List.length_cons] at h_gt ⊢
+          omega
+        rw [h_sub]
+        dsimp [iterList]
+        rw [List.reverse_cons, List.append_assoc, List.singleton_append]
+        exact ih (p.f current) (current :: acc) h_later
+
+/-- When `orbitClosesWithin p d d fuel` holds, `getOrbit p fuel d` is the reverse of `iterList p d (getOrbit p fuel d).length`. -/
+theorem getOrbit_eq_reverse_iterList (p : Perm D) (fuel : Nat) (d : D)
+    (h_closes : orbitClosesWithin p d d fuel) :
+    getOrbit p fuel d = (iterList p d (getOrbit p fuel d).length).reverse := by
+  simpa [getOrbit] using getOrbitAux_eq_reverse_iterList_append p d d [] fuel h_closes
+
+/-- On a complete dart list (`darts.length ≤ fuel`), `getOrbit p fuel d` equals `(iterList p d (getOrbit p fuel d).length).reverse`. -/
+theorem getOrbit_eq_reverse_iterList_of_complete (p : Perm D)
+    (darts : List D) (h_all : ∀ x : D, x ∈ darts)
+    {fuel : Nat} (h_le : darts.length ≤ fuel) (d : D) :
+    getOrbit p fuel d = (iterList p d (getOrbit p fuel d).length).reverse :=
+  getOrbit_eq_reverse_iterList p fuel d
+    (orbitClosesWithin_mono p d d (orbitClosesWithin_of_complete p darts h_all d) h_le)
+
 end Hypermap
