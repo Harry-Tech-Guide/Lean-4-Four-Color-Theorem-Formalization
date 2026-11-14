@@ -2,6 +2,7 @@ import FourColorTheorem.Math.Hypermap
 import FourColorTheorem.Math.Discharging
 import FourColorTheorem.Math.Rules
 import FourColorTheorem.Math.MainTheorem
+import FourColorTheorem.Math.Unavoidability.FastConfEquiv
 
 namespace Math
 
