@@ -25,6 +25,10 @@ lake build `
     FourColorTheorem.Math.CheckerSoundness.InitialLiveProof `
     FourColorTheorem.Math.CheckerSoundness.IterationElimination `
     FourColorTheorem.Math.Topology.SubtypeSurgery `
+    FourColorTheorem.Math.Topology.K5Obstruction `
+    FourColorTheorem.Math.Topology.PlanarKempe `
+    FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal `
+    FourColorTheorem.Math.Topology.CubicGirth5 `
     FourColorTheorem.Math.Unavoidability.CheckIsoSoundness `
     FourColorTheorem.Math.Unavoidability.FreeCompletionProjection `
     FourColorTheorem.Math.Unavoidability `
