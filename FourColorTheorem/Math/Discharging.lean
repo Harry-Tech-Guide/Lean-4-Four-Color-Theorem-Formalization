@@ -3,6 +3,7 @@ import FourColorTheorem.Math.Topology.Euler
 import FourColorTheorem.Math.Rules
 import FourColorTheorem.Math.Coloring
 import FourColorTheorem.Math.TestDischarging
+import FourColorTheorem.Math.ValidHints
 
 namespace Math
 
@@ -5756,11 +5757,271 @@ theorem checkIsoRec_intVerts_sound (ring adjMat : Nat) (intVerts : List IntVert)
   | some p =>
     exact initIsoVertsLoop_sound deg ring st img intVerts 0 0 h_init
 
+theorem popHintRec_validHintStream :
+    ∀ (hs : HintStream) (p : Nat) (hs' : HintStream),
+      validHintStream hs = true →
+      popHintRec hs = some (p, hs') →
+      Nat.ble 5185536 p = false ∧ validHintStream hs' = true := by
+  intro hs p hs' h_hs h_pop
+  rcases hs with ⟨cur, blocks⟩
+  rw [validHintStream_iff] at h_hs
+  rcases h_hs with ⟨h_cur, h_blocks⟩
+  cases cur with
+  | nil =>
+    cases blocks with
+    | nil => simp [popHintRec] at h_pop
+    | cons b bs =>
+      rw [validHintsBlocksRec_cons_iff] at h_blocks
+      rcases h_blocks with ⟨h_b, h_bs⟩
+      cases b with
+      | nil => simp [popHintRec] at h_pop
+      | cons x xs =>
+        dsimp only [popHintRec] at h_pop
+        injection h_pop with h_eq
+        rcases Prod.mk.inj h_eq with ⟨rfl, rfl⟩
+        rw [validHintListRec_cons_iff] at h_b
+        exact ⟨h_b.1, (validHintStream_iff xs bs).mpr ⟨h_b.2, h_bs⟩⟩
+  | cons x xs =>
+    dsimp only [popHintRec] at h_pop
+    injection h_pop with h_eq
+    rcases Prod.mk.inj h_eq with ⟨rfl, rfl⟩
+    rw [validHintListRec_cons_iff] at h_cur
+    exact ⟨h_cur.1, (validHintStream_iff xs blocks).mpr ⟨h_cur.2, h_blocks⟩⟩
+
+theorem reduceAxleRec_validHintStream (deg : Nat) :
+    ∀ (fuel : Nat) (stack : List Nat) (hs : HintStream),
+      validHintStream hs = true →
+      validHintStream (reduceAxleRec deg fuel stack hs).2 = true := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    intro stack hs h_hs
+    cases stack <;> exact h_hs
+  | succ fuel ih =>
+    intro stack hs h_hs
+    cases stack with
+    | nil => exact h_hs
+    | cons cur rest =>
+      change validHintStream (match popHintRec hs with
+        | none => (false, hs)
+        | some (p, hs') =>
+          strictNat (Nat.land (Nat.shiftRight p 7) 63) fun x =>
+          strictNat (Nat.land (Nat.shiftRight p 1) 63) fun y =>
+          let fc := lookupFastConfRec (Nat.shiftRight p 13)
+          match rootedSubConfRec deg cur fc.z0 fc.z1 fc.qSteps x y (Nat.beq (Nat.land p 1) 1) with
+          | none => (false, hs')
+          | some img =>
+            @Bool.rec (fun _ => Bool × HintStream) (false, hs')
+              (reduceAxleRec deg fuel (pushRefinementsRec cur img fc.intVerts rest) hs')
+              (checkIsoRec fc.ring fc.adjMat fc.intVerts deg cur img)).2 = true
+      cases h_pop : popHintRec hs with
+      | none => exact h_hs
+      | some phs =>
+        rcases phs with ⟨p, hs'⟩
+        have h_hs' := (popHintRec_validHintStream hs p hs' h_hs h_pop).2
+        dsimp only
+        simp only [strictNat_eq]
+        cases rootedSubConfRec deg cur (lookupFastConfRec (Nat.shiftRight p 13)).z0
+            (lookupFastConfRec (Nat.shiftRight p 13)).z1 (lookupFastConfRec (Nat.shiftRight p 13)).qSteps
+            (Nat.land (Nat.shiftRight p 7) 63) (Nat.land (Nat.shiftRight p 1) 63) (Nat.beq (Nat.land p 1) 1) with
+        | none => exact h_hs'
+        | some img =>
+          dsimp only
+          cases checkIsoRec (lookupFastConfRec (Nat.shiftRight p 13)).ring
+              (lookupFastConfRec (Nat.shiftRight p 13)).adjMat
+              (lookupFastConfRec (Nat.shiftRight p 13)).intVerts deg cur img with
+          | false => exact h_hs'
+          | true =>
+            dsimp only
+            exact ih (pushRefinementsRec cur img (lookupFastConfRec (Nat.shiftRight p 13)).intVerts rest) hs' h_hs'
+
+theorem checkBoundLoopRec_validHintStream
+    (cb : Nat → Nat → List FastPosOut → List FastPosOut → List FastPosOut → Nat → HintStream → Bool × HintStream)
+    (h_cb : ∀ st' forcedIn' negBefore' rem' excluded' maxch' hs',
+      validHintStream hs' = true →
+      validHintStream (cb st' forcedIn' negBefore' rem' excluded' maxch' hs').2 = true)
+    (st forcedch maxch : Nat) (rem : List FastPosOut) :
+    ∀ (allowedch : Nat) (negBefore curExcluded : List FastPosOut) (hs : HintStream),
+      validHintStream hs = true →
+      validHintStream (checkBoundLoopRec cb st forcedch maxch rem allowedch negBefore curExcluded hs).2 = true := by
+  induction rem with
+  | nil =>
+    intro _ _ _ hs h_hs
+    exact h_hs
+  | cons po subRem ih =>
+    intro allowedch negBefore curExcluded hs h_hs
+    change validHintStream (@Bool.rec (fun _ => Bool × HintStream)
+      (checkBoundLoopRec cb st forcedch maxch subRem allowedch (po :: negBefore) curExcluded hs)
+      (strictNat (narrowSWAR st po) fun st_next =>
+       strictNat (Nat.add forcedch 1) fun forced_next =>
+       let (okSub, hs') :=
+         @Bool.rec (fun _ => Bool × HintStream)
+           (true, hs)
+           (cb st_next forced_next negBefore subRem curExcluded maxch hs)
+           (noExcludedForcedRec st_next curExcluded)
+       @Bool.rec (fun _ => Bool × HintStream)
+         (false, hs')
+         (strictNat (Nat.sub allowedch 1) fun allowedch' =>
+          @Bool.rec (fun _ => Bool × HintStream)
+            (checkBoundLoopRec cb st forcedch maxch subRem allowedch' negBefore (po :: curExcluded) hs')
+            (true, hs')
+            (Nat.ble (Nat.add allowedch' forcedch) maxch))
+         okSub)
+      po.isPos).2 = true
+    cases po.isPos with
+    | false =>
+      dsimp only
+      exact ih allowedch (po :: negBefore) curExcluded hs h_hs
+    | true =>
+      dsimp only
+      simp only [strictNat_eq]
+      let resSub :=
+        @Bool.rec (fun _ => Bool × HintStream)
+          (true, hs)
+          (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs)
+          (noExcludedForcedRec (narrowSWAR st po) curExcluded)
+      have h_resSub : validHintStream resSub.2 = true := by
+        dsimp [resSub]
+        cases noExcludedForcedRec (narrowSWAR st po) curExcluded with
+        | false => exact h_hs
+        | true => exact h_cb _ _ _ _ _ _ hs h_hs
+      change validHintStream (@Bool.rec (fun _ => Bool × HintStream) (false, resSub.2)
+        (@Bool.rec (fun _ => Bool × HintStream)
+          (checkBoundLoopRec cb st forcedch maxch subRem (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2)
+          (true, resSub.2)
+          (Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch)) resSub.1).2 = true
+      cases resSub.1 with
+      | false => exact h_resSub
+      | true =>
+        dsimp only
+        cases Nat.ble (Nat.add (Nat.sub allowedch 1) forcedch) maxch with
+        | true => exact h_resSub
+        | false =>
+          dsimp only
+          exact ih (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2 h_resSub
+
+theorem checkBoundRec_validHintStream (deg : Nat) :
+    ∀ (fuel : Nat) (st forcedIn : Nat) (negBefore rem excluded : List FastPosOut) (maxch : Nat) (hs : HintStream),
+      validHintStream hs = true →
+      validHintStream (checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).2 = true := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    intro _ _ _ _ _ _ hs h_hs
+    exact h_hs
+  | succ fuel ih =>
+    intro st forcedIn negBefore rem excluded maxch hs h_hs
+    let forced1 := (filterNegAPS st negBefore forcedIn).1
+    let nextNegBefore := (filterNegAPS st negBefore forcedIn).2
+    let forcedch := (filterRemAPS st rem forced1).1
+    let allowedch := (filterRemAPS st rem forced1).2.1
+    let nextRem := (filterRemAPS st rem forced1).2.2
+    change validHintStream (@Bool.rec (fun _ => Bool × HintStream)
+      (@Bool.rec (fun _ => Bool × HintStream)
+        (checkBoundLoopRec (checkBoundRec deg fuel) st forcedch maxch nextRem allowedch nextNegBefore excluded hs)
+        (reduceAxleRec deg 64 [st] hs)
+        (Nat.ble (Nat.add maxch 1) forcedch))
+      (true, hs)
+      (Nat.ble (Nat.add forcedch allowedch) maxch)).2 = true
+    cases Nat.ble (Nat.add forcedch allowedch) maxch with
+    | true => exact h_hs
+    | false =>
+      dsimp only
+      cases Nat.ble (Nat.add maxch 1) forcedch with
+      | true =>
+        dsimp only
+        exact reduceAxleRec_validHintStream deg 64 [st] hs h_hs
+      | false =>
+        dsimp only
+        exact checkBoundLoopRec_validHintStream (checkBoundRec deg fuel) (fun _ _ _ _ _ _ => ih _ _ _ _ _ _)
+          st forcedch maxch nextRem allowedch nextNegBefore excluded hs h_hs
+
+theorem verifyHubcapMembersRec_validHintStream (deg st : Nat) (shiftedTable : List (List FastPosOut))
+    (members : List (Nat × Nat × Int)) :
+    ∀ (hs : HintStream),
+      validHintStream hs = true →
+      validHintStream (verifyHubcapMembersRec deg st shiftedTable members hs).2 = true := by
+  induction members with
+  | nil =>
+    intro hs h_hs
+    exact h_hs
+  | cons m rest ih =>
+    intro hs h_hs
+    rcases m with ⟨x, y, v⟩
+    change validHintStream (
+      let outsX := lookupListRec [] shiftedTable x
+      let initRem := @Bool.rec (fun _ => List FastPosOut) outsX
+        (appendFastPosOut outsX (lookupListRec [] shiftedTable y)) (!Nat.beq x y)
+      strictNat (v + 500).toNat fun maxchStrict =>
+      let (ok, hs') := checkBoundRec deg 20 st 500 [] initRem [] maxchStrict hs
+      @Bool.rec (fun _ => Bool × HintStream) (false, hs')
+        (verifyHubcapMembersRec deg st shiftedTable rest hs') ok).2 = true
+    simp only [strictNat_eq]
+    let initRem := @Bool.rec (fun _ => List FastPosOut) (lookupListRec [] shiftedTable x)
+      (appendFastPosOut (lookupListRec [] shiftedTable x) (lookupListRec [] shiftedTable y)) (!Nat.beq x y)
+    have h_cb := checkBoundRec_validHintStream deg 20 st 500 [] initRem [] (v + 500).toNat hs h_hs
+    cases (checkBoundRec deg 20 st 500 [] initRem [] (v + 500).toNat hs).1 with
+    | false => exact h_cb
+    | true =>
+      dsimp only
+      exact ih _ h_cb
+
+theorem verifyTreePureRec_validHintStream (deg : Nat) (shiftedTable : List (List FastPosOut))
+    (t : ProofTree) :
+    ∀ (st lineno lev condV condM : Nat) (syms : List SymOutlet) (hs : HintStream),
+      validHintStream hs = true →
+      validHintStream (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).2.2 = true := by
+  induction t with
+  | reduce =>
+    intro st lineno lev condV condM syms hs h_hs
+    change validHintStream (let (ok, hs') := reduceAxleRec deg 64 [st] hs
+      strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).2.2 = true
+    simp only [strictNat_eq]
+    exact reduceAxleRec_validHintStream deg 64 [st] hs h_hs
+  | hubcap members =>
+    intro st lineno lev condV condM syms hs h_hs
+    change validHintStream (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
+      strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).2.2 = true
+    simp only [strictNat_eq]
+    exact verifyHubcapMembersRec_validHintStream deg st shiftedTable members hs h_hs
+  | sym k eps lev_in line =>
+    intro st lineno lev condV condM syms hs h_hs
+    change validHintStream (strictNat (Nat.add lineno 1) fun lineno' =>
+      (@Bool.rec (fun _ => Bool) false (match findSymOutletRec line syms with
+        | none => false
+        | some found => @Bool.rec (fun _ => Bool) false (symForcedRec st (Nat.add k 1) deg (!Nat.beq eps 0) found.conds)
+            (Nat.beq found.nolines (Nat.add lev_in 1))) (!Nat.ble deg k && Nat.ble eps 1), lineno', hs)).2.2 = true
+    simp only [strictNat_eq]
+    exact h_hs
+  | cond v m tTrue tFalse ihTrue ihFalse =>
+    intro st lineno lev condV condM syms hs h_hs
+    rw [verifyTreePureRec_cond_eq]
+    simp only [strictNat_eq]
+    let condV' := setLaneNat (setLaneNat condV lev v) (Nat.add lev 1) 0
+    let condM' := setLaneNat (setLaneNat condM lev (condMaskNat m)) (Nat.add lev 1) 0
+    let syms' := match extractCondsRec deg condV condM lev with
+      | none => syms
+      | some conds => { number := lineno, nolines := Nat.add lev 1, conds := conds } :: syms
+    let resTrue := verifyTreePureRec deg shiftedTable tTrue
+      (setLaneNat st v (Nat.land (getLaneNat st v) (condMaskNat m)))
+      (Nat.add lineno 1) (Nat.add lev 1) condV' condM' syms' hs
+    have h1 : validHintStream resTrue.2.2 = true := ihTrue _ _ _ _ _ _ hs h_hs
+    change validHintStream (@Bool.rec (fun _ => Bool × Nat × HintStream)
+      (false, resTrue.2.fst, resTrue.2.snd)
+      (verifyTreePureRec deg shiftedTable tFalse
+        (setLaneNat st v (Nat.land (getLaneNat st v) (Nat.xor 31 (condMaskNat m))))
+        resTrue.2.fst lev condV' condM' syms' resTrue.2.snd)
+      resTrue.fst).2.2 = true
+    cases h_b : resTrue.fst with
+    | false => dsimp; exact h1
+    | true => dsimp; exact ihFalse _ _ _ _ _ _ resTrue.2.snd h1
+
 /-- Predicate characterizing that a cartwheel degree assignment `cartDeg` has a verified
     reducible configuration embedding (`rootedSubConfRec` + `checkIsoRec`) whose interior vertex
     degrees `iv.d` match `cartDeg` at every cartwheel vertex `1 ≤ v ≤ 5 * deg`. -/
 def HasExactReducedAxle (deg : Nat) (cartDeg : Nat → Nat) : Prop :=
   ∃ (cur h x y : Nat) (cw : Bool) (img : Nat),
+    h < 633 ∧
     MatchesCartState31 deg cartDeg cur ∧
     let fc := lookupFastConfRec h
     rootedSubConfRec deg cur fc.z0 fc.z1 fc.qSteps x y cw = some img ∧
@@ -5806,19 +6067,20 @@ theorem reduceAxleRec_succ_eq (deg fuel : Nat) (cur : Nat) (rest : List Nat) (hs
 theorem reduceAxleRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤ 11) :
     ∀ (fuel : Nat) (stack : List Nat) (hs : HintStream),
       (∃ st ∈ stack, MatchesCartState31 deg cartDeg st) →
+      validHintStream hs = true →
       (reduceAxleRec deg fuel stack hs).1 = true →
       HasExactReducedAxle deg cartDeg := by
   intro fuel
   induction fuel with
   | zero =>
-    intro stack hs ⟨st, h_mem, _⟩ h_ok
+    intro stack hs ⟨st, h_mem, _⟩ _ h_ok
     cases stack with
     | nil => cases h_mem
     | cons cur rest =>
       change (false : Bool) = true at h_ok
       contradiction
   | succ fuel ih =>
-    intro stack hs ⟨st, h_mem, h_st⟩ h_ok
+    intro stack hs ⟨st, h_mem, h_st⟩ h_hs h_ok
     cases stack with
     | nil => cases h_mem
     | cons cur rest =>
@@ -5829,6 +6091,9 @@ theorem reduceAxleRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤
         rw [h_pop] at h_ok; contradiction
       | some phs =>
         rcases phs with ⟨p, hs'⟩
+        have h_phs := popHintRec_validHintStream hs p hs' h_hs h_pop
+        have h_hlt : Nat.shiftRight p 13 < 633 := nat_shiftRight_13_lt_633_of_ble_false p h_phs.1
+        have h_hs' : validHintStream hs' = true := h_phs.2
         rw [h_pop] at h_ok
         dsimp only at h_ok
         let h := Nat.shiftRight p 13
@@ -5854,17 +6119,17 @@ theorem reduceAxleRec_sound (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg ≤
               have h_ivs_le : ∀ iv ∈ fc.intVerts, getImgNat img iv.u ≤ 5 * deg :=
                 fun iv hm => (h_ivs iv hm).1
               rcases matchesCartState31_pushRefinementsRec_or_exact deg cartDeg st img fc.intVerts h_deg h_st h_ivs_le rest with h_exact | h_next
-              · refine ⟨st, h, x, y, cw, img, h_st, h_sub, h_iso, ?_⟩
+              · refine ⟨st, h, x, y, cw, img, h_hlt, h_st, h_sub, h_iso, ?_⟩
                 intro iv hm
                 have ⟨hle, hd⟩ := h_ivs iv hm
                 refine ⟨hle, hd, ?_⟩
                 intro hv1
                 rw [hd]
                 exact h_exact iv hm hv1
-              · exact ih (pushRefinementsRec st img fc.intVerts rest) hs' h_next h_ok
+              · exact ih (pushRefinementsRec st img fc.intVerts rest) hs' h_next h_hs' h_ok
             · -- `st ∈ rest`
               exact ih (pushRefinementsRec cur img fc.intVerts rest) hs'
-                ⟨st, mem_pushRefinementsRec_of_mem cur img fc.intVerts rest h_in_rest, h_st⟩ h_ok
+                ⟨st, mem_pushRefinementsRec_of_mem cur img fc.intVerts rest h_in_rest, h_st⟩ h_hs' h_ok
 
 /-!
 ### Stage K.2: `symForcedRec`, `extractCondsRec`, and Full Semantic Soundness of `verifyTree`
@@ -7011,9 +7276,13 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
       (∀ po ∈ negBefore', validFastPosOut deg po = true ∧ po.isPos = false) →
       (∀ po ∈ rem', validFastPosOut deg po = true) →
       (∀ ex ∈ excluded', OutletActive deg cartDeg ex = false) →
+      validHintStream hs' = true →
       (cb st' forcedIn' negBefore' rem' excluded' maxch' hs').1 = true →
       HasExactReducedAxle deg cartDeg ∨
       (forcedIn' : Int) + activeOutletSum deg cartDeg negBefore' + activeOutletSum deg cartDeg rem' ≤ (maxch' : Int))
+    (h_cb_hs : ∀ (st' forcedIn' : Nat) (negBefore' rem' excluded' : List FastPosOut) (maxch' : Nat) (hs' : HintStream),
+      validHintStream hs' = true →
+      validHintStream (cb st' forcedIn' negBefore' rem' excluded' maxch' hs').2 = true)
     (st forcedch maxch : Nat) (h_match31 : MatchesCartState31 deg cartDeg st)
     (rem : List FastPosOut) :
     ∀ (allowedch : Nat) (negBefore curExcluded : List FastPosOut) (hs : HintStream),
@@ -7021,16 +7290,17 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
       (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
       (∀ po ∈ rem, validFastPosOut deg po = true) →
       (∀ ex ∈ curExcluded, OutletActive deg cartDeg ex = false) →
+      validHintStream hs = true →
       (checkBoundLoopRec cb st forcedch maxch rem allowedch negBefore curExcluded hs).1 = true →
       HasExactReducedAxle deg cartDeg ∨
       (forcedch : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
   induction rem with
   | nil =>
-    intro allowedch negBefore curExcluded hs _ _ _ _ h_ok
+    intro allowedch negBefore curExcluded hs _ _ _ _ _ h_ok
     rw [checkBoundLoopRec_nil] at h_ok
     contradiction
   | cons po subRem ih =>
-    intro allowedch negBefore curExcluded hs h_all h_neg h_rem h_excl h_ok
+    intro allowedch negBefore curExcluded hs h_all h_neg h_rem h_excl h_hs h_ok
     have h_po := h_rem po List.mem_cons_self
     have h_sub : ∀ q ∈ subRem, validFastPosOut deg q = true :=
       fun q hq => h_rem q (List.mem_cons_of_mem po hq)
@@ -7047,7 +7317,7 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
         rcases List.mem_cons.mp hq with rfl | hq_mem
         · exact ⟨h_po, h_pos⟩
         · exact h_neg q hq_mem
-      rcases ih allowedch (po :: negBefore) curExcluded hs h_all' h_neg' h_sub h_excl h_ok with h_red | h_bound
+      rcases ih allowedch (po :: negBefore) curExcluded hs h_all' h_neg' h_sub h_excl h_hs h_ok with h_red | h_bound
       · exact Or.inl h_red
       · right
         simp only [activeOutletSum] at h_bound ⊢
@@ -7066,7 +7336,7 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
           rw [h_cb_ok] at h_ok; dsimp only at h_ok; contradiction
         | true =>
           rcases h_cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs
-            h_match_next h_neg h_sub h_excl h_cb_ok with h_red | h_bound
+            h_match_next h_neg h_sub h_excl h_hs h_cb_ok with h_red | h_bound
           · exact Or.inl h_red
           · right
             simp only [Nat.add_eq, activeOutletSum, outletVal, h_act, h_pos, ↓reduceIte] at h_bound ⊢
@@ -7077,6 +7347,11 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
             (true, hs)
             (cb (narrowSWAR st po) (Nat.add forcedch 1) negBefore subRem curExcluded maxch hs)
             (noExcludedForcedRec (narrowSWAR st po) curExcluded)
+        have h_resSub_hs : validHintStream resSub.2 = true := by
+          dsimp [resSub]
+          cases noExcludedForcedRec (narrowSWAR st po) curExcluded with
+          | false => exact h_hs
+          | true => exact h_cb_hs _ _ _ _ _ _ hs h_hs
         change (@Bool.rec (fun _ => Bool × HintStream)
           (false, resSub.2)
           (@Bool.rec (fun _ => Bool × HintStream)
@@ -7110,7 +7385,7 @@ theorem checkBoundLoopRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : d
               rcases List.mem_cons.mp hex with rfl | hex_mem
               · exact h_act
               · exact h_excl ex hex_mem
-            rcases ih (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2 h_all' h_neg h_sub h_excl' h_ok with h_red | h_bound
+            rcases ih (Nat.sub allowedch 1) negBefore (po :: curExcluded) resSub.2 h_all' h_neg h_sub h_excl' h_resSub_hs h_ok with h_red | h_bound
             · exact Or.inl h_red
             · right
               simp only [activeOutletSum, h_act, Bool.false_eq_true, ↓reduceIte]
@@ -7126,16 +7401,17 @@ theorem checkBoundRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg �
       (∀ po ∈ negBefore, validFastPosOut deg po = true ∧ po.isPos = false) →
       (∀ po ∈ rem, validFastPosOut deg po = true) →
       (∀ ex ∈ excluded, OutletActive deg cartDeg ex = false) →
+      validHintStream hs = true →
       (checkBoundRec deg fuel st forcedIn negBefore rem excluded maxch hs).1 = true →
       HasExactReducedAxle deg cartDeg ∨
       (forcedIn : Int) + activeOutletSum deg cartDeg negBefore + activeOutletSum deg cartDeg rem ≤ (maxch : Int) := by
   induction fuel with
   | zero =>
-    intro st forcedIn negBefore rem excluded maxch hs _ _ _ _ h_ok
+    intro st forcedIn negBefore rem excluded maxch hs _ _ _ _ _ h_ok
     rw [checkBoundRec_zero] at h_ok
     contradiction
   | succ fuel ih =>
-    intro st forcedIn negBefore rem excluded maxch hs h_match31 h_neg h_rem h_excl h_ok
+    intro st forcedIn negBefore rem excluded maxch hs h_match31 h_neg h_rem h_excl h_hs h_ok
     rw [checkBoundRec_succ_eq] at h_ok
     have h_fneg := filterNegAPS_sound deg cartDeg st h_deg h_match31.1 negBefore forcedIn h_neg
     let forced1 := (filterNegAPS st negBefore forcedIn).1
@@ -7170,12 +7446,14 @@ theorem checkBoundRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_deg : deg �
       cases h_ble2 : Nat.ble (Nat.add maxch 1) forcedch with
       | true =>
         rw [h_ble2] at h_ok; dsimp only at h_ok
-        exact Or.inl (reduceAxleRec_sound deg cartDeg h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok)
+        exact Or.inl (reduceAxleRec_sound deg cartDeg h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_hs h_ok)
       | false =>
         rw [h_ble2] at h_ok; dsimp only at h_ok
         rcases checkBoundLoopRec_sound31 deg cartDeg h_deg (checkBoundRec deg fuel) ih
+          (fun st' forcedIn' negBefore' rem' excluded' maxch' hs' =>
+            checkBoundRec_validHintStream deg fuel st' forcedIn' negBefore' rem' excluded' maxch' hs')
           st forcedch maxch h_match31 nextRem allowedch nextNegBefore excluded hs
-          h_frem.2.1 h_fneg.1 h_frem.1 h_excl h_ok with h_red | h_bound
+          h_frem.2.1 h_fneg.1 h_frem.1 h_excl h_hs h_ok with h_red | h_bound
         · exact Or.inl h_red
         · right
           have h1 : (forcedIn : Int) + activeOutletSum deg cartDeg negBefore ≤
@@ -7194,6 +7472,7 @@ theorem verifyHubcapMembersRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_de
     (h_table : ∀ row ∈ shiftedTable, ∀ po ∈ row, validFastPosOut deg po = true)
     (members : List (Nat × Nat × Int)) :
     ∀ (hs : HintStream),
+      validHintStream hs = true →
       (verifyHubcapMembersRec deg st shiftedTable members hs).1 = true →
       HasExactReducedAxle deg cartDeg ∨
       ∀ m ∈ members,
@@ -7203,10 +7482,10 @@ theorem verifyHubcapMembersRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_de
           ((m.2.2 + 500).toNat : Int) := by
   induction members with
   | nil =>
-    intro _ _
+    intro _ _ _
     exact Or.inr (fun _ hm => by contradiction)
   | cons m rest ih =>
-    intro hs h_ok
+    intro hs h_hs h_ok
     rw [verifyHubcapMembersRec_cons] at h_ok
     rcases m with ⟨x, y, v⟩
     dsimp only at h_ok
@@ -7239,9 +7518,9 @@ theorem verifyHubcapMembersRec_sound31 (deg : Nat) (cartDeg : Nat → Nat) (h_de
           · exact validFastPosOut_lookupListRec deg shiftedTable h_table x po hX
           · exact validFastPosOut_lookupListRec deg shiftedTable h_table y po hY
       rcases checkBoundRec_sound31 deg cartDeg h_deg 20 st 500 [] initRem [] (v + 500).toNat hs
-        h_match31 (by intro _ h; contradiction) h_init_valid (by intro _ h; contradiction) h_cb with h_red | h_bound
+        h_match31 (by intro _ h; contradiction) h_init_valid (by intro _ h; contradiction) h_hs h_cb with h_red | h_bound
       · exact Or.inl h_red
-      · rcases ih resCB.2 h_ok with h_red | h_rest
+      · rcases ih resCB.2 (checkBoundRec_validHintStream deg 20 st 500 [] initRem [] (v + 500).toNat hs h_hs) h_ok with h_red | h_rest
         · exact Or.inl h_red
         · right
           intro m' hm'
@@ -7806,19 +8085,20 @@ theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List F
       (∀ conds, extractCondsRec deg condV condM lev = some conds →
         ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd') →
       (∀ cd', SatisfiesPrefix cd' condV condM lev → P cd' ∨ MatchesCartState31 deg cd' st) →
+      validHintStream hs = true →
       (verifyTreePureRec deg shiftedTable t st lineno lev condV condM syms hs).1 = true →
       ∀ cd, SatisfiesPrefix cd condV condM lev → P cd := by
   induction t with
   | reduce =>
-    intro maxLev st lineno lev condV condM syms hs _ _ _ _ h_pref h_ok cd h_cd
+    intro maxLev st lineno lev condV condM syms hs _ _ _ _ h_pref h_hs h_ok cd h_cd
     rcases h_pref cd h_cd with hP | h_match31
     · exact hP
     · change (let (ok, hs') := reduceAxleRec deg 64 [st] hs
               strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
       simp only [strictNat_eq] at h_ok
-      exact h_leaf cd (Or.inl (reduceAxleRec_sound deg cd h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_ok))
+      exact h_leaf cd (Or.inl (reduceAxleRec_sound deg cd h_deg 64 [st] hs ⟨st, List.mem_cons_self, h_match31⟩ h_hs h_ok))
   | hubcap members =>
-    intro maxLev st lineno lev condV condM syms hs h_valid _ _ _ h_pref h_ok cd h_cd
+    intro maxLev st lineno lev condV condM syms hs h_valid _ _ _ h_pref h_hs h_ok cd h_cd
     have h_cover : validHubcapCover deg members = true := by
       cases maxLev <;> exact h_valid
     rcases h_pref cd h_cd with hP | h_match31
@@ -7826,11 +8106,11 @@ theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List F
     · change (let (ok, hs') := verifyHubcapMembersRec deg st shiftedTable members hs
               strictNat (Nat.add lineno 1) fun lineno' => (ok, lineno', hs')).1 = true at h_ok
       simp only [strictNat_eq] at h_ok
-      rcases verifyHubcapMembersRec_sound31 deg cd h_deg st h_match31 shiftedTable h_table members hs h_ok with h_red | h_bounds
+      rcases verifyHubcapMembersRec_sound31 deg cd h_deg st h_match31 shiftedTable h_table members hs h_hs h_ok with h_red | h_bounds
       · exact h_leaf cd (Or.inl h_red)
       · exact h_leaf cd (Or.inr ⟨members, h_cover, h_bounds⟩)
   | sym k eps lev_in line =>
-    intro maxLev st lineno lev condV condM syms hs _ _ h_syms _ h_pref h_ok cd h_cd
+    intro maxLev st lineno lev condV condM syms hs _ _ h_syms _ h_pref _ h_ok cd h_cd
     rcases h_pref cd h_cd with hP | h_match31
     · exact hP
     · change (let ok :=
@@ -7872,7 +8152,7 @@ theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List F
               found.conds h_deg1 h_shift_lt h_match31.1 h_found_conds h_ok
             exact h_sym cd k (!Nat.beq eps 0) found.conds hk_lt h_found_conds h_forced h_found_P
   | cond v m tTrue tFalse ihTrue ihFalse =>
-    intro maxLev st lineno lev condV condM syms hs h_valid h_lev_max h_syms h_sib h_pref h_ok
+    intro maxLev st lineno lev condV condM syms hs h_valid h_lev_max h_syms h_sib h_pref h_hs h_ok
     cases maxLev with
     | zero =>
       dsimp [validProofTree] at h_valid
@@ -7935,7 +8215,7 @@ theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List F
           · exact Or.inr (matchesCartState31_cond_true deg cd' st v m h_deg h_match31 h_tb)
         have h_true_all : ∀ cd', SatisfiesPrefix cd' condV' condM' lev1 → P cd' :=
           ihTrue maxLev' stTrue lineno1 lev1 condV' condM' syms' hs
-            h_val_true (by change (lev + 1) + maxLev' < 60; omega) h_syms' h_sib_true h_pref_true h_b
+            h_val_true (by change (lev + 1) + maxLev' < 60; omega) h_syms' h_sib_true h_pref_true h_hs h_b
         have h_sib_false : ∀ conds, extractCondsRec deg condV' condM' lev = some conds →
             ∀ cd', (∀ c ∈ conds, c.2.testBit (degBitIdx (cd' c.1)) = true) → P cd' := by
           intro conds h_some cd' h_sat
@@ -7953,9 +8233,11 @@ theorem verifyTreePureRec_sound_of_pred (deg : Nat) (shiftedTable : List (List F
               exact Or.inl (h_true_all cd' h_sat1)
             | false =>
               exact Or.inr (matchesCartState31_cond_false deg cd' st v m h_deg h_match31 h_bit)
+        have h_hs1 : validHintStream resTrue.2.snd = true :=
+          verifyTreePureRec_validHintStream deg shiftedTable tTrue stTrue lineno1 lev1 condV' condM' syms' hs h_hs
         have h_false_all : ∀ cd', SatisfiesPrefix cd' condV' condM' lev → P cd' :=
           ihFalse maxLev' stFalse resTrue.2.fst lev condV' condM' syms' resTrue.2.snd
-            h_val_false (by omega) h_syms' h_sib_false h_pref_false h_ok
+            h_val_false (by omega) h_syms' h_sib_false h_pref_false h_hs1 h_ok
         intro cd h_cd
         exact h_false_all cd ((satisfiesPrefix_cond_iff cd condV condM lev v maskTrue h_lev1).mpr h_cd)
 
@@ -8026,7 +8308,7 @@ theorem verifyTree_core_soundness (configs : List Configuration) (deg : Nat)
   exact verifyTreePureRec_sound_of_pred deg shiftedTable P h_deg1 h_le11
     (validFastPosOut_getShiftedTableForDeg deg h_deg) h_leaf h_sym t
     58 (getInitStateForDeg deg) 2 0 0 0 [] ([], getHintsForDeg deg)
-    h_valid (by omega) h_syms0 h_sib0 h_pref0 h_ver cd0 h_sat0 h_cd0
+    h_valid (by omega) h_syms0 h_sib0 h_pref0 (validHintStream_getHintsForDeg deg h_deg) h_ver cd0 h_sat0 h_cd0
 
 /-- Top-level `DischargingTreesVerified` Core Soundness (with `ProofTree.sym` eliminated):
     for every hub degree `deg ∈ {7, 8, 9, 10, 11}` and any dihedral-closed family `ℱ`
