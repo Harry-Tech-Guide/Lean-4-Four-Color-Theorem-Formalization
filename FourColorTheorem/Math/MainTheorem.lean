@@ -14,6 +14,7 @@ import FourColorTheorem.Math.Batch.DischargeMaster
 import FourColorTheorem.Math.Topology.SubtypeSurgery
 import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
 import FourColorTheorem.Math.Topology.CubicGirth5
+import FourColorTheorem.Math.Topology.CartwheelFaithfulness
 import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
 
 namespace Math
@@ -219,9 +220,16 @@ lifting to RSST `(3.3)–(3.4)` `Unavoidability.CorrespondingProjection` via
 Phase 3 primal structural theorems (`mc_numComponents_eq_one`, `mc_nodeDegree_eq_three`,
 `mc_faceDegree_ge_five` from `MinimalCounterexamplePrimal` and `CubicGirth5`) are now **100% discharged**.
 
-Only the dual cartwheel embedding (`Unavoidability.CartwheelEmbedded`) and Phase 4
-(constructing `FullReductionWitness` from `CorrespondingProjection c H.dual darts` via subtype
-excision, contract pullback, and planar Kempe chain transfer) remain in `RSSTStandardizationBridge`. -/
+All Phase 1–3 prerequisites — Phase 1 (`MasterCertificate.rsst_all_unavoidable_reducible`),
+Phase 3 primal structural theorems (`mc_numComponents_eq_one`, `mc_nodeDegree_eq_three`,
+`mc_faceDegree_ge_five`), Phase 3 dual cartwheel faithfulness (`_root_.Hypermap.mc_cartwheelEmbedded_dual`),
+and Phase 5 unconditional dual unavoidability (`Unavoidability.dual_unavoidability_appearsInTriangulation_matched`
+lifting to RSST `(3.3)–(3.4)` `CorrespondingProjection` + `RingFanProjectionConsistent`) — are
+now **100% discharged**.
+
+Only Phase 4 (constructing `FullReductionWitness` from `CorrespondingProjection c H.dual darts`
+via subtype excision, contract pullback, and planar Kempe chain transfer) remains in
+`RSSTStandardizationBridge`. -/
 
 /-- Any `Math.MinimalCounterexample` satisfies `Hypermap.PrimalMinimalCounterexample`. -/
 theorem MinimalCounterexample.toPrimal {H : Hypermap} [DecidableEq H.Dart] {darts : List H.Dart}
@@ -265,15 +273,11 @@ theorem mc_dual_triangulation (H : Hypermap) [DecidableEq H.Dart] (darts : List 
 def RSSTStandardizationBridge : Prop :=
   ∀ (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
     MinimalCounterexample H darts →
-    (∀ (refl : Bool) (d0 : H.Dart),
-      5 ≤ Hypermap.nodeDegree H.dual d0 darts.length →
-      Hypermap.nodeDegree H.dual d0 darts.length ≤ 11 →
-      Unavoidability.CartwheelEmbedded H.dual darts.length refl d0) ∧
-    (∀ (h : Nat) (hh : h < 633),
+    ∀ (h : Nat) (hh : h < 633),
       let c := theUnavoidableSet[h]'(by rw [unavoidable_size_eq]; exact hh)
       IsReducible c →
       Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) →
-      Nonempty (FullReductionWitness H darts c))
+      Nonempty (FullReductionWitness H darts c)
 
 /-- The Discharging Verification Theorem:
     The computational correctness of the RSST cartwheel discharging trees (degrees 7 through 11)
@@ -290,26 +294,33 @@ theorem theUnavoidableSet_getElem_eq_configOfRConf (h : Nat) (hh : h < 633) :
     configOfRConf (parsedRConfList[h]'(by rw [Unavoidability.parsedRConfList_length]; exact hh))
   exact List.getElem_map configOfRConf
 
-/-- In any minimal counterexample, the dual hypermap `H.dual` is a triangulation
+/-- In any minimal counterexample, the dual hypermap `H.dual` is unconditionally a triangulation
     (`faceDegree H.dual d darts.length = 3` on every dart). -/
 theorem rsst_mc_dual_triangulation (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (_h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+    (mc : MinimalCounterexample H darts) :
     ∀ d : H.dual.Dart, d ∈ darts → Hypermap.faceDegree H.dual d darts.length = 3 :=
   mc_dual_triangulation H darts mc
 
-/-- **Unconditional Matched Dual Unavoidability Projection Theorem:**
-    Every minimal counterexample whose dual cartwheel embedding `(h_rsst H darts mc).1`
-    holds contains some configuration `h < 633` from `theUnavoidableSet` realizing a faithful
-    RSST `(3.3)–(3.4)` `CorrespondingProjection` on `H.dual` (proved unconditionally from Phase 3
-    via `dual_unavoidability_appearsInTriangulation_matched` and
-    `appearsInTriangulation_matched_implies_correspondingProjection`). -/
-theorem rsst_unavoidability_dual_matched (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+/-- **Unconditional Full Matched Dual Unavoidability Projection Theorem:**
+    Every minimal counterexample contains some `h < 633` realizing a faithful RSST `(3.3)–(3.4)`
+    `CorrespondingProjection` on `H.dual`, together with `MatchesConfCycle` and
+    `RingFanProjectionConsistent`, proved completely unconditionally via Phase 3
+    `_root_.Hypermap.mc_cartwheelEmbedded_dual` and `correspondingProjectionOfEmbedding`. -/
+theorem rsst_unavoidability_dual_matched_full (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (mc : MinimalCounterexample H darts) :
     ∃ (h : Nat) (hh : h < 633),
-      let c := theUnavoidableSet[h]'(by rw [unavoidable_size_eq]; exact hh)
-      c ∈ theUnavoidableSet ∧
-      Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) := by
-  have hCartwheel := (h_rsst H darts mc).1
+      let hlen : h < parsedRConfList.length := by
+        rw [Unavoidability.parsedRConfList_length]; exact hh
+      let rc := parsedRConfList[h]'hlen
+      let c := configOfRConf rc
+      ∃ (p : Unavoidability.CorrespondingProjection c H.dual darts),
+        Unavoidability.MatchesConfCycle rc H.dual darts p.emb ∧
+        Unavoidability.RingFanProjectionConsistent rc H.dual darts p.emb := by
+  have hCartwheel : ∀ (refl : Bool) (d0 : H.Dart),
+      5 ≤ Hypermap.nodeDegree H.dual d0 darts.length →
+      Hypermap.nodeDegree H.dual d0 darts.length ≤ 11 →
+      Unavoidability.CartwheelEmbedded H.dual darts.length refl d0 :=
+    fun refl d0 h5 h11 => _root_.Hypermap.mc_cartwheelEmbedded_dual H darts mc.toPrimal refl d0 h5 h11
   obtain ⟨h, hh, e, hmc⟩ :=
     Unavoidability.dual_unavoidability_appearsInTriangulation_matched H darts
       mc.complete.1 mc.complete.2.1 mc.is_bridgeless mc.is_planar
@@ -317,31 +328,48 @@ theorem rsst_unavoidability_dual_matched (H : Hypermap) [DecidableEq H.Dart] (da
       (mc_nodeDegree_eq_three H darts mc)
       (mc_faceDegree_ge_five H darts mc)
       hCartwheel
+  have hlen : h < parsedRConfList.length := by
+    rw [Unavoidability.parsedRConfList_length]; exact hh
   have h_tri : ∀ d : H.dual.Dart, d ∈ darts → Hypermap.faceDegree H.dual d darts.length = 3 :=
     mc_dual_triangulation H darts mc
-  have hProj :=
-    (Unavoidability.appearsInTriangulation_matched_implies_correspondingProjection
-      h hh H.dual darts mc.complete.2.1 h_tri
-      (by rw [Unavoidability.parsedRConfList_length]; exact hh) e hmc).1
+  let p := Unavoidability.correspondingProjectionOfEmbedding h hh H.dual darts mc.complete.2.1 hlen e
+  have hfan := Unavoidability.ring_fan_projection_consistent h hh H.dual darts mc.complete.2.1 h_tri hlen e hmc
+  exact ⟨h, hh, p, hmc, hfan⟩
+
+/-- **Unconditional Matched Dual Unavoidability Projection Theorem:**
+    Every minimal counterexample contains some configuration `h < 633` from `theUnavoidableSet`
+    realizing a faithful RSST `(3.3)–(3.4)` `CorrespondingProjection` on `H.dual`, proved
+    unconditionally without `RSSTStandardizationBridge`. -/
+theorem rsst_unavoidability_dual_matched (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
+    (mc : MinimalCounterexample H darts) :
+    ∃ (h : Nat) (hh : h < 633),
+      let c := theUnavoidableSet[h]'(by rw [unavoidable_size_eq]; exact hh)
+      c ∈ theUnavoidableSet ∧
+      Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) := by
+  obtain ⟨h, hh, p, _, _⟩ := rsst_unavoidability_dual_matched_full H darts mc
   have h_eq := theUnavoidableSet_getElem_eq_configOfRConf h hh
   refine ⟨h, hh, Array.getElem_mem _, ?_⟩
-  rwa [← h_eq] at hProj
+  exact ⟨h_eq.symm ▸ p⟩
 
-/-- **RSST Unavoidability Theorem (`CorrespondingProjection` on `H.dual`):**
+/-- **Unconditional RSST Unavoidability Theorem (`CorrespondingProjection` on `H.dual`):**
     Every minimal counterexample to the Four Color Theorem yields an unavoidable configuration
     `c ∈ theUnavoidableSet` admitted via a faithful `CorrespondingProjection c H.dual darts`. -/
 theorem rsst_unavoidability_dual_projection (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+    (mc : MinimalCounterexample H darts) :
     ∃ c ∈ theUnavoidableSet, Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) := by
-  obtain ⟨h, hh, hc_in, hProj⟩ := rsst_unavoidability_dual_matched H darts h_rsst mc
+  obtain ⟨h, hh, hc_in, hProj⟩ := rsst_unavoidability_dual_matched H darts mc
   exact ⟨_, hc_in, hProj⟩
 
-/-- Direct existence of a dual `CorrespondingProjection` via `AppearsInTriangulation`. -/
+/-- Direct unconditional existence of a dual `CorrespondingProjection` via `AppearsInTriangulation`. -/
 theorem rsst_unavoidability_dual_projection_of_appearsInTriangulation
     (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+    (mc : MinimalCounterexample H darts) :
     ∃ c ∈ theUnavoidableSet, Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) := by
-  have hCartwheel := (h_rsst H darts mc).1
+  have hCartwheel : ∀ (refl : Bool) (d0 : H.Dart),
+      5 ≤ Hypermap.nodeDegree H.dual d0 darts.length →
+      Hypermap.nodeDegree H.dual d0 darts.length ≤ 11 →
+      Unavoidability.CartwheelEmbedded H.dual darts.length refl d0 :=
+    fun refl d0 h5 h11 => _root_.Hypermap.mc_cartwheelEmbedded_dual H darts mc.toPrimal refl d0 h5 h11
   obtain ⟨c, hc_in, hc_app⟩ :=
     Unavoidability.dual_unavoidability_appearsInTriangulation H darts
       mc.complete.1 mc.complete.2.1 mc.is_bridgeless mc.is_planar
@@ -364,13 +392,13 @@ theorem rsst_all_unavoidable_reducible (c : Configuration) :
 /-- Every minimal counterexample contains an indexed configuration `h < 633` that is both
     unconditionally reducible and realizes a faithful `CorrespondingProjection` on `H.dual`. -/
 theorem exists_reducible_dual_projection (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+    (mc : MinimalCounterexample H darts) :
     ∃ (h : Nat) (hh : h < 633),
       let c := theUnavoidableSet[h]'(by rw [unavoidable_size_eq]; exact hh)
       c ∈ theUnavoidableSet ∧
       IsReducible c ∧
       Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) := by
-  obtain ⟨h, hh, hc_in, hProj⟩ := rsst_unavoidability_dual_matched H darts h_rsst mc
+  obtain ⟨h, hh, hc_in, hProj⟩ := rsst_unavoidability_dual_matched H darts mc
   exact ⟨h, hh, hc_in, rsst_all_unavoidable_reducible _ hc_in, hProj⟩
 
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction).
@@ -379,8 +407,8 @@ theorem exists_reducible_dual_projection (H : Hypermap) [DecidableEq H.Dart] (da
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_rsst : RSSTStandardizationBridge)
     (mc : MinimalCounterexample H darts) : False := by
-  obtain ⟨h, hh, _hc_in, hRed, hProj⟩ := exists_reducible_dual_projection H darts h_rsst mc
-  obtain ⟨w⟩ := (h_rsst H darts mc).2 h hh hRed hProj
+  obtain ⟨h, hh, _hc_in, hRed, hProj⟩ := exists_reducible_dual_projection H darts mc
+  obtain ⟨w⟩ := h_rsst H darts mc h hh hRed hProj
   exact no_reducible_with_full_witness H darts mc _ w hRed
 
 

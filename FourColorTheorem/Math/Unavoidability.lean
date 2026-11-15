@@ -25,13 +25,12 @@ def containsUnavoidableDual (H : Hypermap) [DecidableEq H.Dart] (darts : List H.
   ∃ (c : Configuration), c ∈ theUnavoidableSet ∧
     Nonempty (Unavoidability.CorrespondingProjection c H.dual darts)
 
-/-- The fundamental theorem of Discharging (Phase 5, unconditional):
-    Every minimal counterexample whose dual cartwheel embedding `(h_rsst H darts mc).1` holds
-    admits an unavoidable configuration `c ∈ theUnavoidableSet` via
+/-- The fundamental theorem of Discharging (Phase 5, 100% unconditional):
+    Every minimal counterexample admits an unavoidable configuration `c ∈ theUnavoidableSet` via
     a faithful `CorrespondingProjection c H.dual darts` on its dual triangulation `H.dual`. -/
 theorem discharging_forces_unavoidable (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge) (mc : MinimalCounterexample H darts) :
+    (mc : MinimalCounterexample H darts) :
     containsUnavoidableDual H darts :=
-  rsst_unavoidability_dual_projection H darts h_rsst mc
+  rsst_unavoidability_dual_projection H darts mc
 
 end Math
