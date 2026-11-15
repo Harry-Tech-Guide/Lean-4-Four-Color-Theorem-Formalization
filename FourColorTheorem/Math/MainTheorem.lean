@@ -17,6 +17,7 @@ import FourColorTheorem.Math.Topology.CubicGirth5
 import FourColorTheorem.Math.Topology.CartwheelFaithfulness
 import FourColorTheorem.Math.Topology.DiskExcision
 import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+import FourColorTheorem.Math.Topology.ContractedColoring
 
 namespace Math
 
@@ -285,6 +286,16 @@ def RSSTStandardizationBridge : Prop :=
       Unavoidability.MatchesConfCycle rc H.dual darts p.emb →
       Nonempty (Unavoidability.VertexColoringMod H.dual (Unavoidability.mappedContractDarts p.emb))
 
+/-- Unconditional proof of `RSSTStandardizationBridge`: every matched C-reducible
+    configuration in a minimal counterexample admits a quotient coloring
+    `VertexColoringMod H.dual (mappedContractDarts p.emb)` by deleting its contract
+    edges in the primal (`Hypermap.mc_c_reducible_mod_coloring`). -/
+theorem rsst_standardization_bridge : RSSTStandardizationBridge := by
+  intro H _ darts mc h hh rc c hC p hmc
+  have hlen : h < parsedRConfList.length := by
+    rw [Unavoidability.parsedRConfList_length]; exact hh
+  exact _root_.Hypermap.mc_c_reducible_mod_coloring h hh hlen H darts mc.toPrimal hC.1 p hmc
+
 /-- The Discharging Verification Theorem:
     The computational correctness of the RSST cartwheel discharging trees (degrees 7 through 11)
     is formally verified in-kernel via reflection and `kernel reduction` by `discharging_trees_verified`. -/
@@ -407,13 +418,13 @@ theorem exists_reducible_dual_projection (H : Hypermap) [DecidableEq H.Dart] (da
   obtain ⟨h, hh, hc_in, hProj⟩ := rsst_unavoidability_dual_matched H darts mc
   exact ⟨h, hh, hc_in, rsst_all_unavoidable_reducible _ hc_in, hProj⟩
 
-/-- If there were a minimal counterexample, we could prove `False` (a contradiction).
-    Proved by chaining unconditional dual unavoidability projection, unconditional Phase 1
-    reducibility, Phase 4 capped-ring disk excision (`d_reducible_matched_impossible` for all
-    249 D-reducible configurations), and `c_reducible_matched_impossible_of_mod_coloring` with
-    the narrowed C-reducible `RSSTStandardizationBridge`. -/
+/-- Every minimal counterexample yields `False` unconditionally:
+    chaining dual unavoidability (`rsst_unavoidability_dual_matched_full`), in-kernel
+    batch reducibility certificates (`rsst_all_unavoidable_reducible`), D-reducibility disk
+    excision (`d_reducible_matched_impossible` for all 249 D-reducible configurations),
+    and C-reducible contract-edge deletion + Kempe lifting (`rsst_standardization_bridge` and
+    `c_reducible_matched_impossible_of_mod_coloring` for all 384 C-reducible configurations). -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
-    (h_rsst : RSSTStandardizationBridge)
     (mc : MinimalCounterexample H darts) : False := by
   obtain ⟨h, hh, p, hmc, hfan⟩ := rsst_unavoidability_dual_matched_full H darts mc
   have hlen : h < parsedRConfList.length := by
@@ -424,7 +435,7 @@ theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (d
   have hRed := rsst_all_unavoidable_reducible _ hc_in
   rcases hRed with hD | hC
   · exact _root_.Hypermap.d_reducible_matched_impossible H darts mc.toPrimal h hh hlen p hmc hfan hD
-  · obtain ⟨col_mod⟩ := h_rsst H darts mc h hh hC p hmc
+  · obtain ⟨col_mod⟩ := rsst_standardization_bridge H darts mc h hh hC p hmc
     exact _root_.Hypermap.c_reducible_matched_impossible_of_mod_coloring
       H darts mc.toPrimal h hh hlen p hmc hfan hC col_mod
 
@@ -446,16 +457,16 @@ theorem minimal_counterexample_exists (H : Hypermap) [DecidableEq H.Dart] (darts
     rw [← hlen] at hmin
     exact False.elim (hmin darts'.length hlt hEx')
 
-/-- THE FOUR COLOR THEOREM
-Every planar, bridgeless combinatorial map admits a valid 4-coloring. -/
-theorem four_color_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart) 
+/-- **The Four Color Theorem** (unconditional):
+    Every finite planar bridgeless hypermap admits a valid 4-coloring. -/
+theorem four_color_theorem (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   (h_complete : IsCompleteDarts H darts)
-  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts)
-  (h_rsst : RSSTStandardizationBridge) : Nonempty (MapColoring H) := by
+  (h_planar : IsPlanar H darts) (h_bridgeless : Hypermap.isBridgeless H darts) :
+  Nonempty (MapColoring H) := by
   by_cases h_colorable : Nonempty (MapColoring H)
   · exact h_colorable
   · have h_not : MapColoring H → False := fun c => h_colorable ⟨c⟩
     have ⟨H', dec', darts', mc⟩ := minimal_counterexample_exists H darts h_complete h_planar h_bridgeless h_not
-    exact False.elim (@minimal_counterexample_impossible H' dec' darts' h_rsst mc)
+    exact False.elim (@minimal_counterexample_impossible H' dec' darts' mc)
 
 end Math
