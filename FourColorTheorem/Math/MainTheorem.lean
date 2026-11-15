@@ -15,6 +15,7 @@ import FourColorTheorem.Math.Topology.SubtypeSurgery
 import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
 import FourColorTheorem.Math.Topology.CubicGirth5
 import FourColorTheorem.Math.Topology.CartwheelFaithfulness
+import FourColorTheorem.Math.Topology.DiskExcision
 import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
 
 namespace Math
@@ -220,16 +221,19 @@ lifting to RSST `(3.3)–(3.4)` `Unavoidability.CorrespondingProjection` via
 Phase 3 primal structural theorems (`mc_numComponents_eq_one`, `mc_nodeDegree_eq_three`,
 `mc_faceDegree_ge_five` from `MinimalCounterexamplePrimal` and `CubicGirth5`) are now **100% discharged**.
 
-All Phase 1–3 prerequisites — Phase 1 (`MasterCertificate.rsst_all_unavoidable_reducible`),
-Phase 3 primal structural theorems (`mc_numComponents_eq_one`, `mc_nodeDegree_eq_three`,
-`mc_faceDegree_ge_five`), Phase 3 dual cartwheel faithfulness (`_root_.Hypermap.mc_cartwheelEmbedded_dual`),
-and Phase 5 unconditional dual unavoidability (`Unavoidability.dual_unavoidability_appearsInTriangulation_matched`
-lifting to RSST `(3.3)–(3.4)` `CorrespondingProjection` + `RingFanProjectionConsistent`) — are
-now **100% discharged**.
+All Phase 1–3, Phase 5, and Phase 4 D-reducibility prerequisites —
+- Phase 1 (`MasterCertificate.rsst_all_unavoidable_reducible`),
+- Phase 3 primal structural theorems (`mc_numComponents_eq_one`, `mc_nodeDegree_eq_three`,
+  `mc_faceDegree_ge_five`) and dual cartwheel faithfulness (`_root_.Hypermap.mc_cartwheelEmbedded_dual`),
+- Phase 5 unconditional dual unavoidability (`Unavoidability.dual_unavoidability_appearsInTriangulation_matched`
+  lifting to RSST `(3.3)–(3.4)` `CorrespondingProjection` + `MatchesConfCycle` + `RingFanProjectionConsistent`),
+- Phase 4 capped-ring subtype disk excision, Kempe chain pullback, dual-primal gluing, and
+  all 249 D-reducible configurations (`_root_.Hypermap.d_reducible_matched_impossible`),
+- Phase 4 conditional C-reducible contradiction (`_root_.Hypermap.c_reducible_matched_impossible_of_mod_coloring`) —
+are now **100% discharged**.
 
-Only Phase 4 (constructing `FullReductionWitness` from `CorrespondingProjection c H.dual darts`
-via subtype excision, contract pullback, and planar Kempe chain transfer) remains in
-`RSSTStandardizationBridge`. -/
+Only C-reducible contract-edge coloring existence (`VertexColoringMod H.dual (mappedContractDarts p.emb)`
+when `IsCReducible c`) remains in `RSSTStandardizationBridge`. -/
 
 /-- Any `Math.MinimalCounterexample` satisfies `Hypermap.PrimalMinimalCounterexample`. -/
 theorem MinimalCounterexample.toPrimal {H : Hypermap} [DecidableEq H.Dart] {darts : List H.Dart}
@@ -274,10 +278,12 @@ def RSSTStandardizationBridge : Prop :=
   ∀ (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
     MinimalCounterexample H darts →
     ∀ (h : Nat) (hh : h < 633),
-      let c := theUnavoidableSet[h]'(by rw [unavoidable_size_eq]; exact hh)
-      IsReducible c →
-      Nonempty (Unavoidability.CorrespondingProjection c H.dual darts) →
-      Nonempty (FullReductionWitness H darts c)
+      let rc := parsedRConfList[h]'(by rw [Unavoidability.parsedRConfList_length]; exact hh)
+      let c := configOfRConf rc
+      IsCReducible c →
+      ∀ (p : Unavoidability.CorrespondingProjection c H.dual darts),
+      Unavoidability.MatchesConfCycle rc H.dual darts p.emb →
+      Nonempty (Unavoidability.VertexColoringMod H.dual (Unavoidability.mappedContractDarts p.emb))
 
 /-- The Discharging Verification Theorem:
     The computational correctness of the RSST cartwheel discharging trees (degrees 7 through 11)
@@ -403,13 +409,24 @@ theorem exists_reducible_dual_projection (H : Hypermap) [DecidableEq H.Dart] (da
 
 /-- If there were a minimal counterexample, we could prove `False` (a contradiction).
     Proved by chaining unconditional dual unavoidability projection, unconditional Phase 1
-    reducibility, and Phase 4 reduction transfer (`FullReductionWitness`). -/
+    reducibility, Phase 4 capped-ring disk excision (`d_reducible_matched_impossible` for all
+    249 D-reducible configurations), and `c_reducible_matched_impossible_of_mod_coloring` with
+    the narrowed C-reducible `RSSTStandardizationBridge`. -/
 theorem minimal_counterexample_impossible (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_rsst : RSSTStandardizationBridge)
     (mc : MinimalCounterexample H darts) : False := by
-  obtain ⟨h, hh, _hc_in, hRed, hProj⟩ := exists_reducible_dual_projection H darts mc
-  obtain ⟨w⟩ := h_rsst H darts mc h hh hRed hProj
-  exact no_reducible_with_full_witness H darts mc _ w hRed
+  obtain ⟨h, hh, p, hmc, hfan⟩ := rsst_unavoidability_dual_matched_full H darts mc
+  have hlen : h < parsedRConfList.length := by
+    rw [Unavoidability.parsedRConfList_length]; exact hh
+  have hc_in : configOfRConf (parsedRConfList[h]'hlen) ∈ theUnavoidableSet := by
+    rw [← theUnavoidableSet_getElem_eq_configOfRConf h hh]
+    exact Array.getElem_mem _
+  have hRed := rsst_all_unavoidable_reducible _ hc_in
+  rcases hRed with hD | hC
+  · exact _root_.Hypermap.d_reducible_matched_impossible H darts mc.toPrimal h hh hlen p hmc hfan hD
+  · obtain ⟨col_mod⟩ := h_rsst H darts mc h hh hC p hmc
+    exact _root_.Hypermap.c_reducible_matched_impossible_of_mod_coloring
+      H darts mc.toPrimal h hh hlen p hmc hfan hC col_mod
 
 
 /-- If a counterexample exists, there exists a genuine minimal counterexample (a planar, bridgeless, uncolorable map where every smaller map is colorable). -/

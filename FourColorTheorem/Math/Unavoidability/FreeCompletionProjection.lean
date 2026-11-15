@@ -511,7 +511,7 @@ theorem vertexColoringMod_to_faceColoringMod_dual {H : Hypermap} {M : List H.Dar
   rw [H.face.left_inv] at h
   exact h.symm
 
-private theorem contractEdgeDart_canon
+theorem contractEdgeDart_canon
     {c : Configuration} {T : Hypermap} [DecidableEq T.Dart] {darts : List T.Dart}
     (p : CorrespondingProjection c T darts)
     {q : Nat × Nat} (hq_mem : q ∈ c.contractEdges) :

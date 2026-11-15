@@ -29,6 +29,11 @@ lake build `
     FourColorTheorem.Math.Topology.PlanarKempe `
     FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal `
     FourColorTheorem.Math.Topology.CubicGirth5 `
+    FourColorTheorem.Math.Topology.JordanCycleSeparation `
+    FourColorTheorem.Math.Topology.ShortCircuits `
+    FourColorTheorem.Math.Topology.Birkhoff5Ring `
+    FourColorTheorem.Math.Topology.CartwheelFaithfulness `
+    FourColorTheorem.Math.Topology.DiskExcision `
     FourColorTheorem.Math.Unavoidability.CheckIsoSoundness `
     FourColorTheorem.Math.Unavoidability.FreeCompletionProjection `
     FourColorTheorem.Math.Unavoidability `
