@@ -1,23 +1,26 @@
 import Spec
-import ConditionalSolution
+import FourColorTheorem.Math.MainTheorem
+import FourColorTheorem.Math.SpecBridge
 
 /-!
 # Palomar / Comparator Solution Module: The Four Color Theorem
 
-**STATUS: OPEN.** `four_color_theorem` below has the *identical* name, universe levels, and type
-as `Challenge.four_color_theorem` (hypothesis-free) but is **not yet proved**; it is stated with
-`sorry` on purpose so that this repository never claims more than it has.
-
-What exists today is the *conditional* theorem `four_color_theorem_conditional`
-(`ConditionalSolution.lean`, sorry-free, standard axioms only), which assumes
-`Spec.RSSTStandardizationBridge`. That bridge is equivalent to "no minimal counterexample exists"
-(`SanityChecks.bridge_iff_no_mc`), so it must be *eliminated*, not assumed. See the roadmap in
-`README.md`.
+`four_color_theorem` below has the *identical* name, universe levels, and type as
+`Challenge.four_color_theorem` (hypothesis-free) and is proved unconditionally via
+`SpecBridge.four_color_theorem_spec` (backed by `Math.four_color_theorem`), completely and
+unconditionally, using only the standard Lean axioms `[propext, Classical.choice, Quot.sound]`.
 -/
 
-/-- The Four Color Theorem (Solution; **still `sorry`** until the roadmap in `README.md` is done). -/
+/-- **The Four Color Theorem** (unconditional Solution matching `Challenge.four_color_theorem`). -/
 theorem four_color_theorem (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_complete : Spec.IsCompleteDarts H darts)
     (h_planar : Spec.IsPlanar H darts)
     (h_bridgeless : Spec.Hypermap.isBridgeless H darts) :
-    Nonempty (Spec.MapColoring H) := sorry
+    Nonempty (Spec.MapColoring H) :=
+  SpecBridge.four_color_theorem_spec H darts h_complete h_planar h_bridgeless
+
+/--
+info: 'four_color_theorem' depends on axioms: [propext, Classical.choice, Quot.sound]
+-/
+#guard_msgs in
+#print axioms four_color_theorem

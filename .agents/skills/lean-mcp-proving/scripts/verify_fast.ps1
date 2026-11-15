@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 Set-Location "c:\Four Color Theorem"
 
-Write-Host "=== [1/3] Checking for 'sorry' across FourColorTheorem/Math ===" -ForegroundColor Cyan
-$sorries = Select-String -Path "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\CheckerSoundness\*.lean", "FourColorTheorem\Math\Topology\*.lean", "FourColorTheorem\Math\KernelSoundness\*.lean", "FourColorTheorem\Math\Unavoidability\*.lean" -Pattern "\bsorry\b" |
+Write-Host "=== [1/3] Checking for 'sorry' across FourColorTheorem/Math, Spec, and Solution ===" -ForegroundColor Cyan
+$sorries = Select-String -Path "Spec.lean", "Solution.lean", "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\CheckerSoundness\*.lean", "FourColorTheorem\Math\Topology\*.lean", "FourColorTheorem\Math\KernelSoundness\*.lean", "FourColorTheorem\Math\Unavoidability\*.lean" -Pattern "\bsorry\b" |
     Where-Object { $_.Line -notmatch "^\s*--" }
 
 if ($sorries) {
@@ -34,11 +34,14 @@ lake build `
     FourColorTheorem.Math.Topology.Birkhoff5Ring `
     FourColorTheorem.Math.Topology.CartwheelFaithfulness `
     FourColorTheorem.Math.Topology.DiskExcision `
+    FourColorTheorem.Math.Topology.ContractedColoring `
     FourColorTheorem.Math.Unavoidability.CheckIsoSoundness `
     FourColorTheorem.Math.Unavoidability.FreeCompletionProjection `
     FourColorTheorem.Math.Unavoidability `
     FourColorTheorem.Math.MasterCertificate `
-    FourColorTheorem.Math.MainTheorem
+    FourColorTheorem.Math.MainTheorem `
+    FourColorTheorem.Math.SpecBridge `
+    Solution
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Targeted lake build failed." -ForegroundColor Red
