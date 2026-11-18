@@ -27,6 +27,21 @@ classification:
     - "68V15"
 
 sources:
+  - title: "The four-colour theorem"
+    authors:
+      - "Neil Robertson"
+      - "Daniel P. Sanders"
+      - "Paul Seymour"
+      - "Robin Thomas"
+    id: "doi:10.1006/jctb.1997.1750"
+    type: "article"
+    location: "Journal of Combinatorial Theory, Series B, 70(1):2-44, 1997"
+    relationship: "formalizes"
+    author_endorsement: "not-contacted"
+    note: >-
+      Primary full proof paper: formalizes the RSST 633-configuration D/C-reducibility and degree
+      7-11 cartwheel discharging architecture directly from the published mathematical proof,
+      discharging rules, and configuration tables.
   - title: "A new proof of the four-colour theorem"
     authors:
       - "Neil Robertson"
@@ -39,8 +54,7 @@ sources:
     relationship: "formalizes"
     author_endorsement: "not-contacted"
     note: >-
-      Formalizes the RSST 633-configuration reducibility and degree 7-11 cartwheel discharging
-      architecture directly from the published mathematical method and configuration/rule tables.
+      RSST's 1996 research announcement accompanying the full 1997 JCTB proof.
   - title: "Formal proof — the four-color theorem"
     authors:
       - "Georges Gonthier"
