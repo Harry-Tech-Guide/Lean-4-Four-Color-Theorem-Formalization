@@ -71,6 +71,9 @@ related_formalizations:
   - id: "https://github.com/math-comp/fourcolor"
     relationship: "independent"
     note: "Gonthier's original Coq/Rocq Mathematical Components formalization."
+  - id: "PALOMAR-2026-09-27-000005"
+    relationship: "independent"
+    note: "Prior Lean 4 Mathlib-based port of Gonthier's Coq Four Color Theorem formalization; the present repository is an independent, de novo, zero-Mathlib formalization following RSST (1997)."
 
 automation:
   methods:
