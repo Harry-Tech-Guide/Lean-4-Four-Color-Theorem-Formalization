@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.CheckerSoundness.MatchingExtraction
+module
+
+public import FourColorTheorem.Math.CheckerSoundness.MatchingExtraction
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness
@@ -547,16 +551,19 @@ theorem edgeXor_swapOfChords_eq_false_of_not_endpoint (r : Nat) (b : Nat → Col
 ### Edge Digit Identities under `boundaryKempeSwap`
 -/
 
+private theorem color_swap_digit_eq (c1 c2 : Color) (s1 s2 : Bool)
+    (h_xor : Bool.xor s1 s2 = false) :
+    (let d := (if s1 then theta1.swap c1 else c1).toNat ^^^ (if s2 then theta1.swap c2 else c2).toNat
+     if d > 0 then d - 1 else 0) =
+    (let d := c1.toNat ^^^ c2.toNat; if d > 0 then d - 1 else 0) := by
+  revert h_xor
+  cases c1 <;> cases c2 <;> cases s1 <;> cases s2 <;> decide
+
 theorem edgeDigitAt_boundaryKempeSwap_of_edgeXor_false
     (c : Configuration) (r : Nat) (b : Nat → Color) (S : Nat → Bool) (i : Nat)
     (h_xor : edgeXor r S i = false) :
-    edgeDigitAt r (boundaryKempeSwap c b theta1 S) i = edgeDigitAt r b i := by
-  dsimp [edgeDigitAt, boundaryKempeSwap, edgeXor] at h_xor ⊢
-  cases h1 : S i <;> cases h2 : S ((i + 1) % r)
-  · rfl
-  · rw [h1, h2] at h_xor; contradiction
-  · rw [h1, h2] at h_xor; contradiction
-  · cases b i <;> cases b ((i + 1) % r) <;> rfl
+    edgeDigitAt r (boundaryKempeSwap c b theta1 S) i = edgeDigitAt r b i :=
+  color_swap_digit_eq (b i) (b ((i + 1) % r)) (S i) (S ((i + 1) % r)) h_xor
 
 private theorem color_swap_digit_left (cx1 cx2 : Color) (sx1 sx2 bt : Bool)
     (h_pair_x : Nat.ble 2 cx1.toNat ≠ Nat.ble 2 cx2.toNat)

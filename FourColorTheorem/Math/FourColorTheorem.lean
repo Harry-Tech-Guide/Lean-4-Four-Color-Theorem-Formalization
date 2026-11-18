@@ -1,11 +1,15 @@
-import FourColorTheorem.Math.Topology
+module
 
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Planarity
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.Configuration
-import FourColorTheorem.Math.Reflection
-import FourColorTheorem.Math.DReductionProof
+public import FourColorTheorem.Math.Topology
+
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Planarity
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Configuration
+public import FourColorTheorem.Math.Reflection
+public import FourColorTheorem.Math.DReductionProof
+
+@[expose] public section
 
 namespace FourColorTheorem
 

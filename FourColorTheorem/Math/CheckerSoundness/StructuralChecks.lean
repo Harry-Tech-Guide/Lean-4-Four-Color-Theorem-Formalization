@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Soundness.StructuralVerification
+module
+
+public import FourColorTheorem.Math.Soundness.StructuralVerification
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness

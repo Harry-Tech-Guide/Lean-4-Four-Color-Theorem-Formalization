@@ -1,11 +1,17 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.ParsedRConf633
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Unavoidability.HintBounds
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.ParsedRConf633
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Unavoidability.HintBounds
+
+@[expose] public section
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 /-!
 # FastConf ↔ RConf Core Checker & Algebraic Extraction Lemmas
@@ -445,15 +451,7 @@ theorem array_getD_toList {α : Type} (a : Array α) (i : Nat) (d : α) :
       | zero => rfl
       | succ k' => exact ih k'
   rw [h1]
-  rcases a with ⟨l⟩
-  dsimp [Array.getD]
-  split
-  · rename_i hi
-    simp [List.getElem?_eq_getElem hi]
-  · rename_i hni
-    have hge : l.length ≤ i := by simpa using hni
-    rw [List.getElem?_eq_none hge]
-    rfl
+  by_cases hi : i < a.size <;> simp [Array.getD, hi]
 
 theorem nbrMaskNodup_spec (xs : List Nat) (m res : Nat)
     (h : nbrMaskNodup xs m = some res) :
@@ -519,7 +517,7 @@ theorem extractMasks_spec (xss : List (List Nat)) (ms : List Nat)
         | zero =>
           have ⟨hn, _, hb⟩ := nbrMaskNodup_spec xs 0 m hm
           refine ⟨hn, fun y => ?_⟩
-          simpa using hb y
+          simpa [listGetD] using hb y
         | succ k =>
           exact hrest k (by simpa using hi)
 

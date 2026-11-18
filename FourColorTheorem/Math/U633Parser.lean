@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.U633String
-import FourColorTheorem.Math.Batch.Runner
+module
+
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.U633String
+public import FourColorTheorem.Math.Batch.Runner
+
+@[expose] public section
 
 set_option maxRecDepth 500000
 

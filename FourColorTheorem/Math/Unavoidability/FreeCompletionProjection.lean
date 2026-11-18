@@ -1,11 +1,15 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
-import FourColorTheorem.Math.Unavoidability.ConfGeomCert
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCert
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Coloring
+
+@[expose] public section
 
 /-!
 # Stage R.3: Free-Completion Projection & Contracted Pullback (`RSST (3.3)–(3.6)`)
@@ -365,7 +369,7 @@ theorem ring_fan_projection_consistent (h : Nat) (hh : h < 633)
 
 /-- Surjectivity/bijectivity of `e.dart u` onto `getOrbit T.node darts.length (e.rep u)`
     for any `TriangulationEmbedding e` of configuration `h < 633`. -/
-private theorem triangulationEmbedding_int_dart_bij (h : Nat) (hh : h < 633)
+theorem triangulationEmbedding_int_dart_bij (h : Nat) (hh : h < 633)
     (T : Hypermap) [DecidableEq T.Dart]
     (darts : List T.Dart) (h_all : ∀ d : T.Dart, d ∈ darts)
     (hlen : h < parsedRConfList.length := by rw [Math.Unavoidability.parsedRConfList_length]; exact hh)

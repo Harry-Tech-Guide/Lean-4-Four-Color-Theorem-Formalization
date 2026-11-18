@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.KernelSoundness.KernelInitialSoundness
-import FourColorTheorem.Math.KernelSoundness.KernelKempeSoundness
+module
+
+public import FourColorTheorem.Math.KernelSoundness.KernelInitialSoundness
+public import FourColorTheorem.Math.KernelSoundness.KernelKempeSoundness
+
+@[expose] public section
 
 namespace Math
 namespace KernelSoundness

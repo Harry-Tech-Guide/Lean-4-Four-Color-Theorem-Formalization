@@ -1,11 +1,15 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.Genus
-import FourColorTheorem.Math.Topology.PlanarKempe
-import FourColorTheorem.Math.Topology.CubicGirth5
-import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+public import FourColorTheorem.Math.Topology.Genus
+public import FourColorTheorem.Math.Topology.PlanarKempe
+public import FourColorTheorem.Math.Topology.CubicGirth5
+public import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+
+@[expose] public section
 
 /-!
 # Stage U.5: Capped-Ring Disk Excision & Unconditional D-Reduction (`DiskExcision`)
@@ -45,7 +49,7 @@ namespace Hypermap
 open Math Math.Discharging Math.Unavoidability
 open Math.Hypermap (sameVertex faceDegree)
 
-private theorem list_length_pos_of_ne_nil {α : Type} {l : List α} (h : l ≠ []) : 0 < l.length := by
+theorem list_length_pos_of_ne_nil_de {α : Type} {l : List α} (h : l ≠ []) : 0 < l.length := by
   cases l with
   | nil => exact False.elim (h rfl)
   | cons _ _ => exact Nat.succ_pos _
@@ -79,7 +83,7 @@ private theorem iter_perm_symm_iff_rev {D : Type} (p : Perm D) :
   fun _ _ => sameOrbit_symm_perm p
 
 /-- Orientation-reversing mirror involution `(e, n⁻¹, e ∘ f⁻¹ ∘ e)` on hypermaps. -/
-def mirror (H : Hypermap) : Hypermap where
+abbrev mirror (H : Hypermap) : Hypermap where
   Dart := H.Dart
   edge := H.edge
   node := Perm.symm H.node
@@ -234,12 +238,11 @@ theorem isPlanar_mirror (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart
   have hm := (eulerChar_le_two_mul_numComponents H.mirror darts h_nodup h_all h_len).2
   have hp := (eulerChar_le_two_mul_numComponents H darts h_nodup h_all h_len).2
   rw [hm, hp, genusDeficit_mirror_eq H darts h_all h_len]
-  rfl
 
 /-- Canonical orientation-normalized dual triangulation for a matched embedding:
     equals `H.dual` when `orient = false` and `H.dual.mirror` when `orient = true`,
     so `(orientedDual H orient).node = nodePermOriented H.dual orient`. -/
-def orientedDual (H : Hypermap) (orient : Bool) : Hypermap where
+abbrev orientedDual (H : Hypermap) (orient : Bool) : Hypermap where
   Dart := H.Dart
   edge := H.edge
   node := nodePermOriented H.dual orient
@@ -413,7 +416,7 @@ theorem bypassValid_sameOrbit_iff {D : Type} {p0 p : Perm D} {S : D → Prop}
           rw [hmeq, ← Perm.iter_add, Nat.sub_add_cancel hmn, hn]
         exact sameOrbit_trans p (sameOrbit_step p rfl) (ih (n' + 1 - m) hsub hSpx hrem)
 
-private theorem uncoupleEdge_e_inv {D : Type} [DecidableEq D] (T : PermTriple D)
+theorem uncoupleEdge_e_inv {D : Type} [DecidableEq D] (T : PermTriple D)
     (h_inv : ∀ x, T.e.f (T.e.f x) = x) (d : D) :
     let b := T.e.f d
     ∀ x, (uncoupleEdge T d b).e.f ((uncoupleEdge T d b).e.f x) = x := by
@@ -603,7 +606,7 @@ private theorem deleteEdgesFold_inv {D : Type} [DecidableEq D]
     · exact Or.inl hzd
     · exact Or.inr (Or.inr hzdone)
 
-private theorem deleteEdgesFold_final_bv {D : Type} [DecidableEq D]
+theorem deleteEdgesFold_final_bv {D : Type} [DecidableEq D]
     (T0 : PermTriple D) (h_inv0 : ∀ x, T0.e.f (T0.e.f x) = x)
     (h_free : ∀ x : D, T0.e.f x ≠ x)
     (removed : List D) (h_closed : ∀ z, z ∈ removed ↔ T0.e.f z ∈ removed) :
@@ -653,7 +656,7 @@ private theorem deleteEdgesFold_final_bv {D : Type} [DecidableEq D]
 
 /-- Construct the multi-edge-deleted subtype hypermap removing all darts in an `H.edge`-closed
     list `removed`, assuming `H` has no self-paired darts (`∀ d, H.edge.f d ≠ d`). -/
-def deleteEdgesSubtype (H : Hypermap) [DecidableEq H.Dart]
+abbrev deleteEdgesSubtype (H : Hypermap) [DecidableEq H.Dart]
     (removed : List H.Dart) (h_closed : ∀ d, d ∈ removed ↔ H.edge.f d ∈ removed)
     (h_free : ∀ d : H.Dart, H.edge.f d ≠ d) : Hypermap :=
   let Tf := (deleteEdgesFold ⟨H.hypermapToTriple, H.edge_involution⟩ removed).1
@@ -666,7 +669,7 @@ instance instDecidableEqDeleteEdgesSubtype (H : Hypermap) [DecidableEq H.Dart]
     (removed : List H.Dart) (h_closed : ∀ d, d ∈ removed ↔ H.edge.f d ∈ removed)
     (h_free : ∀ d : H.Dart, H.edge.f d ≠ d) :
     DecidableEq (deleteEdgesSubtype H removed h_closed h_free).Dart := by
-  dsimp only [deleteEdgesSubtype, Hypermap.exciseSubtype]
+  try dsimp only [deleteEdgesSubtype, Hypermap.exciseSubtype]
   exact Subtype.instDecidableEq
 
 theorem deleteEdgesSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
@@ -694,12 +697,9 @@ theorem deleteEdgesSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
     (deleteEdgesFold ⟨H.hypermapToTriple, H.edge_involution⟩ removed).2
     (deleteEdgesFold ⟨H.hypermapToTriple, H.edge_involution⟩ removed).1.enf_id
     hspec.1 hspec.2.1 h_nodup h_all h_fuel h_planar hgd_le hfree' darts' h_nodup' h_comp' h_fuel'
-  dsimp only [deleteEdgesSubtype]
-  rwa [instBEqOfDecidableEq_eq_de inferInstance
-    (H.instDecidableEqExciseDart removed _ _ _
-      (deleteEdgesFold ⟨H.hypermapToTriple, H.edge_involution⟩ removed).2
-      (deleteEdgesFold ⟨H.hypermapToTriple, H.edge_involution⟩ removed).1.enf_id
-      hspec.1 hspec.2.1)]
+  first
+    | exact hres
+    | exact congrArg (fun b => @Hypermap.isPlanar _ b fuel' darts' = true) (instBEqOfDecidableEq_eq_de _ _) ▸ hres
 
 theorem deleteEdgesSubtype_edge_val (H : Hypermap) [DecidableEq H.Dart]
     (removed : List H.Dart) (h_closed : ∀ d, d ∈ removed ↔ H.edge.f d ∈ removed)
@@ -875,7 +875,7 @@ private theorem mc_dual_loopless {H : Hypermap} [DecidableEq H.Dart] {darts : Li
   exact dual_sameVertex_edge_eq_false_of_isBridgeless H darts h_mc.complete
     (Nat.le_refl _) (Nat.le_refl _) h_mc.is_bridgeless d
 
-private theorem mc_oriented_edge_free {H : Hypermap} [DecidableEq H.Dart] {darts : List H.Dart}
+theorem mc_oriented_edge_free {H : Hypermap} [DecidableEq H.Dart] {darts : List H.Dart}
     (h_mc : PrimalMinimalCounterexample H darts) (orient : Bool) :
     ∀ d : H.Dart, (orientedDual H orient).edge.f d ≠ d := by
   intro d
@@ -904,7 +904,7 @@ private theorem fanHead_spec (h : Nat) (hh : h < 633)
   have hx_adj : x < rc.adj.size := by rw [hhdr.2.2.2.2.2.2.2.2.2.2.2.1]; exact hx_tot
   have hrf := hfan x hx hx_adj
   have hf0 : 0 < (((rc.adj[x]'hx_adj).toList.drop 1).dropLast).length :=
-    list_length_pos_of_ne_nil hrf.1
+    list_length_pos_of_ne_nil_de hrf.1
   let fans := ((rc.adj[x]'hx_adj).toList.drop 1).dropLast
   let f0 := fans[0]'hf0
   have hf0_mem : f0 ∈ fans := List.getElem_mem _
@@ -935,7 +935,7 @@ def capRingRawDart (h : Nat) (hh : h < 633)
     exact Nat.lt_of_lt_of_le hx (Nat.le_add_right _ _)
   have hrf := hfan x hx hx_adj
   have hf0 : 0 < (((rc.adj[x]'hx_adj).toList.drop 1).dropLast).length :=
-    list_length_pos_of_ne_nil hrf.1
+    list_length_pos_of_ne_nil_de hrf.1
   let f0 := (((rc.adj[x]'hx_adj).toList.drop 1).dropLast)[0]'hf0
   (orientedDual H p.emb.orient).face.f (p.emb.dart f0 x)
 
@@ -956,7 +956,7 @@ private theorem capRingRawDart_equations (h : Nat) (hh : h < 633)
       rw [h1, h3, h2]
       exact Nat.lt_of_lt_of_le hx (Nat.le_add_right _ _)
     let fans := ((rc.adj[x]'hx_adj).toList.drop 1).dropLast
-    let f0 := fans[0]'(list_length_pos_of_ne_nil (hfan x hx hx_adj).1)
+    let f0 := fans[0]'(list_length_pos_of_ne_nil_de (hfan x hx hx_adj).1)
     let dx := capRingRawDart h hh hlen H darts p hfan x hx
     T0.node.f dx = H.edge.f (p.emb.dart f0 x) ∧
     H.edge.f dx = T0.node.f (H.edge.f (p.emb.dart f0 ((x + 1) % rc.r))) := by
@@ -973,7 +973,7 @@ private theorem capRingRawDart_equations (h : Nat) (hh : h < 633)
     rwa [h_edge_eq] at h_e
   have h2 : H.edge.f dx = T0.node.f (H.edge.f (p.emb.dart f0 ((x + 1) % rc.r))) := by
     have hrf := hfan x hx hx_adj
-    have hf0 : 0 < fans.length := list_length_pos_of_ne_nil hrf.1
+    have hf0 : 0 < fans.length := list_length_pos_of_ne_nil_de hrf.1
     have hturn := hrf.2.2.1 hf0
     change p.emb.dart f0 ((x + 1) % rc.r) = T0.node.f (p.emb.dart f0 x) at hturn
     have h_fen := T0.face_edge_node_id (p.emb.dart f0 x)
@@ -1149,7 +1149,7 @@ theorem capRingRawDart_inj (h : Nat) (hh : h < 633)
 
 /-- Surviving dual triangulation obtained from `orientedDual H p.emb.orient` by excising all
     darts incident to interior vertices of `c`. -/
-def capTriangulation (h : Nat) (hh : h < 633)
+abbrev capTriangulation (h : Nat) (hh : h < 633)
     (hlen : h < parsedRConfList.length := by rw [parsedRConfList_length]; exact hh)
     (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_mc : PrimalMinimalCounterexample H darts)
@@ -1162,7 +1162,7 @@ def capTriangulation (h : Nat) (hh : h < 633)
     (mc_oriented_edge_free h_mc p.emb.orient)
 
 /-- Primal capped-ring hypermap `H_cap := capTriangulation.dual`. -/
-def capHypermap (h : Nat) (hh : h < 633)
+abbrev capHypermap (h : Nat) (hh : h < 633)
     (hlen : h < parsedRConfList.length := by rw [parsedRConfList_length]; exact hh)
     (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
     (h_mc : PrimalMinimalCounterexample H darts)
@@ -1373,7 +1373,7 @@ theorem capHypermap_dual_face_ring (h : Nat) (hh : h < 633)
   have hfanY_ne : fansY ≠ [] := hrfY.1
   have hfanX_ne : fansX ≠ [] := hrfX.1
   let s := fansY.length
-  have hs_pos : 0 < s := list_length_pos_of_ne_nil hfanY_ne
+  have hs_pos : 0 < s := list_length_pos_of_ne_nil_de hfanY_ne
   have hnode_eq : T0.node = nodePermOriented H.dual p.emb.orient := orientedDual_node_eq H p.emb.orient
   have h_chain : ∀ k (hk : k < s),
       Perm.iter T0.node (k + 1) (capRingRawDart h hh hlen H darts p hfan y hy) =
@@ -1393,8 +1393,8 @@ theorem capHypermap_dual_face_ring (h : Nat) (hh : h < 633)
         (nodePermOriented H.dual p.emb.orient).f (H.dual.edge.f (p.emb.dart (fansY[k]'hk_lt) y)) at hturn
       rw [← hnode_eq] at hturn
       exact hturn.symm
-  have h_last_eq : fansY[s - 1]'(by omega) = fansX[0]'(list_length_pos_of_ne_nil hfanX_ne) := by
-    have hlast_y := hrfX.2.2.2.1 hy_adj (list_length_pos_of_ne_nil hfanX_ne)
+  have h_last_eq : fansY[s - 1]'(by omega) = fansX[0]'(list_length_pos_of_ne_nil_de hfanX_ne) := by
+    have hlast_y := hrfX.2.2.2.1 hy_adj (list_length_pos_of_ne_nil_de hfanX_ne)
     change fansY.getLast? = some (fansX[0]'_) at hlast_y
     rw [List.getLast?_eq_some_getLast hfanY_ne, Option.some.injEq] at hlast_y
     rw [← List.getLast_eq_getElem hfanY_ne]
@@ -1436,8 +1436,10 @@ theorem capHypermap_dual_face_ring (h : Nat) (hh : h < 633)
     have := (removedIntDarts_edge_closed c H darts h_mc.complete p.emb.rep p.emb.orient _).mpr
       (by rwa [orientedDual_edge])
     exact capRingRawDart_not_mem_removed h hh hlen H darts h_mc p hfan x hx this
-  let dx_cap := capRingDart h hh hlen H darts h_mc p hfan x hx
-  let dy_cap := capRingDart h hh hlen H darts h_mc p hfan y hy
+  let dx_cap : (capTriangulation h hh hlen H darts h_mc p).Dart :=
+    capRingDart h hh hlen H darts h_mc p hfan x hx
+  let dy_cap : (capTriangulation h hh hlen H darts h_mc p).Dart :=
+    capRingDart h hh hlen H darts h_mc p hfan y hy
   have hnode_cap : ((capTriangulation h hh hlen H darts h_mc p).node.f dy_cap).val =
       ((capTriangulation h hh hlen H darts h_mc p).edge.f dx_cap).val := by
     change ((T0.deleteEdgesSubtype rem
@@ -1589,20 +1591,18 @@ theorem capRingDart_adj (h : Nat) (hh : h < 633)
       H_cap.edge.f (capRingDart h hh hlen H darts h_mc p hfan a ha),
       sameOrbit_refl H_cap.face _, ?_, rfl⟩
     have hdual_face := capHypermap_dual_face_ring h hh hlen H darts h_mc p hfan a ha
+    let da : (capTriangulation h hh hlen H darts h_mc p).Dart :=
+      capRingDart h hh hlen H darts h_mc p hfan a ha
+    let db : (capTriangulation h hh hlen H darts h_mc p).Dart :=
+      capRingDart h hh hlen H darts h_mc p hfan b hb
     have h_en : (capTriangulation h hh hlen H darts h_mc p).edge.f
-        ((capTriangulation h hh hlen H darts h_mc p).node.f
-          (capRingDart h hh hlen H darts h_mc p hfan b hb)) =
-        (capRingDart h hh hlen H darts h_mc p hfan a ha) := by
-      have hsub : (capTriangulation h hh hlen H darts h_mc p).face.f
-          (capRingDart h hh hlen H darts h_mc p hfan a ha) =
-          capRingDart h hh hlen H darts h_mc p hfan b hb := hdual_face
-      have hid := (capTriangulation h hh hlen H darts h_mc p).edge_node_face_id
-        (capRingDart h hh hlen H darts h_mc p hfan a ha)
+        ((capTriangulation h hh hlen H darts h_mc p).node.f db) = da := by
+      have hsub : (capTriangulation h hh hlen H darts h_mc p).face.f da = db := hdual_face
+      have hid := (capTriangulation h hh hlen H darts h_mc p).edge_node_face_id da
       rw [hsub] at hid
       exact hid
-    have h_inv_node : (capTriangulation h hh hlen H darts h_mc p).node.f
-        (capRingDart h hh hlen H darts h_mc p hfan b hb) =
-        H_cap.edge.f (capRingDart h hh hlen H darts h_mc p hfan a ha) := by
+    have h_inv_node : (capTriangulation h hh hlen H darts h_mc p).node.f db =
+        (capTriangulation h hh hlen H darts h_mc p).edge.f da := by
       have := congrArg (capTriangulation h hh hlen H darts h_mc p).edge.f h_en
       rwa [(capTriangulation h hh hlen H darts h_mc p).edge_involution] at this
     have h_sym := congrArg (capTriangulation h hh hlen H darts h_mc p).node.inv h_inv_node
@@ -1684,7 +1684,7 @@ private theorem face_invariant_sameOrbit {H : Hypermap} (col : H.FaceColoring) :
   | zero => rfl
   | succ k ih => rw [Perm.iter_succ, col.face_invariant, ih]
 
-private theorem node_invariant_sameOrbit {T : Hypermap} (col : T.Dart → Color)
+theorem node_invariant_sameOrbit {T : Hypermap} (col : T.Dart → Color)
     (h_inv : ∀ d, col (T.node.f d) = col d) :
     ∀ {x y : T.Dart}, SameOrbit T.node x y → col y = col x := by
   intro x y ⟨k, hk⟩
@@ -1694,7 +1694,7 @@ private theorem node_invariant_sameOrbit {T : Hypermap} (col : T.Dart → Color)
   | zero => rfl
   | succ k ih => rw [Perm.iter_succ, h_inv, ih]
 
-private theorem dual_face_color_sameOrbit_node {T : Hypermap} (col : T.dual.FaceColoring)
+theorem dual_face_color_sameOrbit_node {T : Hypermap} (col : T.dual.FaceColoring)
     {x y : T.Dart} (hso : SameOrbit T.node x y) : col.color y = col.color x := by
   have hso_sym : SameOrbit T.node.symm y x := (sameOrbit_symm_perm T.node).mpr hso
   exact (face_invariant_sameOrbit col hso_sym).symm
@@ -1989,33 +1989,34 @@ def restrictModColoringToCap (h : Nat) (hh : h < 633)
     exact (isIntVertBool_eq_true_iff c H.dual darts p.emb.rep _).mpr ⟨qA, hqAr, hqAn, hsv⟩
   { color := fun x => col_mod.color x.val
     face_invariant := fun x => by
-      change col_mod.color (T_cap.node.inv x).val = col_mod.color x.val
-      have hso_cap : SameOrbit T_cap.node (T_cap.node.inv x) x :=
-        ⟨1, by simp [Perm.iter, T_cap.node.right_inv]⟩
-      have hso_T0 : SameOrbit T0.node (T_cap.node.inv x).val x.val :=
+      let x' : T_cap.Dart := x
+      change col_mod.color (T_cap.node.inv x').val = col_mod.color x'.val
+      have hso_cap : SameOrbit T_cap.node (T_cap.node.inv x') x' :=
+        ⟨1, T_cap.node.right_inv x'⟩
+      have hso_T0 : SameOrbit T0.node (T_cap.node.inv x').val x'.val :=
         (deleteEdgesSubtype_sameOrbit_node_iff T0 rem
           (removedIntDarts_edge_closed c H darts h_mc.complete p.emb.rep p.emb.orient)
-          (mc_oriented_edge_free h_mc p.emb.orient) (T_cap.node.inv x) x).mp
-          (by dsimp only [T_cap, capTriangulation, T0, rem, c] at hso_cap ⊢; exact hso_cap)
-      have hso_dual : SameOrbit H.dual.node (T_cap.node.inv x).val x.val := by
+          (mc_oriented_edge_free h_mc p.emb.orient) (T_cap.node.inv x') x').mp hso_cap
+      have hso_dual : SameOrbit H.dual.node (T_cap.node.inv x').val x'.val := by
         have hf := (orientedDual_sameOrbit_node_iff H darts h_mc.complete p.emb.orient _ _).mp hso_T0
         exact (sameOrbit_symm_perm H.face).mpr (sameOrbit_symm_of_complete H.face darts h_mc.complete hf)
       exact (node_invariant_sameOrbit col_mod.color col_mod.node_invariant hso_dual).symm
     edge_proper := fun x => by
-      have he_val : ((capHypermap h hh hlen H darts h_mc p).edge.f x).val = H.edge.f x.val := by
-        change ((deleteEdgesSubtype T0 rem
+      let x' : T_cap.Dart := x
+      have he_val : (T_cap.edge.f x').val = H.edge.f x'.val :=
+        (deleteEdgesSubtype_edge_val T0 rem
           (removedIntDarts_edge_closed c H darts h_mc.complete p.emb.rep p.emb.orient)
-          (mc_oriented_edge_free h_mc p.emb.orient)).edge.f x).val = H.edge.f x.val
-        rw [deleteEdgesSubtype_edge_val, orientedDual_edge]
-      change col_mod.color ((capHypermap h hh hlen H darts h_mc p).edge.f x).val ≠ col_mod.color x.val
+          (mc_oriented_edge_free h_mc p.emb.orient) x').trans
+          (congrFun (congrArg Perm.f (orientedDual_edge H p.emb.orient)) x'.val)
+      change col_mod.color (T_cap.edge.f x').val ≠ col_mod.color x'.val
       rw [he_val]
-      have hx_not_M : x.val ∉ mappedContractDarts p.emb := not_mem_contract x.val x.property
-      have hex_not_rem : H.edge.f x.val ∉ rem := by
+      have hx_not_M : x'.val ∉ mappedContractDarts p.emb := not_mem_contract x'.val x'.property
+      have hex_not_rem : H.edge.f x'.val ∉ rem := by
         rw [← orientedDual_edge H p.emb.orient]
         intro hm
-        exact x.property ((removedIntDarts_edge_closed c H darts h_mc.complete p.emb.rep p.emb.orient x.val).mpr hm)
-      have hex_not_M : H.edge.f x.val ∉ mappedContractDarts p.emb := not_mem_contract (H.edge.f x.val) hex_not_rem
-      exact col_mod.edge_proper x.val hx_not_M hex_not_M }
+        exact x'.property ((removedIntDarts_edge_closed c H darts h_mc.complete p.emb.rep p.emb.orient x'.val).mpr hm)
+      have hex_not_M : H.edge.f x'.val ∉ mappedContractDarts p.emb := not_mem_contract (H.edge.f x'.val) hex_not_rem
+      exact col_mod.edge_proper x'.val hx_not_M hex_not_M }
 
 theorem restrictModColoringToCap_ring_eq (h : Nat) (hh : h < 633)
     (hlen : h < parsedRConfList.length := by rw [parsedRConfList_length]; exact hh)

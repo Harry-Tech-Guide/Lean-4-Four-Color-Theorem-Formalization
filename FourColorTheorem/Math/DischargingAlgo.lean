@@ -1,13 +1,17 @@
-import FourColorTheorem.Math.Rules
-import FourColorTheorem.Math.ProofTree
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.PrecomputedConfMats
-import FourColorTheorem.Math.PrecomputedOutlets
-import FourColorTheorem.Math.PrecomputedHints7
-import FourColorTheorem.Math.PrecomputedHints8
-import FourColorTheorem.Math.PrecomputedHints9
-import FourColorTheorem.Math.PrecomputedHints10
-import FourColorTheorem.Math.PrecomputedHints11
+module
+
+public import FourColorTheorem.Math.Rules
+public import FourColorTheorem.Math.ProofTree
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.PrecomputedConfMats
+public import FourColorTheorem.Math.PrecomputedOutlets
+public import FourColorTheorem.Math.PrecomputedHints7
+public import FourColorTheorem.Math.PrecomputedHints8
+public import FourColorTheorem.Math.PrecomputedHints9
+public import FourColorTheorem.Math.PrecomputedHints10
+public import FourColorTheorem.Math.PrecomputedHints11
+
+@[expose] public section
 
 namespace Math.Discharging
 

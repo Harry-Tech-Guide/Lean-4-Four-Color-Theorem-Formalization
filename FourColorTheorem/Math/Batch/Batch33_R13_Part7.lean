@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Batch.Runner13
+module
+
+public import FourColorTheorem.Math.Batch.Runner13
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Planarity
+module
+
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Planarity
+
+@[expose] public section
 
 namespace Hypermap
 
@@ -91,10 +95,7 @@ theorem getOrbit_fixed_point (p : Perm D) (d : D) (fuel : Nat) (h : IsFixedPoint
     getOrbit p (fuel + 1) d = [d] := by
   dsimp [getOrbit, getOrbitAux]
   have hf : p.f d = d := h
-  have hbeq : (p.f d == d) = true := by
-    change (if p.f d = d then true else false) = true
-    rw [hf]
-    simp
+  have hbeq : (p.f d == d) = true := beq_iff_eq.mpr hf
   rw [hbeq]
   rfl
 
@@ -257,14 +258,10 @@ theorem getOrbitAux_fuel_eq_of_closes (p : Perm D) (start current : D) (acc : Li
     | succ f2 =>
       dsimp [getOrbitAux]
       by_cases h_hit : p.f current = start
-      · have hbeq : (p.f current == start) = true := by
-          change (if p.f current = start then true else false) = true
-          rw [h_hit]; simp
+      · have hbeq : (p.f current == start) = true := beq_iff_eq.mpr h_hit
         rw [hbeq]
         rfl
-      · have hbeq : (p.f current == start) = false := by
-          change (if p.f current = start then true else false) = false
-          rw [if_neg h_hit]
+      · have hbeq : (p.f current == start) = false := beq_eq_false_iff_ne.mpr h_hit
         rw [hbeq]
         dsimp
         rcases h_closes with h_now | h_later
@@ -329,9 +326,7 @@ theorem getOrbitAux_closed_under_f (p : Perm D) (start current : D) (acc : List 
   | succ fuel ih =>
     dsimp [getOrbitAux]
     by_cases h_hit : p.f current = start
-    · have hbeq : (p.f current == start) = true := by
-        change (if p.f current = start then true else false) = true
-        rw [h_hit]; simp
+    · have hbeq : (p.f current == start) = true := beq_iff_eq.mpr h_hit
       rw [hbeq]
       dsimp
       intro x hx
@@ -339,9 +334,7 @@ theorem getOrbitAux_closed_under_f (p : Perm D) (start current : D) (acc : List 
       · rw [h_hit]
         exact h_start
       · exact h_acc x hx_acc
-    · have hbeq : (p.f current == start) = false := by
-        change (if p.f current = start then true else false) = false
-        rw [if_neg h_hit]
+    · have hbeq : (p.f current == start) = false := beq_eq_false_iff_ne.mpr h_hit
       rw [hbeq]
       dsimp
       rcases h_closes with h_now | h_later
@@ -754,14 +747,10 @@ theorem getOrbitAux_nodup (p : Perm D) (start current : D) (acc : List D) (fuel 
   | succ fuel ih =>
     dsimp [getOrbitAux]
     by_cases h_hit : p.f current = start
-    · have hbeq : (p.f current == start) = true := by
-        change (if p.f current = start then true else false) = true
-        rw [h_hit]; simp
+    · have hbeq : (p.f current == start) = true := beq_iff_eq.mpr h_hit
       rw [hbeq]
       exact h_nodup
-    · have hbeq : (p.f current == start) = false := by
-        change (if p.f current = start then true else false) = false
-        rw [if_neg h_hit]
+    · have hbeq : (p.f current == start) = false := beq_eq_false_iff_ne.mpr h_hit
       rw [hbeq]
       dsimp
       have h_not_in : p.f current ∉ current :: acc := by
@@ -979,19 +968,14 @@ theorem getOrbit_involution_of_ne (p : Perm D) (he : ∀ x, p.f (p.f x) = x) (d 
   | zero => omega
   | succ f =>
     dsimp [getOrbit, getOrbitAux]
-    have hbeq1 : (p.f d == d) = false := by
-      change (if p.f d = d then true else false) = false
-      rw [if_neg hne]
+    have hbeq1 : (p.f d == d) = false := beq_eq_false_iff_ne.mpr hne
     rw [hbeq1]
     dsimp
     cases f with
     | zero => rfl
     | succ f' =>
       dsimp [getOrbitAux]
-      have hbeq2 : (p.f (p.f d) == d) = true := by
-        change (if p.f (p.f d) = d then true else false) = true
-        rw [he d]
-        simp
+      have hbeq2 : (p.f (p.f d) == d) = true := beq_iff_eq.mpr (he d)
       rw [hbeq2]
       rfl
 
@@ -1571,16 +1555,12 @@ theorem perm_iter_length_sub_getOrbitAux (p : Perm D) (start current : D) (acc :
   | succ f ih =>
     dsimp [getOrbitAux]
     by_cases h_hit : p.f current = start
-    · have hbeq : (p.f current == start) = true := by
-        change (if p.f current = start then true else false) = true
-        rw [h_hit]; simp
+    · have hbeq : (p.f current == start) = true := beq_iff_eq.mpr h_hit
       rw [hbeq]
       dsimp
       rw [Nat.add_sub_cancel_left]
       exact h_hit
-    · have hbeq : (p.f current == start) = false := by
-        change (if p.f current = start then true else false) = false
-        rw [if_neg h_hit]
+    · have hbeq : (p.f current == start) = false := beq_eq_false_iff_ne.mpr h_hit
       rw [hbeq]
       dsimp
       rcases h_closes with h_now | h_later
@@ -1636,16 +1616,12 @@ theorem getOrbitAux_eq_reverse_iterList_append (p : Perm D) (start current : D) 
   | succ f ih =>
     dsimp [getOrbitAux]
     by_cases h_hit : p.f current = start
-    · have hbeq : (p.f current == start) = true := by
-        change (if p.f current = start then true else false) = true
-        rw [h_hit]; simp
+    · have hbeq : (p.f current == start) = true := beq_iff_eq.mpr h_hit
       rw [hbeq]
       dsimp
       rw [Nat.add_sub_cancel_left]
       rfl
-    · have hbeq : (p.f current == start) = false := by
-        change (if p.f current = start then true else false) = false
-        rw [if_neg h_hit]
+    · have hbeq : (p.f current == start) = false := beq_eq_false_iff_ne.mpr h_hit
       rw [hbeq]
       dsimp
       rcases h_closes with h_now | h_later

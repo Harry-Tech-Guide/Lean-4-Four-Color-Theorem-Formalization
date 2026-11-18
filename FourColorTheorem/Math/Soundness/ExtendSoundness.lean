@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.FastReducer
+module
+
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.FastReducer
+
+@[expose] public section
 
 set_option linter.unusedVariables false
 
@@ -49,29 +53,13 @@ theorem size_set! (col : Array Nat) (v c : Nat) :
 
 theorem getCol_set_eq (col : Array Nat) (v c : Nat) (hv : v < col.size) :
     getCol (col.set! v c) v = c := by
-  dsimp [getCol, Array.getD, Array.set!, Array.setIfInBounds]
-  rw [dif_pos hv]
-  have h_sz : v < (col.set v c hv).size := by
-    rw [Array.size_set]; exact hv
-  rw [dif_pos h_sz]
-  simp
+  simp [getCol, Array.getD, Array.set!, Array.setIfInBounds, hv]
 
 theorem getCol_set_ne (col : Array Nat) (v c i : Nat) (hv : v < col.size) (hne : i ≠ v) :
     getCol (col.set! v c) i = getCol col i := by
-  dsimp [getCol, Array.getD, Array.set!, Array.setIfInBounds]
-  rw [dif_pos hv]
   by_cases hi : i < col.size
-  · have hi' : i < (col.set v c hv).size := by
-      rw [Array.size_set]; exact hi
-    rw [dif_pos hi, dif_pos hi']
-    rw [Array.getElem_set]
-    split
-    · rename_i h_eq
-      exact False.elim (hne h_eq.symm)
-    · rfl
-  · have hi' : ¬ (i < (col.set v c hv).size) := by
-      rw [Array.size_set]; exact hi
-    rw [dif_neg hi, dif_neg hi']
+  · simp [getCol, Array.getD, Array.set!, Array.setIfInBounds, hv, hi, Ne.symm hne]
+  · simp [getCol, Array.getD, Array.set!, Array.setIfInBounds, hv, hi]
 
 theorem colorFree_imp (nbrs : Array Nat) (col : Array Nat) (c : Nat)
     (hFree : colorFree nbrs col c = true) :
@@ -277,13 +265,8 @@ theorem initCol_size (c : Configuration) (b : BoundaryColoring c) :
 theorem getCol_initCol_ring (c : Configuration) (b : BoundaryColoring c) (i : Nat)
     (hi : i < c.ringSize) (h_tot : c.ringSize ≤ c.totalNodes) :
     getCol (initCol c b) i = (b i).toNat := by
-  dsimp [getCol, Array.getD, initCol]
   have hi_tot : i < c.totalNodes := by omega
-  have h_sz : i < (Array.ofFn fun (j : Fin c.totalNodes) => if j.val < c.ringSize then (b j.val).toNat else 0).size := by
-    rw [Array.size_ofFn]; exact hi_tot
-  rw [dif_pos h_sz]
-  rw [Array.getElem_ofFn]
-  rw [if_pos hi]
+  simp [getCol, Array.getD, initCol, hi, hi_tot]
 
 set_option linter.unusedVariables false
 

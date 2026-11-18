@@ -1,7 +1,11 @@
+module
 
-import FourColorTheorem.Math.Topology.Paths
-import FourColorTheorem.Math.Topology.Jordan
-import FourColorTheorem.Math.Topology.Euler
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.KempeTopology
-import FourColorTheorem.Math.Topology.OrbitLemmas
+
+public import FourColorTheorem.Math.Topology.Paths
+public import FourColorTheorem.Math.Topology.Jordan
+public import FourColorTheorem.Math.Topology.Euler
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.KempeTopology
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+
+@[expose] public section

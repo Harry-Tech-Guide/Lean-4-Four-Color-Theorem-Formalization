@@ -1,4 +1,8 @@
-import FiveColorTheorem.Kempe
+module
+
+public import FiveColorTheorem.Kempe
+
+@[expose] public section
 
 namespace Math
 

@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Topology.ShortCircuits
+module
+
+public import FourColorTheorem.Math.Topology.ShortCircuits
+
+@[expose] public section
 
 /-!
 # Birkhoff's 1913 5-Ring Reduction (`Birkhoff5Ring`)
@@ -2254,10 +2258,18 @@ theorem cap5_pentagon_realizable {H : Hypermap} [DecidableEq H.Dart]
         else if cut.inArcL darts h_mc.complete ⟨4, by decide⟩ d then 4
         else 6
     | Sum.inr z =>
-        match z.val % 3 with
-        | 0 => (z.val / 3 + 1) % 5
-        | 1 => 5
-        | _ => z.val / 3
+        if z.val % 3 = 0 then (z.val / 3 + 1) % 5
+        else if z.val % 3 = 1 then 5
+        else z.val / 3
+  have htag5_u : ∀ m : Fin 5, tag5 (Sum.inr (uFin m)) = (m.val + 1) % 5 := by
+    intro m; dsimp only [tag5, uFin]
+    rw [if_pos (by omega : 3 * m.val % 3 = 0)]; omega
+  have htag5_v : ∀ m : Fin 5, tag5 (Sum.inr (vFin m)) = 5 := by
+    intro m; dsimp only [tag5, vFin]
+    rw [if_neg (by omega : ¬ (3 * m.val + 1) % 3 = 0), if_pos (by omega : (3 * m.val + 1) % 3 = 1)]
+  have htag5_w : ∀ m : Fin 5, tag5 (Sum.inr (wFin m)) = m.val := by
+    intro m; dsimp only [tag5, wFin]
+    rw [if_neg (by omega : ¬ (3 * m.val + 2) % 3 = 0), if_neg (by omega : ¬ (3 * m.val + 2) % 3 = 1)]; omega
   have htag5_inArc : ∀ (i : Fin 5) (d : H.Dart) (hd : cut.capSingleVertex_DL d),
       cut.inArcL darts h_mc.complete i d → tag5 (Sum.inl ⟨d, hd⟩) = i.val := by
     intro ⟨iv, hi⟩ d hd hd_arc
@@ -2309,8 +2321,7 @@ theorem cap5_pentagon_realizable {H : Hypermap} [DecidableEq H.Dart]
         have hf : T5.f.f (pairA m) = Sum.inr (wFin m) := (hTseq_f_inl_lt 5 (Nat.le_refl _) m m.isLt).1
         have h1 : (Sum.inl ⟨cut.cutDart m, hd⟩ : D5) = pairA m := rfl
         rw [h1, hf, htag5_inArc m _ hd (cut.cutDart_mem_inArcL darts h_mc.complete m)]
-        dsimp [tag5, wFin]
-        rw [show (3 * m.val + 2) % 3 = 2 by omega, show (3 * m.val + 2) / 3 = m.val by omega]
+        exact htag5_w m
       · have hne : ∀ j : Fin 5, d ≠ cut.cutDart j := fun j h => hcut ⟨j, h⟩
         rw [hTseq_f_agree 5 ⟨d, hd⟩ hne]
         by_cases harc : ∃ i : Fin 5, cut.inArcL darts h_mc.complete i d
@@ -2356,20 +2367,13 @@ theorem cap5_pentagon_realizable {H : Hypermap} [DecidableEq H.Dart]
           have := h_fwd 1 (by omega) ht1
           simpa [Perm.iter_succ, Perm.iter_zero] using this
         rw [htag5_inArc ⟨(m.val + 1) % 5, Nat.mod_lt _ (by decide)⟩ _ (TL.f.f (a m)).property h_in1]
-        dsimp [tag5, uFin]
-        rw [show 3 * m.val % 3 = 0 by omega, show 3 * m.val / 3 = m.val by omega]
+        simp only [htag5_u]
       · have hne : ∀ j : Fin 5, vFin m ≠ uFin j := by intro j h; have := congrArg Fin.val h; dsimp [vFin, uFin] at this; omega
         rw [hTseq_f_inr 5 (vFin m) (fun j _ => hne j), hpent_v_v]
-        dsimp [tag5, vFin]
-        rw [show (3 * ((m.val + 1) % 5) + 1) % 3 = 1 by omega, show (3 * m.val + 1) % 3 = 1 by omega]
+        simp only [htag5_v]
       · have hne : ∀ j : Fin 5, wFin m ≠ uFin j := by intro j h; have := congrArg Fin.val h; dsimp [wFin, uFin] at this; omega
         rw [hTseq_f_inr 5 (wFin m) (fun j _ => hne j), hpent_w_u]
-        dsimp [tag5, uFin, wFin]
-        rw [show 3 * ((m.val + 4) % 5) % 3 = 0 by omega,
-            show 3 * ((m.val + 4) % 5) / 3 = (m.val + 4) % 5 by omega,
-            show (3 * m.val + 2) % 3 = 2 by omega,
-            show (3 * m.val + 2) / 3 = m.val by omega]
-        dsimp; omega
+        simp only [htag5_u, htag5_w]; omega
   have hH5_planar : @Hypermap.isPlanar H5 (@instBEqOfDecidableEq D5 instDecD5) dartsU.length dartsU = true :=
     @tripleToHypermap_isPlanar D5 instDecD5 T5 h5_invol dartsU hU_nd hU_all hgen5 h5_no_fix
   have hH5_br : @Math.Hypermap.isBridgeless H5 instDecD5 dartsU dartsU.length := by
@@ -2383,9 +2387,7 @@ theorem cap5_pentagon_realizable {H : Hypermap} [DecidableEq H.Dart]
         have h1 : (Sum.inl ⟨cut.cutDart m, hd⟩ : D5) = pairA m := rfl
         rw [h1, (h5_e_cut m).1] at htag_eq
         rw [htag5_inArc m _ hd (cut.cutDart_mem_inArcL darts h_mc.complete m)] at htag_eq
-        dsimp [tag5, pairU, uFin] at htag_eq
-        rw [show 3 * m.val % 3 = 0 by omega] at htag_eq
-        dsimp at htag_eq; omega
+        dsimp only [pairU] at htag_eq; simp only [htag5_u] at htag_eq; omega
       · have hne : ∀ m : Fin 5, d ≠ cut.cutDart m := fun m h => hcut ⟨m, h⟩
         obtain ⟨hdn, he_eq⟩ := h5_e_ext d hd hne
         rw [he_eq] at htag_eq hso
@@ -2437,29 +2439,19 @@ theorem cap5_pentagon_realizable {H : Hypermap} [DecidableEq H.Dart]
             (cut.cutDart_mem_inArcL darts h_mc.complete m)
         have h1 : (pairA m : D5) = Sum.inl ⟨cut.cutDart m, hd_cut⟩ := rfl
         rw [h1, htag5_inArc m _ hd_cut (cut.cutDart_mem_inArcL darts h_mc.complete m)] at htag_eq
-        dsimp [tag5, uFin] at htag_eq
-        rw [show 3 * m.val % 3 = 0 by omega, show 3 * m.val / 3 = m.val by omega] at htag_eq
-        dsimp at htag_eq; omega
+        simp only [htag5_u] at htag_eq; omega
       · have hne : ∀ j : Fin 5, vFin m ≠ uFin j := fun j h => by
           have := congrArg Fin.val h; dsimp [vFin, uFin] at this; omega
         have he_vw : pent5Triple.e.f (vFin m) = wFin ⟨(m.val + 1) % 5, Nat.mod_lt _ (by decide)⟩ :=
           pent5_e_vw m
         rw [h5_e_inr_vw (vFin m) hne, he_vw] at htag_eq
-        dsimp [tag5, vFin, wFin] at htag_eq
-        rw [show (3 * m.val + 1) % 3 = 1 by omega,
-            show (3 * ((m.val + 1) % 5) + 2) % 3 = 2 by omega,
-            show (3 * ((m.val + 1) % 5) + 2) / 3 = (m.val + 1) % 5 by omega] at htag_eq
-        dsimp at htag_eq; omega
+        simp only [htag5_v, htag5_w] at htag_eq; omega
       · have hne : ∀ j : Fin 5, wFin m ≠ uFin j := fun j h => by
           have := congrArg Fin.val h; dsimp [wFin, uFin] at this; omega
         have he_wv : pent5Triple.e.f (wFin m) = vFin ⟨(m.val + 4) % 5, Nat.mod_lt _ (by decide)⟩ :=
           pent5_e_wv m
         rw [h5_e_inr_vw (wFin m) hne, he_wv] at htag_eq
-        dsimp [tag5, vFin, wFin] at htag_eq
-        rw [show (3 * m.val + 2) % 3 = 2 by omega,
-            show (3 * m.val + 2) / 3 = m.val by omega,
-            show (3 * ((m.val + 4) % 5) + 1) % 3 = 1 by omega] at htag_eq
-        dsimp at htag_eq; omega
+        simp only [htag5_v, htag5_w] at htag_eq; omega
   have hU_ne : dartsU ≠ [] := by
     intro hempty
     have hmem := hU_all (Sum.inr ⟨0, by decide⟩)

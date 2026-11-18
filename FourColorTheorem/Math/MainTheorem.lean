@@ -1,23 +1,27 @@
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.Planarity
-import FourColorTheorem.Math.HypermapGraph
-import FourColorTheorem.Math.Topology.KempeTopology
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.Euler
-import FourColorTheorem.Math.Topology.Jordan
-import FourColorTheorem.Math.MasterCertificate
-import FourColorTheorem.Math.TestDischarging
-import FourColorTheorem.Math.Batch.DischargeMaster
-import FourColorTheorem.Math.Topology.SubtypeSurgery
-import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
-import FourColorTheorem.Math.Topology.CubicGirth5
-import FourColorTheorem.Math.Topology.CartwheelFaithfulness
-import FourColorTheorem.Math.Topology.DiskExcision
-import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
-import FourColorTheorem.Math.Topology.ContractedColoring
+module
+
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.Planarity
+public import FourColorTheorem.Math.HypermapGraph
+public import FourColorTheorem.Math.Topology.KempeTopology
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.Euler
+public import FourColorTheorem.Math.Topology.Jordan
+public import FourColorTheorem.Math.MasterCertificate
+public import FourColorTheorem.Math.TestDischarging
+public import FourColorTheorem.Math.Batch.DischargeMaster
+public import FourColorTheorem.Math.Topology.SubtypeSurgery
+public import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
+public import FourColorTheorem.Math.Topology.CubicGirth5
+public import FourColorTheorem.Math.Topology.CartwheelFaithfulness
+public import FourColorTheorem.Math.Topology.DiskExcision
+public import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+public import FourColorTheorem.Math.Topology.ContractedColoring
+
+@[expose] public section
 
 namespace Math
 

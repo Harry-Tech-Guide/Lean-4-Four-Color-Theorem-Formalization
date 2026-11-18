@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.TestDischarging
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.KernelRfl
+module
+
+public import FourColorTheorem.Math.TestDischarging
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.KernelRfl
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

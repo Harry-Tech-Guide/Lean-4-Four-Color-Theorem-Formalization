@@ -1,0 +1,105 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/mathlib-initiative/formalization.yaml/main/schema/formalization.schema.json
+version: "v0.4"
+
+project:
+  name: "The Combinatorial Four Color Theorem in Lean 4"
+  description: >-
+    A self-contained, zero-Mathlib Lean 4 formalization of the Combinatorial Four Color Theorem:
+    every finite, complete, Euler-planar, bridgeless orientable combinatorial map (involutive
+    hypermap, `e^2 = id`, `e ∘ n ∘ f = id`) admits a proper 4-coloring of its faces
+    (`Solution.four_color_theorem`). Follows the published mathematics of Robertson, Sanders,
+    Seymour, and Thomas (1996/1997) and Gonthier's hypermap framework (2008), verifying all 633
+    unavoidable configurations (249 D-reducible and 384 C-reducible) and all 5 cartwheel
+    discharging trees directly inside the Lean kernel without `native_decide`.
+  authors:
+    - "Harry Wang"
+  responsible_maintainers:
+    - "Harry Wang"
+  license: "Apache-2.0"
+
+classification:
+  arxiv:
+    - "math.CO"
+    - "cs.LO"
+  msc2020:
+    - "05C15"
+    - "05C10"
+    - "68V15"
+
+sources:
+  - title: "A new proof of the four-colour theorem"
+    authors:
+      - "Neil Robertson"
+      - "Daniel P. Sanders"
+      - "Paul Seymour"
+      - "Robin Thomas"
+    id: "doi:10.1090/S1079-6762-96-00003-0"
+    type: "article"
+    location: "Electronic Research Announcements of the AMS 2(1):17-25, 1996"
+    relationship: "formalizes"
+    author_endorsement: "not-contacted"
+    note: >-
+      Formalizes the RSST 633-configuration reducibility and degree 7-11 cartwheel discharging
+      architecture directly from the published mathematical method and configuration/rule tables.
+  - title: "Formal proof — the four-color theorem"
+    authors:
+      - "Georges Gonthier"
+    type: "article"
+    location: "Notices of the AMS 55(11):1382-1393, 2008"
+    relationship: "adapts"
+    author_endorsement: "not-contacted"
+    note: >-
+      Adapts the combinatorial dart/permutation hypermap formulation of planarity, bridgelessness,
+      and face 4-coloring; all definitions and proofs are written from scratch in Lean 4 with
+      zero transliteration of Coq or C source code.
+
+related_formalizations:
+  - id: "https://github.com/math-comp/fourcolor"
+    relationship: "independent"
+    note: "Gonthier's original Coq/Rocq Mathematical Components formalization."
+
+automation:
+  methods:
+    - method: "agent"
+      framework: "Google Antigravity"
+      models:
+        - "Gemini 4 Carbon"
+        - "Gemini 4 Hydrogen"
+      tool_setup: "lean-lsp MCP interactive proving, custom KernelReducer reflection certificates, sequential RAM-throttled Lake harness"
+
+status:
+  scope: >-
+    Formalizes the complete Combinatorial Four Color Theorem (`four_color_theorem` in
+    zero-import `Challenge.lean` and `Solution.lean`) over orientable combinatorial maps
+    (`Spec.Hypermap`, i.e., involutive hypermaps satisfying `e^2 = id` and `e ∘ n ∘ f = id`,
+    prelude-only, zero Mathlib): every finite complete dart map satisfying Euler genus-0
+    planarity (`V - E + F = 2 * C`) and bridgelessness admits a proper 4-face-coloring
+    (`Spec.MapColoring`). Semantic non-vacuity and sharpness ($K_4$ planar and 4-colorable but
+    not 3-colorable; $K_5$ non-planar and not 4-colorable) are proved in `SanityChecks.lean`.
+    Point-set / Jordan-curve analytic topology in R^2, general non-involutive hyperedges
+    (`e^k = id` for `k >= 3`), and bridges to Mathlib's `SimpleGraph` are outside scope.
+  sorry_count: 0
+  sorry_in_definitions: 0
+  axioms:
+    - "propext"
+    - "Classical.choice"
+    - "Quot.sound"
+  main_results:
+    - declaration: "four_color_theorem"
+      file: "Solution.lean"
+      sorry_count: 0
+      axioms:
+        - "propext"
+        - "Classical.choice"
+        - "Quot.sound"
+      comparator_config: "comparator.json"
+
+review:
+  status: "agent-reviewed"
+  notes: >-
+    Audited across all source modules for zero `sorry` (outside `Challenge.lean`), zero custom
+    axioms, zero `native_decide` / `bv_decide` / `ofReduceBool`, <=10,000 physical lines per file,
+    and verified via standalone fresh kernel replay (`leanchecker --fresh Solution`, exit 0),
+    `lake comparator` (`bwrap` sandbox + statement/axiom check + `Lean default` kernel `--from-export`,
+    exit 0 in 2,458.05 s CPU), and `nanoda_bin` external Rust kernel checks (`comparator.json`
+    enables `nanoda` for high-memory runner execution).

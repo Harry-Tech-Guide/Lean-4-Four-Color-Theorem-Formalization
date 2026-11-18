@@ -1,7 +1,11 @@
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.FastReducer
-import FourColorTheorem.Math.Batch.Runner
+module
+
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.FastReducer
+public import FourColorTheorem.Math.Batch.Runner
+
+@[expose] public section
 
 namespace Math
 namespace Soundness

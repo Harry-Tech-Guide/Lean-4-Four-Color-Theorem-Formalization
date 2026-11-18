@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.CheckerSoundness.TraceSymmetry
+module
+
+public import FourColorTheorem.Math.CheckerSoundness.TraceSymmetry
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness

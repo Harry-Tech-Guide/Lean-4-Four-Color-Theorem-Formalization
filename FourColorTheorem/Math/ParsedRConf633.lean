@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.FastReducer
+module
+
+public import FourColorTheorem.Math.FastReducer
+
+@[expose] public section
 
 namespace Math
 open FastReducer

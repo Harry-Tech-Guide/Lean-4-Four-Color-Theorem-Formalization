@@ -1,8 +1,8 @@
 $ErrorActionPreference = "Stop"
 Set-Location "c:\Four Color Theorem"
 
-Write-Host "=== [1/3] Checking for 'sorry' across FourColorTheorem/Math, Spec, and Solution ===" -ForegroundColor Cyan
-$sorries = Select-String -Path "Spec.lean", "Solution.lean", "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\CheckerSoundness\*.lean", "FourColorTheorem\Math\Topology\*.lean", "FourColorTheorem\Math\KernelSoundness\*.lean", "FourColorTheorem\Math\Unavoidability\*.lean" -Pattern "\bsorry\b" |
+Write-Host "=== [1/3] Checking for 'sorry' across FourColorTheorem, Spec, SanityChecks, and Solution ===" -ForegroundColor Cyan
+$sorries = Select-String -Path "Spec.lean", "Solution.lean", "SanityChecks.lean", "FourColorTheorem.lean", "FiveColorTheorem.lean", "FiveColorTheorem\*.lean", "FourColorTheorem\Math\*.lean", "FourColorTheorem\Math\Batch\*.lean", "FourColorTheorem\Math\Soundness\*.lean", "FourColorTheorem\Math\CheckerSoundness\*.lean", "FourColorTheorem\Math\Topology\*.lean", "FourColorTheorem\Math\KernelSoundness\*.lean", "FourColorTheorem\Math\Unavoidability\*.lean" -Pattern "\bsorry\b" |
     Where-Object { $_.Line -notmatch "^\s*--" }
 
 if ($sorries) {
@@ -32,6 +32,8 @@ lake build `
     FourColorTheorem.Math.Topology.JordanCycleSeparation `
     FourColorTheorem.Math.Topology.ShortCircuits `
     FourColorTheorem.Math.Topology.Birkhoff5Ring `
+    FourColorTheorem.Math.DischargingBase `
+    FourColorTheorem.Math.Discharging `
     FourColorTheorem.Math.Topology.CartwheelFaithfulness `
     FourColorTheorem.Math.Topology.DiskExcision `
     FourColorTheorem.Math.Topology.ContractedColoring `
@@ -41,6 +43,9 @@ lake build `
     FourColorTheorem.Math.MasterCertificate `
     FourColorTheorem.Math.MainTheorem `
     FourColorTheorem.Math.SpecBridge `
+    Spec `
+    Challenge `
+    SanityChecks `
     Solution
 
 if ($LASTEXITCODE -ne 0) {
@@ -48,7 +53,7 @@ if ($LASTEXITCODE -ne 0) {
     exit $LASTEXITCODE
 }
 
-Write-Host "=== [3/3] Auditing Axiom Footprint of Math.four_color_theorem ===" -ForegroundColor Cyan
+Write-Host "=== [3/3] Auditing Axiom Footprint of Math.four_color_theorem & Solution.four_color_theorem ===" -ForegroundColor Cyan
 lake env lean ".agents\skills\lean-mcp-proving\scripts\AxiomCheck.lean"
 if ($LASTEXITCODE -ne 0) {
     Write-Host "ERROR: Axiom audit failed." -ForegroundColor Red

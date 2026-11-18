@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Hypermap
+module
+
+public import FourColorTheorem.Math.Hypermap
+
+@[expose] public section
 
 -- Step 2: Euler's Formula and Planarity
 

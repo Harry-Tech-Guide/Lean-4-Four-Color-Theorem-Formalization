@@ -1,6 +1,10 @@
-import Spec
+module
+
+public import Spec
 import FourColorTheorem.Math.MainTheorem
 import FourColorTheorem.Math.SpecBridge
+
+@[expose] public section
 
 /-!
 # Palomar / Comparator Solution Module: The Four Color Theorem

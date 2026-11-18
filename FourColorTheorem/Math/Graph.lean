@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Hypermap
+module
+
+public import FourColorTheorem.Math.Hypermap
+
+@[expose] public section
 
 namespace Math
 

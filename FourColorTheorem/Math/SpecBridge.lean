@@ -1,5 +1,9 @@
-import Spec
-import FourColorTheorem.Math.MainTheorem
+module
+
+public import Spec
+public import FourColorTheorem.Math.MainTheorem
+
+@[expose] public section
 
 namespace SpecBridge
 

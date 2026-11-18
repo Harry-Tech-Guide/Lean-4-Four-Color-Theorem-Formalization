@@ -1,3 +1,6 @@
+module
+
+@[expose] public section
 
 -- Axiomatic foundation of Combinatorial Hypermaps for the Four Color Theorem
 
@@ -79,7 +82,7 @@ theorem face_edge_node_id (d : H.Dart) : H.face.f (H.edge.f (H.node.f d)) = d :=
 
 /-- The topological dual of a hypermap. 
     Faces become nodes, nodes become faces, and edges remain edges. -/
-def dual : Hypermap where
+abbrev dual : Hypermap where
   Dart := H.Dart
   edge := H.edge
   node := Perm.symm H.face

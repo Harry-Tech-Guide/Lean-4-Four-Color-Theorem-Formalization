@@ -15,6 +15,6 @@ jobs:
       # the light, auditable specification and sanity-check targets.
       - uses: leanprover/lean-action@v1
         with:
-          build-args: "Spec Challenge ConditionalBridge SanityChecks"
+          build-args: "Spec Challenge SanityChecks"
           test: false
           lint: false

@@ -1,3 +1,5 @@
+module
+
 /-
 FourColorTheorem/Math/Topology/ShortCircuits.lean
 
@@ -9,8 +11,10 @@ Dual short-circuit reductions (k = 2, 3, 4) for minimal counterexamples:
         every 4-cycle in `H.dual` bounds ≤ 6 darts (a single edge = two adjacent cubic vertices) on at least one side,
         hence has a chord (`H.dual` has no chordless 4-cycle).
 -/
-import FourColorTheorem.Math.Topology.JordanCycleSeparation
-import FourColorTheorem.Math.Topology.CubicGirth5
+public import FourColorTheorem.Math.Topology.JordanCycleSeparation
+public import FourColorTheorem.Math.Topology.CubicGirth5
+
+@[expose] public section
 
 namespace Hypermap
 
@@ -115,8 +119,7 @@ theorem capSingleVertex_beq_eq {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
       @instBEqOfDecidableEq ({ d // cut.capSingleVertex_DL d } ⊕ Fin k) _ := by
   apply beq_sum_eq_dec
   · intro a b
-    change decide (a.val = b.val) = decide (a = b)
-    exact decide_eq_decide.mpr Subtype.ext_iff.symm
+    exact Bool.eq_iff_iff.mpr (by simp [beq_iff_eq])
   · intro a b
     exact Bool.eq_iff_iff.mpr (by simp [beq_iff_eq])
 
@@ -2102,7 +2105,6 @@ private theorem pinch_coloring_of_no_chord02 {H : Hypermap} [DecidableEq H.Dart]
     (hTL_fix ⟨0, by decide⟩) (hTL_fix ⟨1, by decide⟩)
     (ha'_inj ⟨0, by decide⟩ ⟨1, by decide⟩ (by decide)) (ha_in_TL ⟨1, by decide⟩)
   dsimp only at hc1
-  rw [← subtype_beq_eq_dec DL] at hc1
   change (T1.e.f (a' ⟨0, by decide⟩) = a' ⟨1, by decide⟩ ∧
       T1.e.f (a' ⟨1, by decide⟩) = a' ⟨0, by decide⟩) ∧
     (∀ {x y}, ReachEN T1.e T1.n x y ↔ ReachEN TL.e TL.n x y) ∧
@@ -2206,7 +2208,6 @@ private theorem pinch_coloring_of_no_chord02 {H : Hypermap} [DecidableEq H.Dart]
   have hc2 := coupleEdge_sameFace T1 darts_DL hDL_all (Nat.le_refl _)
     hT1_fix2 hT1_fix3 (ha'_inj ⟨2, by decide⟩ ⟨3, by decide⟩ (by decide)) ha3_in_T1
   dsimp only at hc2
-  rw [← subtype_beq_eq_dec DL] at hc2
   change (T2.e.f (a' ⟨2, by decide⟩) = a' ⟨3, by decide⟩ ∧
       T2.e.f (a' ⟨3, by decide⟩) = a' ⟨2, by decide⟩) ∧
     (∀ {x y}, ReachEN T2.e T2.n x y ↔ ReachEN T1.e T1.n x y) ∧
@@ -2264,14 +2265,12 @@ private theorem pinch_coloring_of_no_chord02 {H : Hypermap} [DecidableEq H.Dart]
             exact ⟨0, hx_eq.symm⟩
   let H_pinch := tripleToHypermap T2 hT2_invol
   have hP_pl : H_pinch.isPlanar darts_DL.length darts_DL = true :=
-    (@decEq_beq_eq D_L (@Subtype.instDecidableEq H.Dart DL _) _) ▸
-      tripleToHypermap_isPlanar T2 hT2_invol darts_DL hDL_nd hDL_all
-        (by rw [hc2.2.2.2.2.2, hc1.2.2.2.2.2, hTL_g0]) hT2_no_fix
+    tripleToHypermap_isPlanar T2 hT2_invol darts_DL hDL_nd hDL_all
+      (by rw [hc2.2.2.2.2.2, hc1.2.2.2.2.2, hTL_g0]) hT2_no_fix
   have hP_rc : countRelClasses (ReachEN T2.e T2.n) darts_DL = 1 := by
     rw [hc2.2.2.1, hc1.2.2.1, hTL_rc]
   have hP_conn : H_pinch.numComponents darts_DL.length darts_DL = 1 :=
-    (@decEq_beq_eq D_L (@Subtype.instDecidableEq H.Dart DL _) _) ▸
-      tripleToHypermap_numComponents_eq_one T2 hT2_invol darts_DL hDL_all hP_rc
+    tripleToHypermap_numComponents_eq_one T2 hT2_invol darts_DL hDL_all hP_rc
   have h_arc_sameOrbit : ∀ (m : Nat) (hm : m < 4) (x : D_L),
       FaceCycleCut.inArcL darts h_all cut ⟨(m + 1) % 4, Nat.mod_lt _ (by decide)⟩ x.val →
       SameOrbit T2.f x (a' ⟨(m + 1) % 4, Nat.mod_lt _ (by decide)⟩) :=
@@ -2886,15 +2885,9 @@ private theorem s2_genusDeficit_zero :
   dsimp only [genusDeficit]
   rw [countRelClasses_eq_one_of_all (ReachEN s2Triple.e s2Triple.n) s2Darts
     (by simp [s2Darts]) s2_reachEN_all]
-  have hn : countOrbits s2Triple.n 2 s2Darts = 2 := by
-    rw [decEq_beq_eq _ (instDecidableEqFin 2)]
-    decide
-  have he : countOrbits s2Triple.e 2 s2Darts = 1 := by
-    rw [decEq_beq_eq _ (instDecidableEqFin 2)]
-    decide
-  have hf : countOrbits s2Triple.f 2 s2Darts = 1 := by
-    rw [decEq_beq_eq _ (instDecidableEqFin 2)]
-    decide
+  have hn : countOrbits s2Triple.n 2 s2Darts = 2 := by decide
+  have he : countOrbits s2Triple.e 2 s2Darts = 1 := by decide
+  have hf : countOrbits s2Triple.f 2 s2Darts = 1 := by decide
   rw [hn, he, hf]
   rfl
 
@@ -3401,7 +3394,7 @@ private theorem capSplit02_coloring {H : Hypermap} [DecidableEq H.Dart]
         have h_same_cap := h_faceId_iter k (Sum.inl x)
         rw [← hk] at h_same_cap
         have h_same_x : SameOrbit H_cap.face x (H_cap.edge.f x) := by
-          simpa [faceId, T3, T0, sumTriple, hypermapToTriple] using h_same_cap
+          simpa [faceId, T3, T0, sumTriple, sumPerm, hypermapToTriple] using h_same_cap
         exact ((isBridgeless_iff_no_sameOrbit_face_edge_jcs H_cap darts_cap h_cap_all).mp h_cap_br) x h_same_x
     | inr i =>
         rcases i with ⟨mi, hmi⟩
@@ -3409,13 +3402,13 @@ private theorem capSplit02_coloring {H : Hypermap} [DecidableEq H.Dart]
         rcases hmi_cases with rfl | rfl
         · have h02 : (Sum.inr ⟨2, by decide⟩ : H_cap.Dart) ∈
               getOrbit H_cap.face darts_cap.length (Sum.inr ⟨0, by decide⟩) := by
-            simpa [faceId, T3, T0, sumTriple, s2Triple] using hmem_cap
+            simpa [faceId, T3, T0, sumTriple, sumPerm, s2Triple] using hmem_cap
           rcases (hsp.2.2.2.2.2.2.2.2.2.2.2.1 ⟨0, by decide⟩ (Sum.inr ⟨2, by decide⟩)).mp h02 with h | ⟨_, _, h, _⟩
           · injection h with hfin; have hval := congrArg Fin.val hfin; dsimp at hval; omega
           · cases h
         · have h20 : (Sum.inr ⟨0, by decide⟩ : H_cap.Dart) ∈
               getOrbit H_cap.face darts_cap.length (Sum.inr ⟨2, by decide⟩) := by
-            simpa [faceId, T3, T0, sumTriple, s2Triple] using hmem_cap
+            simpa [faceId, T3, T0, sumTriple, sumPerm, s2Triple] using hmem_cap
           rcases (hsp.2.2.2.2.2.2.2.2.2.2.2.1 ⟨2, by decide⟩ (Sum.inr ⟨0, by decide⟩)).mp h20 with h | ⟨_, _, h, _⟩
           · injection h with hfin; have hval := congrArg Fin.val hfin; dsimp at hval; omega
           · cases h

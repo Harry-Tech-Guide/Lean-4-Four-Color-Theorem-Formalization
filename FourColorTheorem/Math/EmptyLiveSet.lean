@@ -1,5 +1,9 @@
+module
 
-import FourColorTheorem.Math.KempeConsistencyTheorem
+
+public import FourColorTheorem.Math.KempeConsistencyTheorem
+
+@[expose] public section
 
 -- Step 11: The Empty LiveSet Theorem
 

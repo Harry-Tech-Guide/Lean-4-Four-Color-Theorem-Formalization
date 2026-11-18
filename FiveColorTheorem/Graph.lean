@@ -1,4 +1,8 @@
-import Init
+module
+
+public import Init
+
+@[expose] public section
 
 namespace Math
 

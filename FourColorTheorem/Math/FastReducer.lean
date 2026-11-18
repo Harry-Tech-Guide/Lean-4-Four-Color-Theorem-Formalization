@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.U633String
+module
+
+public import FourColorTheorem.Math.U633String
+
+@[expose] public section
 
 /-!
 # Fast native D-reducibility checker (RSST Kempe-chain consistency)

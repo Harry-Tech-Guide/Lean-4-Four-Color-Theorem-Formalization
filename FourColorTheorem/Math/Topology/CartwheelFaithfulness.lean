@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Topology.Birkhoff5Ring
-import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
+module
+
+public import FourColorTheorem.Math.Topology.Birkhoff5Ring
+public import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
+
+@[expose] public section
 
 /-!
 # Faithfulness of Small-Degree Cartwheels in a Minimal Counterexample
@@ -236,7 +240,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
   have h_b : ∀ i : Fin 3, SameOrbit H.face (rf ⟨(i.val + 1) % 3, Nat.mod_lt _ (by omega)⟩) (H.edge.f (cd i)) := by
     rintro ⟨iv, hiv⟩
     apply sameOrbit_face_of_sameVertex_dual darts h_mc
-    rcases (by omega : iv = 0 ∨ iv = 1 ∨ iv = 2) with rfl | rfl | rfl <;> dsimp [rf, cd]
+    rcases (by omega : iv = 0 ∨ iv = 1 ∨ iv = 2) with rfl | rfl | rfl <;> simp only [rf, cd]
     · exact dual_sameVertex_symm darts h_mc h1B
     · exact dual_sameVertex_symm darts h_mc hd_BCC
     · rw [H.edge_edge]; exact dual_sameVertex_symm darts h_mc h2A
@@ -251,7 +255,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
   have hres : H.dual.node.f d_AB = d_AC ∨ H.dual.node.inv d_AB = d_AC := by
     rcases mc_three_cycle_is_facial_dual H darts h_mc cut with h3L | h3R
     · have horb := (mc_three_cycle_facial_orbits_dual H darts h_mc cut h3L).2.2 ⟨0, by decide⟩ ⟨2, by decide⟩
-      dsimp [cut, cd] at horb
+      simp only [cut, cd] at horb
       rcases sameOrbit_node_cases darts h_mc horb with h0 | h1 | h2
       · exfalso
         have heq : H.edge.f d_AB = d_AC := by rw [← h0, H.edge_edge]
@@ -279,7 +283,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
       have hcutR2 : cut.rev.cutDart ⟨2, by decide⟩ = H.edge.f (cd ⟨0, by decide⟩) := by
         dsimp [FaceCycleCut.rev]
       rw [hcutR0, hcutR2] at horb
-      dsimp [cd] at horb
+      simp only [cd] at horb
       rw [H.edge_edge] at horb
       rcases sameOrbit_node_cases darts h_mc horb with h0 | h1 | h2
       · exfalso
@@ -818,7 +822,6 @@ private theorem spokeRay_pred2_edge {H : Hypermap} [DecidableEq H.Dart]
       cartDartOriented H.dual (nodeDegree H.dual d0 darts.length) refl d0
         (nodeDegree H.dual d0 darts.length + i) := by
   rw [spokeRay_sub_two_eq_inv2 darts h_mc refl d0 hi1 hi, cartDart_hat_eq _ _ _ _ hi1 hi]
-  rfl
 
 private theorem spokeRay_two_edge {H : Hypermap} [DecidableEq H.Dart]
     (darts : List H.Dart) (h_mc : H.PrimalMinimalCounterexample darts)
@@ -848,7 +851,6 @@ private theorem spokeRay_two_edge {H : Hypermap} [DecidableEq H.Dart]
   rw [hfz, hy_edge] at htri_z
   have hez : H.edge.f z = cartDartOriented H.dual deg refl d0 (deg + prevDeg deg i) := by
     rw [cartDart_hat_eq _ _ _ _ hp1 hp2]
-    rfl
   rw [hez] at htri_z
   exact htri_z
 

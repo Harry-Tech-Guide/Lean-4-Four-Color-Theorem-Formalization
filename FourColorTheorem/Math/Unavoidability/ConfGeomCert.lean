@@ -1,13 +1,17 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBase
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk0
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk1
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk2
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk3
-import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk4
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBase
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk0
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk1
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk2
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk3
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCertBlk4
+
+@[expose] public section
 
 /-!
 # Certified Configuration Geometric & Combinatorial Invariants (Stage R.1)

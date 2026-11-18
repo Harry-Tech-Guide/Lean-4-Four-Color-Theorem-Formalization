@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.PrecomputedOutlets
+module
+
+public import FourColorTheorem.Math.PrecomputedOutlets
+
+@[expose] public section
 
 namespace Math.Discharging
 

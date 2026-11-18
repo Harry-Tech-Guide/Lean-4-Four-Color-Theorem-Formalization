@@ -1,7 +1,11 @@
+module
+
 /-
 Stage P.2 Data Certificates: Discharging proof trees (`deg = 5, 6`) and RSST (4.8) outflow bounds (`deg = 5, 6, 7`).
 -/
-import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Discharging
+
+@[expose] public section
 
 namespace Math.Unavoidability
 

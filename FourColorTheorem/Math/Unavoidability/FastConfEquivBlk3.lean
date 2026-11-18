@@ -1,8 +1,12 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Unavoidability.FastConfEquivData
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivData
+
+@[expose] public section
 
 /-!
 # 633-Configuration `FastConf` ↔ `RConf` Certificate Block 3

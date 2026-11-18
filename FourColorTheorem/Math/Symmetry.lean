@@ -1,5 +1,9 @@
+module
 
-import FourColorTheorem.Math.Trace
+
+public import FourColorTheorem.Math.Trace
+
+@[expose] public section
 
 -- Step 7: Symmetry and Klein Four-Group Invariance
 

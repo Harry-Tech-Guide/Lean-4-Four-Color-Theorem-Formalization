@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.KernelReducer
-import FourColorTheorem.Math.CheckerSoundness.InitialLive
+module
+
+public import FourColorTheorem.Math.KernelReducer
+public import FourColorTheorem.Math.CheckerSoundness.InitialLive
+
+@[expose] public section
 
 namespace Math
 namespace KernelSoundness
@@ -12,6 +16,8 @@ open CheckerSoundness
 
 set_option linter.unusedVariables false
 set_option linter.constructorNameAsVariable false
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 /-!
 # Checkpoint K4.1: Canonical Slice Bijection, `repeatBlock` Specification, and $S_3$ Digit Swaps

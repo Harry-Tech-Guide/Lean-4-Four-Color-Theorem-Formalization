@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.TestDischarging
-import FourColorTheorem.Math.U633Parser
+module
+
+public import FourColorTheorem.Math.TestDischarging
+public import FourColorTheorem.Math.U633Parser
+
+@[expose] public section
 
 def main : IO Unit := do
   IO.println "--- STARTING ---"
@@ -9,12 +13,16 @@ def main : IO Unit := do
   
   let configs := (Math.parseAllConfigs ()).toList
   
+  let runTest (deg : Nat) (t : Math.Discharging.ProofTree) (configs : List Math.Configuration) (_ : Unit) : Bool :=
+    let outs := Math.Discharging.readOutlets deg Math.Discharging.theRules
+    Math.Discharging.verifyTreeFull configs deg (Math.Discharging.trivial_A_low deg) (Math.Discharging.trivial_A_upp deg) t outs
+
   let tests : List (Nat × (List Math.Configuration → Unit → Bool)) := [
-    (7, Math.Discharging.test7),
-    (8, Math.Discharging.test8),
-    (9, Math.Discharging.test9),
-    (10, Math.Discharging.test10),
-    (11, Math.Discharging.test11)
+    (7, runTest 7 (Math.Discharging.present7 ())),
+    (8, runTest 8 (Math.Discharging.present8 ())),
+    (9, runTest 9 (Math.Discharging.present9 ())),
+    (10, runTest 10 (Math.Discharging.present10 ())),
+    (11, runTest 11 (Math.Discharging.present11 ()))
   ]
   
   let mut all_success := true

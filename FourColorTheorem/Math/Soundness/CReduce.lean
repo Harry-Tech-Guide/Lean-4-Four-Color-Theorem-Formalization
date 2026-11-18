@@ -1,9 +1,13 @@
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.Batch.Runner
-import FourColorTheorem.Math.Soundness.ExtendSoundness
-import FourColorTheorem.Math.Soundness.Representation
-import FourColorTheorem.Math.Soundness.DReduce
+module
+
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Batch.Runner
+public import FourColorTheorem.Math.Soundness.ExtendSoundness
+public import FourColorTheorem.Math.Soundness.Representation
+public import FourColorTheorem.Math.Soundness.DReduce
+
+@[expose] public section
 
 set_option linter.constructorNameAsVariable false
 set_option linter.unusedVariables false

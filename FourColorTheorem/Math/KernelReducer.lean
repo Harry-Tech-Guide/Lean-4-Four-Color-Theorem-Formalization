@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.FastReducer
-import FourColorTheorem.Math.ParsedRConf633
-import FourColorTheorem.Math.KernelRfl
+module
+
+public import FourColorTheorem.Math.FastReducer
+public import FourColorTheorem.Math.ParsedRConf633
+public import FourColorTheorem.Math.KernelRfl
+
+@[expose] public section
 
 namespace Math
 namespace KernelReducer

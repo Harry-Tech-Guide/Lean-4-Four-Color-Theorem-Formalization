@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Soundness.CReduce
+module
+
+public import FourColorTheorem.Math.Soundness.CReduce
+
+@[expose] public section
 
 set_option linter.unusedVariables false
 set_option linter.constructorNameAsVariable false
@@ -58,8 +62,7 @@ theorem boundaryTraceAux_xorShift (r : Nat) (b : Nat → Color) (pow3 : Array Na
   induction rem generalizing i acc with
   | zero => rfl
   | succ rem ih =>
-    dsimp [boundaryTraceAux, xorShiftColoring]
-    rw [xorColor_diff (b i) (b ((i + 1) % r)) dCol]
+    simp only [boundaryTraceAux, xorShiftColoring, xorColor_diff]
     exact ih (i + 1) _
 
 theorem boundaryTrace_xorShift (c : Configuration) (b : BoundaryColoring c)
@@ -230,10 +233,7 @@ theorem aliasColorSound_computeContractAliasLoop (c : Configuration) (full : Nat
 
 theorem getCol_range (n w : Nat) (hw : w < n) :
     getCol (Array.range n) w = w := by
-  dsimp [getCol, Array.getD]
-  have h_sz : w < (Array.range n).size := by
-    rw [Array.size_range]; exact hw
-  rw [dif_pos h_sz, Array.getElem_range]
+  simp [getCol, Array.getD, hw]
 
 theorem aliasColorSound_init (c : Configuration) (full : Nat → Color) :
     AliasColorSound c full (Array.range c.totalNodes) := by

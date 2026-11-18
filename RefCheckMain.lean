@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.Soundness.CReduce
-import FourColorTheorem.Math.KernelReducer
+module
+
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.Soundness.CReduce
+public import FourColorTheorem.Math.KernelReducer
+
+@[expose] public section
 
 open Math
 open Math.FastReducer

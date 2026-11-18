@@ -1,9 +1,13 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.OrbitLemmas
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+
+@[expose] public section
 
 /-!
 # Subtype-Based Hypermap Disk Excision (`exciseSubtype`)
@@ -71,7 +75,7 @@ theorem face_mem_removed_iff_of_edge_node {D : Type} (removed : List D) (e' n' f
 
 /-- Construct a hypermap on the subtype `{ d : H.Dart // d ∉ removed }` from modified
     permutations `(e', n', f')` whose fixed/invariant removed set is closed under `e'` and `n'`. -/
-def exciseSubtype (H : Hypermap) (removed : List H.Dart) (e' n' f' : Perm H.Dart)
+abbrev exciseSubtype (H : Hypermap) (removed : List H.Dart) (e' n' f' : Perm H.Dart)
     (h_e_inv : ∀ d, e'.f (e'.f d) = d)
     (h_enf : ∀ d, e'.f (n'.f (f'.f d)) = d)
     (h_edge : ∀ d, d ∈ removed ↔ e'.f d ∈ removed)
@@ -82,6 +86,10 @@ def exciseSubtype (H : Hypermap) (removed : List H.Dart) (e' n' f' : Perm H.Dart
   face := restrictPerm f' removed (face_mem_removed_iff_of_edge_node removed e' n' f' h_enf h_edge h_node)
   edge_involution x := Subtype.ext (h_e_inv x.1)
   edge_node_face_id x := Subtype.ext (h_enf x.1)
+
+instance (priority := 2000) instBEqSubtypeOfDecidableEq {α : Type} {P : α → Prop}
+    [d : DecidableEq { x : α // P x }] : BEq { x : α // P x } :=
+  @instBEqOfDecidableEq { x : α // P x } d
 
 /-- Convenience constructor when `e'` and `n'` fix every dart of `removed` pointwise. -/
 def exciseSubtypeOfFixed (H : Hypermap) (removed : List H.Dart) (e' n' f' : Perm H.Dart)
@@ -219,7 +227,7 @@ end SubDartsCompleteness
 
 section NonVacuityWitness
 
-private theorem fin4_all {P : Fin 4 → Prop}
+theorem fin4_all {P : Fin 4 → Prop}
     (h0 : P ⟨0, by decide⟩) (h1 : P ⟨1, by decide⟩)
     (h2 : P ⟨2, by decide⟩) (h3 : P ⟨3, by decide⟩) : ∀ x : Fin 4, P x
   | ⟨0, _⟩ => h0
@@ -227,7 +235,7 @@ private theorem fin4_all {P : Fin 4 → Prop}
   | ⟨2, _⟩ => h2
   | ⟨3, _⟩ => h3
 
-private def swap01Perm : Perm (Fin 4) where
+def swap01Perm : Perm (Fin 4) where
   f
     | ⟨0, _⟩ => ⟨1, by decide⟩
     | ⟨1, _⟩ => ⟨0, by decide⟩
@@ -241,7 +249,7 @@ private def swap01Perm : Perm (Fin 4) where
   left_inv := fin4_all rfl rfl rfl rfl
   right_inv := fin4_all rfl rfl rfl rfl
 
-private def twoEdgeSphereEdge : Perm (Fin 4) where
+def twoEdgeSphereEdge : Perm (Fin 4) where
   f
     | ⟨0, _⟩ => ⟨1, by decide⟩
     | ⟨1, _⟩ => ⟨0, by decide⟩
@@ -255,7 +263,7 @@ private def twoEdgeSphereEdge : Perm (Fin 4) where
   left_inv := fin4_all rfl rfl rfl rfl
   right_inv := fin4_all rfl rfl rfl rfl
 
-private def twoEdgeSphereNode : Perm (Fin 4) where
+def twoEdgeSphereNode : Perm (Fin 4) where
   f
     | ⟨0, _⟩ => ⟨2, by decide⟩
     | ⟨1, _⟩ => ⟨3, by decide⟩
@@ -269,7 +277,7 @@ private def twoEdgeSphereNode : Perm (Fin 4) where
   left_inv := fin4_all rfl rfl rfl rfl
   right_inv := fin4_all rfl rfl rfl rfl
 
-private def twoEdgeSphereFace : Perm (Fin 4) where
+def twoEdgeSphereFace : Perm (Fin 4) where
   f
     | ⟨0, _⟩ => ⟨3, by decide⟩
     | ⟨1, _⟩ => ⟨2, by decide⟩

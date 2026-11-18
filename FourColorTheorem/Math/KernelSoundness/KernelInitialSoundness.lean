@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.KernelSoundness.KernelSlice
+module
+
+public import FourColorTheorem.Math.KernelSoundness.KernelSlice
+
+@[expose] public section
 
 namespace Math
 namespace KernelSoundness
@@ -11,6 +15,8 @@ open CheckerSoundness
 
 set_option linter.unusedVariables false
 set_option linter.constructorNameAsVariable false
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 /-!
 # Checkpoint K4.2: Soundness and Completeness of `dfsInterior`, `lookupRingCols`, and Alias Relaxation
@@ -524,11 +530,10 @@ theorem edgeDigitAt_canonRingColor (r j e : Nat) (he : e + 1 < r) :
   dsimp [edgeDigitAt]
   have hMod : (e + 1) % r = e + 1 := Nat.mod_eq_of_lt he
   rw [hMod, toNat_canonRingColor, toNat_canonRingColor]
-  dsimp [canonRingColorNat]
   have hlt1 := canonRingColorNat_lt_four j e
   have hd_lt : (j / 3 ^ e) % 3 < 3 := Nat.mod_lt (j / 3 ^ e) (by decide)
   have hlt2 : ((j / 3 ^ e) % 3) + 1 < 4 := by omega
-  rw [xor_self_xor_right _ _ hlt1 hlt2]
+  simp only [canonRingColorNat, xor_self_xor_right _ _ hlt1 hlt2]
   have hPos : (j / 3 ^ e) % 3 + 1 > 0 := by omega
   rw [if_pos hPos]
   omega
@@ -668,8 +673,8 @@ theorem stepRow8_bit1 (u col a b c j : Nat) (hCol : col < 4)
     have hGe1 : ¬ (j ≥ 3 ^ u) := by omega
     have hGe2 : ¬ (j ≥ 2 * 3 ^ u) := by omega
     have hDiv : j / 3 ^ u = 0 := Nat.div_eq_of_lt hj0
-    dsimp [canonRingColorNat]
-    rw [decide_eq_true hj0, decide_eq_true hj3, decide_eq_false hGe1, decide_eq_false hGe2, hDiv]
+    simp only [canonRingColorNat, decide_eq_true hj0, decide_eq_true hj3,
+      decide_eq_false hGe1, decide_eq_false hGe2, hDiv]
     simp [xor_eq_iff (canonRingColorNat j u) 1 col hCu (by decide) hCol]
   · by_cases hj1 : j < 2 * 3 ^ u
     · have hj3 : j < 3 ^ (u + 1) := by omega
@@ -677,9 +682,9 @@ theorem stepRow8_bit1 (u col a b c j : Nat) (hCol : col < 4)
       have hSub1 : j - 3 ^ u < 3 ^ u := by omega
       have hGe2 : ¬ (j ≥ 2 * 3 ^ u) := by omega
       have hDiv : j / 3 ^ u = 1 := div_pow3_of_range1 j u hGe1 hj1
-      dsimp [canonRingColorNat]
-      rw [decide_eq_false hj0, decide_eq_true hj3, decide_eq_true hGe1, decide_eq_true hSub1,
-          decide_eq_false hGe2, hDiv, canonRingColorNat_sub_pow3 j u hGe1]
+      simp only [canonRingColorNat, decide_eq_false hj0, decide_eq_true hj3,
+        decide_eq_true hGe1, decide_eq_true hSub1, decide_eq_false hGe2, hDiv,
+        canonRingColorNat_sub_pow3 j u hGe1]
       simp [xor_eq_iff (canonRingColorNat j u) 2 col hCu (by decide) hCol]
     · by_cases hj2 : j < 3 * 3 ^ u
       · have hj3 : j < 3 ^ (u + 1) := by omega
@@ -688,9 +693,9 @@ theorem stepRow8_bit1 (u col a b c j : Nat) (hCol : col < 4)
         have hGe2 : j ≥ 2 * 3 ^ u := by omega
         have hSub2 : j - 2 * 3 ^ u < 3 ^ u := by omega
         have hDiv : j / 3 ^ u = 2 := div_pow3_of_range2 j u hGe2 hj2
-        dsimp [canonRingColorNat]
-        rw [decide_eq_false hj0, decide_eq_true hj3, decide_eq_true hGe1, decide_eq_false hSub1,
-            decide_eq_true hGe2, decide_eq_true hSub2, hDiv, canonRingColorNat_sub_two_pow3 j u hGe2]
+        simp only [canonRingColorNat, decide_eq_false hj0, decide_eq_true hj3,
+          decide_eq_true hGe1, decide_eq_false hSub1, decide_eq_true hGe2,
+          decide_eq_true hSub2, hDiv, canonRingColorNat_sub_two_pow3 j u hGe2]
         simp [xor_eq_iff (canonRingColorNat j u) 3 col hCu (by decide) hCol]
       · have hj3 : ¬ (j < 3 ^ (u + 1)) := by omega
         have hSub1 : ¬ (j - 3 ^ u < 3 ^ u) := by omega
@@ -710,17 +715,16 @@ theorem stepRow8_bit0 (u col a0 b j : Nat) (hCol : col < 4)
   · have hj3 : j < 3 ^ (u + 1) := by omega
     have hGe1 : ¬ (j ≥ 3 ^ u) := by omega
     have hDiv : j / 3 ^ u = 0 := Nat.div_eq_of_lt hj0
-    dsimp [canonRingColorNat, isCanon12]
-    rw [decide_eq_true hj0, decide_eq_true hj3, decide_eq_false hGe1, hDiv]
+    simp only [canonRingColorNat, isCanon12, decide_eq_true hj0, decide_eq_true hj3,
+      decide_eq_false hGe1, hDiv]
     simp [xor_eq_iff (canonRingColorNat j u) 1 col hCu (by decide) hCol]
   · by_cases hj1 : j < 2 * 3 ^ u
     · have hj3 : j < 3 ^ (u + 1) := by omega
       have hGe1 : j ≥ 3 ^ u := by omega
       have hSub1 : j - 3 ^ u < 3 ^ u := by omega
       have hDiv : j / 3 ^ u = 1 := div_pow3_of_range1 j u hGe1 hj1
-      dsimp [canonRingColorNat, isCanon12]
-      rw [decide_eq_false hj0, decide_eq_true hj3, decide_eq_true hGe1, decide_eq_true hSub1,
-          hDiv, canonRingColorNat_sub_pow3 j u hGe1]
+      simp only [canonRingColorNat, isCanon12, decide_eq_false hj0, decide_eq_true hj3,
+        decide_eq_true hGe1, decide_eq_true hSub1, hDiv, canonRingColorNat_sub_pow3 j u hGe1]
       simp [xor_eq_iff (canonRingColorNat j u) 2 col hCu (by decide) hCol]
     · by_cases hj2 : j < 3 * 3 ^ u
       · have hj3 : j < 3 ^ (u + 1) := by omega

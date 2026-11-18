@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.TestDischarging
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.DischargingSplit
+module
+
+public import FourColorTheorem.Math.TestDischarging
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.DischargingSplit
+
+@[expose] public section
 
 namespace Math.Discharging
 

@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.Batch.DischargeMaster
+module
+
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Batch.DischargeMaster
+
+@[expose] public section
 
 namespace Math
 namespace Unavoidability

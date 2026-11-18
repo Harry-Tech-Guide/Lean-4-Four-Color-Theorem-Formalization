@@ -1,5 +1,9 @@
+module
 
-import FourColorTheorem.Math.KempeConsistency
+
+public import FourColorTheorem.Math.KempeConsistency
+
+@[expose] public section
 
 -- Step 9: The Kempe Consistency Theorem
 

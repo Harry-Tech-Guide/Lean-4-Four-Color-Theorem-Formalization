@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Soundness.ExtendSoundness
-import FourColorTheorem.Math.Batch.Runner
-import FourColorTheorem.Math.U633Parser
+module
+
+public import FourColorTheorem.Math.Soundness.ExtendSoundness
+public import FourColorTheorem.Math.Batch.Runner
+public import FourColorTheorem.Math.U633Parser
+
+@[expose] public section
 
 namespace Math
 namespace Soundness

@@ -1,10 +1,14 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.ComponentLemmas
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.SubtypeSurgery
+public import FourColorTheorem.Math.Topology.ComponentLemmas
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.SubtypeSurgery
+
+@[expose] public section
 
 /-!
 # Combinatorial Genus Deficit, Euler Inequality, and Planar Surgery Preservation (`Genus`)
@@ -912,7 +916,7 @@ theorem filter_ext_of_mem {α : Type} (p q : α → Bool) :
     rw [hx]
     cases q x <;> simp [hxs]
 
-private def countRelClassesAux (R : D → D → Prop) [DecidableRel R] : Nat → List D → Nat
+def countRelClassesAux (R : D → D → Prop) [DecidableRel R] : Nat → List D → Nat
   | 0, _ => 0
   | _, [] => 0
   | fuel + 1, d :: ds => 1 + countRelClassesAux R fuel (ds.filter (fun x => !decide (R d x)))
@@ -2361,16 +2365,7 @@ def restrictTriplePred {D : Type} (T : PermTriple D) (P : D → Prop)
 
 private theorem contains_decidableEq_iff_mem {α : Type} [DecidableEq α] (l : List α) (x : α) :
     @List.contains α (@instBEqOfDecidableEq α inferInstance) l x = true ↔ x ∈ l := by
-  induction l with
-  | nil =>
-    constructor
-    · intro h; dsimp [List.contains, List.elem] at h; cases h
-    · intro h; cases h
-  | cons a as ih =>
-    dsimp [List.contains, List.elem]
-    change (decide (x = a) || @List.elem α (@instBEqOfDecidableEq α inferInstance) x as) = true ↔ x ∈ a :: as
-    rw [Bool.or_eq_true, decide_eq_true_eq, List.mem_cons]
-    exact or_congr Iff.rfl ih
+  exact List.contains_iff_mem
 
 theorem getOrbit_contains_restrictPermPred_iff {D : Type} [DecidableEq D]
     (p : Perm D) (P : D → Prop) (h_inv : ∀ d, P d ↔ P (p.f d))
@@ -2667,6 +2662,24 @@ theorem genusDeficit_pred_split {D : Type} [DecidableEq D]
        (@countOrbits { d : D // Q d } (@instBEqOfDecidableEq _ inferInstance) TQ.e fuel dartsQ : Int) +
        (@countOrbits { d : D // Q d } (@instBEqOfDecidableEq _ inferInstance) TQ.f fuel dartsQ : Int)))
   dsimp only [TP, TQ, restrictTriplePred]
+  have hC_P :
+      @countRelClasses { d : D // P d }
+        (ReachEN (restrictPermPred T.e P h_e) (restrictPermPred T.n P h_n))
+        (instDecidableRelReachEN (restrictTriplePred T P h_e h_n).e (restrictTriplePred T P h_e h_n).n) dartsP =
+      @countRelClasses { d : D // P d }
+        (ReachEN (restrictPermPred T.e P h_e) (restrictPermPred T.n P h_n))
+        (instDecidableRelReachEN (restrictPermPred T.e P h_e) (restrictPermPred T.n P h_n)) dartsP :=
+    congrArg (fun inst => @countRelClasses _ _ inst dartsP)
+      (funext fun _ => funext fun _ => Subsingleton.elim _ _)
+  have hC_Q :
+      @countRelClasses { d : D // Q d }
+        (ReachEN (restrictPermPred T.e Q hQe) (restrictPermPred T.n Q hQn))
+        (instDecidableRelReachEN (restrictTriplePred T Q hQe hQn).e (restrictTriplePred T Q hQe hQn).n) dartsQ =
+      @countRelClasses { d : D // Q d }
+        (ReachEN (restrictPermPred T.e Q hQe) (restrictPermPred T.n Q hQn))
+        (instDecidableRelReachEN (restrictPermPred T.e Q hQe) (restrictPermPred T.n Q hQn)) dartsQ :=
+    congrArg (fun inst => @countRelClasses _ _ inst dartsQ)
+      (funext fun _ => funext fun _ => Subsingleton.elim _ _)
   have hF_P :
       @countOrbits { d : D // P d } (@instBEqOfDecidableEq _ inferInstance)
         (restrictPermPred T.f P (fun d => (Iff.trans (h_n (T.f.f d))
@@ -2681,7 +2694,7 @@ theorem genusDeficit_pred_split {D : Type} [DecidableEq D]
         fuel dartsQ =
       @countOrbits { d : D // Q d } (@instBEqOfDecidableEq _ inferInstance)
         (restrictPermPred T.f Q (fun d => not_congr (hf_e d))) fuel dartsQ := rfl
-  rw [h_len_split, hC_split, hV_split, hE_split, hF_split, hF_P, hF_Q]
+  rw [hC_P, hC_Q, h_len_split, hC_split, hV_split, hE_split, hF_split, hF_P, hF_Q]
   omega
 
 theorem genusDeficit_eq_of_complete {D : Type} [DecidableEq D]
@@ -2822,8 +2835,11 @@ theorem exciseSubtype_isPlanar_of_perm (H : Hypermap) [DecidableEq H.Dart]
   have h_H'_gd : genusDeficit H'.hypermapToTriple fuel' darts' = 0 := by omega
   have h_H'_free : ∀ x : H'.Dart, H'.edge.f x ≠ x := fun x hfx =>
     h_free x.val x.property (congrArg Subtype.val hfx)
-  exact (eulerChar_le_two_mul_numComponents H' darts' h_nodup' h_comp' h_fuel').2.mpr
+  have h_pl := (eulerChar_le_two_mul_numComponents H' darts' h_nodup' h_comp' h_fuel').2.mpr
     ⟨h_H'_gd, h_H'_free⟩
+  first
+    | exact h_pl
+    | exact congrArg (fun b => @Hypermap.isPlanar H' b fuel' darts' = true) (instBEqOfDecidableEq_eq _ _) ▸ h_pl
 
 /-- Direct Planarity Preservation under `exciseSubtype` using `H`'s original permutations. -/
 theorem exciseSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
@@ -2845,7 +2861,7 @@ theorem exciseSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
     h_nodup h_comp h_fuel h_planar (Int.le_refl _) (fun d _ => h_free d)
     darts' h_nodup' h_comp' h_fuel'
 
-private theorem swapCompLeft_edge_inv [DecidableEq D] (e : Perm D)
+theorem swapCompLeft_edge_inv [DecidableEq D] (e : Perm D)
     (h_invol : ∀ x, e.f (e.f x) = x) (d : D) :
     let e1 := swapCompLeft e d (e.f d)
     ∀ x, e1.f (e1.f x) = x := by
@@ -2870,7 +2886,7 @@ private theorem swapCompLeft_edge_inv [DecidableEq D] (e : Perm D)
       change swapFun d b (e.f (swapFun d b (e.f x))) = x
       rw [swapFun_of_ne hex_ne_d hex_ne_b, h_invol x, swapFun_of_ne hxd hxb]
 
-private theorem swapCompLeft_edge_mem_pair [DecidableEq D] (e : Perm D)
+theorem swapCompLeft_edge_mem_pair [DecidableEq D] (e : Perm D)
     (h_invol : ∀ x, e.f (e.f x) = x) (d : D) :
     ∀ x, x ∈ [d, e.f d] ↔ (swapCompLeft e d (e.f d)).f x ∈ [d, e.f d] := by
   intro x
@@ -2906,7 +2922,7 @@ private theorem perm_f_inj {D : Type} (p : Perm D) {x y : D} (h : p.f x = p.f y)
     _ = p.inv (p.f y) := by rw [h]
     _ = y := p.left_inv y
 
-private theorem bypass_two_mem_pair [DecidableEq D] (p : Perm D) (a b : D) :
+theorem bypass_two_mem_pair [DecidableEq D] (p : Perm D) (a b : D) :
     ∀ x, x ∈ [a, b] ↔ (bypass (bypass p a) b).f x ∈ [a, b] := by
   let p1 := bypass p a
   let p2 := bypass p1 b
@@ -2940,7 +2956,7 @@ private theorem bypass_two_mem_pair [DecidableEq D] (p : Perm D) (a b : D) :
         · have hb_eq' : p2.f x = b := by simpa using hb_eq
           exact hxb (perm_f_inj p2 (by rw [hb_eq', hp2b]))
 
-private def deleteEdgeTriple (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : PermTriple H.Dart :=
+def deleteEdgeTriple (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : PermTriple H.Dart :=
   let b := H.edge.f d
   let T1 := uncoupleEdge H.hypermapToTriple d b
   have h1d : T1.e.f d = d := by
@@ -2954,7 +2970,7 @@ private def deleteEdgeTriple (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : 
   isolateFixed T2 b h2b
 
 /-- Construct the edge-deleted planar-ready subtype hypermap removing `{d, H.edge.f d}`. -/
-def deleteEdgeSubtype (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
+abbrev deleteEdgeSubtype (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
   let T3 := deleteEdgeTriple H d
   have h_inv : ∀ x, T3.e.f (T3.e.f x) = x :=
     swapCompLeft_edge_inv H.edge H.edge_involution d
@@ -3024,17 +3040,11 @@ theorem deleteEdgeSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
     (bypass_two_mem_pair H.node d (H.edge.f d))
     h_nodup h_comp h_fuel h_planar h_gd_le h_free'
     darts' h_nodup' h_comp' h_fuel'
-  dsimp only [deleteEdgeSubtype]
-  rw [instBEqOfDecidableEq_eq (H.instDecidableEqDeleteEdgeDart d)
-    (fun a b => H.instDecidableEqExciseDart [d, H.edge.f d]
-      (deleteEdgeTriple H d).e (deleteEdgeTriple H d).n (deleteEdgeTriple H d).f
-      (swapCompLeft_edge_inv H.edge H.edge_involution d)
-      (deleteEdgeTriple H d).enf_id
-      (swapCompLeft_edge_mem_pair H.edge H.edge_involution d)
-      (bypass_two_mem_pair H.node d (H.edge.f d)) a b)]
-  exact h_res
+  first
+    | exact h_res
+    | exact congrArg (fun b => @Hypermap.isPlanar _ b fuel' darts' = true) (instBEqOfDecidableEq_eq _ _) ▸ h_res
 
-private def smoothDeg2Triple (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart) : PermTriple H.Dart :=
+def smoothDeg2Triple (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart) : PermTriple H.Dart :=
   let y := H.node.f x
   let ex := H.edge.f x
   let ey := H.edge.f y
@@ -3097,7 +3107,7 @@ private theorem smoothDeg2Triple_e_eval (H : Hypermap) [DecidableEq H.Dart] (x :
     have hez_ey : H.edge.f z ≠ ey := fun heq => hzy (perm_f_inj H.edge heq)
     rw [hdef z, swapFun_of_ne hzx hzy, swapFun_of_ne hez_x hez_ey, swapFun_of_ne hez_y hez_ex]
 
-private theorem smoothDeg2Triple_e_inv (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
+theorem smoothDeg2Triple_e_inv (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
     (hx_ne : H.node.f x ≠ x)
     (hx_efree : H.edge.f x ≠ x)
     (hy_efree : H.edge.f (H.node.f x) ≠ H.node.f x)
@@ -3128,7 +3138,7 @@ private theorem smoothDeg2Triple_e_inv (H : Hypermap) [DecidableEq H.Dart] (x : 
           rw [hfo z hzx hzy hzex hzey, hfo (H.edge.f z) hez_x hez_y hez_ex hez_ey,
             H.edge_involution z]
 
-private theorem smoothDeg2Triple_e_mem_pair (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
+theorem smoothDeg2Triple_e_mem_pair (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
     (hx_ne : H.node.f x ≠ x)
     (hx_efree : H.edge.f x ≠ x)
     (hy_efree : H.edge.f (H.node.f x) ≠ H.node.f x)
@@ -3179,7 +3189,7 @@ private theorem smoothDeg2Triple_e_mem_pair (H : Hypermap) [DecidableEq H.Dart] 
             · exact False.elim (hez_x h1)
             · exact False.elim (hez_y (by simpa using h2))
 
-private theorem smoothDeg2Triple_n_mem_pair (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
+theorem smoothDeg2Triple_n_mem_pair (H : Hypermap) [DecidableEq H.Dart] (x : H.Dart)
     (hy_back : H.node.f (H.node.f x) = x) :
     ∀ z, z ∈ [x, H.node.f x] ↔ (smoothDeg2Triple H x).n.f z ∈ [x, H.node.f x] := by
   let y := H.node.f x
@@ -3202,7 +3212,7 @@ private theorem smoothDeg2Triple_n_mem_pair (H : Hypermap) [DecidableEq H.Dart] 
         · exact False.elim (hnz_y (by simpa using h2))
 
 /-- Smooth a degree-2 vertex `{x, H.node.f x}` out of a planar hypermap into a subtype. -/
-def smoothDeg2Subtype (H : Hypermap) [DecidableEq H.Dart]
+abbrev smoothDeg2Subtype (H : Hypermap) [DecidableEq H.Dart]
     (x : H.Dart)
     (hx_ne : H.node.f x ≠ x)
     (hy_back : H.node.f (H.node.f x) = x)
@@ -3305,16 +3315,9 @@ theorem smoothDeg2Subtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
     (smoothDeg2Triple_n_mem_pair H x hy_back)
     h_nodup h_comp h_fuel h_planar h_gd_le h_free'
     darts' h_nodup' h_comp' h_fuel'
-  dsimp only [smoothDeg2Subtype]
-  rw [instBEqOfDecidableEq_eq
-    (H.instDecidableEqSmoothDeg2Dart x hx_ne hy_back hx_efree hy_efree h_noloop)
-    (fun a b => H.instDecidableEqExciseDart [x, y]
-      (smoothDeg2Triple H x).e (smoothDeg2Triple H x).n (smoothDeg2Triple H x).f
-      (smoothDeg2Triple_e_inv H x hx_ne hx_efree hy_efree h_noloop)
-      (smoothDeg2Triple H x).enf_id
-      (smoothDeg2Triple_e_mem_pair H x hx_ne hx_efree hy_efree h_noloop)
-      (smoothDeg2Triple_n_mem_pair H x hy_back) a b)]
-  exact h_res
+  first
+    | exact h_res
+    | exact congrArg (fun b => @Hypermap.isPlanar _ b fuel' darts' = true) (instBEqOfDecidableEq_eq _ _) ▸ h_res
 
 end PlanarSurgeryPreservation
 

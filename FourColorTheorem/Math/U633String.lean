@@ -1,3 +1,7 @@
+module
+
+@[expose] public section
+
 namespace Math
 
 /-- Compacted string representation of U_633.conf -/

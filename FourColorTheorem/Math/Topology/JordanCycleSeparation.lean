@@ -1,8 +1,12 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.CubicGirth5
+public import FourColorTheorem.Math.Topology.CubicGirth5
+
+@[expose] public section
 
 /-!
 # Discrete Jordan `k`-Cycle Separation & Subtype Cap Engine (`U.1`)
@@ -1569,11 +1573,10 @@ theorem findFinIdx_getElem {α : Type} [DecidableEq α] :
     have hcons := List.nodup_cons.mp hnd
     cases i using Fin.cases with
     | zero =>
-      dsimp [findFinIdx]; rw [dif_pos rfl]
+      simp [findFinIdx]
     | succ j =>
       have hne : x ≠ xs[j.val] := fun h => hcons.1 (h ▸ List.getElem_mem j.isLt)
-      dsimp [findFinIdx]
-      rw [dif_neg hne]
+      simp only [Fin.val_succ, List.getElem_cons_succ, findFinIdx, dif_neg hne]
       have ih := findFinIdx_getElem xs hcons.2 j
       apply Fin.ext
       dsimp at ih ⊢
@@ -2302,7 +2305,7 @@ theorem uncoupleEdge_edge_invol {D : Type} [DecidableEq D] (T : PermTriple D)
       rw [swapFun_of_ne hfb hfa, h_invol d, swapFun_of_ne hda hdb]
 
 /-- Materialize a `PermTriple D` with involutive fixed-point-free edge permutation as a `Hypermap`. -/
-def tripleToHypermap {D : Type} (T : PermTriple D)
+abbrev tripleToHypermap {D : Type} (T : PermTriple D)
     (h_invol : ∀ d : D, T.e.f (T.e.f d) = d) : Hypermap where
   Dart := D
   edge := T.e
@@ -3590,8 +3593,7 @@ theorem uncoupleCycle_two_components (H : Hypermap) [DecidableEq H.Dart] (darts 
     rw [list_take_succ_of_lt cut.cutPairs m (by rw [hlen_pairs]; exact hm), coupleList_append]
     have helem : cut.cutPairs[m]'(by rw [hlen_pairs]; exact hm) =
         (cut.cutDart ⟨m, hm⟩, H.edge.f (cut.cutDart ⟨m, hm⟩)) := by
-      dsimp [FaceCycleCut.cutPairs]
-      simp [List.getElem_map, List.getElem_finRange]
+      simp [FaceCycleCut.cutPairs, List.getElem_map, List.getElem_finRange]
     rw [helem]
     rfl
   let Inv : Nat → Prop := fun m =>
@@ -4442,16 +4444,18 @@ private theorem getOrbitAux_sumPerm_inl_gen {α β : Type}
   induction fuel generalizing current acc with
   | zero => rfl
   | succ f ih =>
-    dsimp [getOrbitAux, sumPerm]
-    have hbeq : bSum.beq (Sum.inl (p1.f current)) (Sum.inl start) =
-        b1.beq (p1.f current) start := by
+    have hsf : (sumPerm p1 p2).f (Sum.inl current) = Sum.inl (p1.f current) := rfl
+    have hbeq : (@BEq.beq (α ⊕ β) bSum (Sum.inl (p1.f current)) (Sum.inl start)) =
+        (@BEq.beq α b1 (p1.f current) start) := by
       apply Bool.eq_iff_iff.mpr
       rw [hbSum, hb1]
       exact ⟨fun h => Sum.inl.inj h, fun h => congrArg Sum.inl h⟩
-    rw [hbeq]
-    cases b1.beq (p1.f current) start
-    · exact ih (p1.f current) (current :: acc)
-    · rfl
+    rw [getOrbitAux, getOrbitAux, hsf, hbeq]
+    cases @BEq.beq α b1 (p1.f current) start
+    · simp only [Bool.false_eq_true, ↓reduceIte]
+      rw [← List.map_cons]
+      exact ih (p1.f current) (current :: acc)
+    · simp
 
 private theorem getOrbitAux_sumPerm_inr_gen {α β : Type}
     {bSum : BEq (α ⊕ β)} (hbSum : ∀ u v : α ⊕ β, bSum.beq u v = true ↔ u = v)
@@ -4462,16 +4466,18 @@ private theorem getOrbitAux_sumPerm_inr_gen {α β : Type}
   induction fuel generalizing current acc with
   | zero => rfl
   | succ f ih =>
-    dsimp [getOrbitAux, sumPerm]
-    have hbeq : bSum.beq (Sum.inr (p2.f current)) (Sum.inr start) =
-        b2.beq (p2.f current) start := by
+    have hsf : (sumPerm p1 p2).f (Sum.inr current) = Sum.inr (p2.f current) := rfl
+    have hbeq : (@BEq.beq (α ⊕ β) bSum (Sum.inr (p2.f current)) (Sum.inr start)) =
+        (@BEq.beq β b2 (p2.f current) start) := by
       apply Bool.eq_iff_iff.mpr
       rw [hbSum, hb2]
       exact ⟨fun h => Sum.inr.inj h, fun h => congrArg Sum.inr h⟩
-    rw [hbeq]
-    cases b2.beq (p2.f current) start
-    · exact ih (p2.f current) (current :: acc)
-    · rfl
+    rw [getOrbitAux, getOrbitAux, hsf, hbeq]
+    cases @BEq.beq β b2 (p2.f current) start
+    · simp only [Bool.false_eq_true, ↓reduceIte]
+      rw [← List.map_cons]
+      exact ih (p2.f current) (current :: acc)
+    · simp
 
 theorem getOrbit_sumPerm_inl_gen {α β : Type}
     {bSum : BEq (α ⊕ β)} (hbSum : ∀ u v : α ⊕ β, bSum.beq u v = true ↔ u = v)
@@ -4667,11 +4673,15 @@ private theorem getOrbitAux_restrictPermPred {D : Type} [DecidableEq D]
   | succ f ih =>
     dsimp [getOrbitAux, restrictPermPred]
     by_cases h : p.f current.val = start.val
-    · have hb2 : (p.f current.val == start.val) = true := beq_iff_eq.mpr h
-      rw [hb2]; rfl
-    · have hb2 : (p.f current.val == start.val) = false :=
+    · have hb1 : ((⟨p.f current.val, (h_inv current.val).mp current.property⟩ : { d : D // P d }) == start) = true :=
+        beq_iff_eq.mpr (Subtype.ext h)
+      have hb2 : (p.f current.val == start.val) = true := beq_iff_eq.mpr h
+      rw [hb1, hb2]; rfl
+    · have hb1 : ((⟨p.f current.val, (h_inv current.val).mp current.property⟩ : { d : D // P d }) == start) = false :=
+        beq_eq_false_iff_ne.mpr (fun heq => h (congrArg Subtype.val heq))
+      have hb2 : (p.f current.val == start.val) = false :=
         Bool.eq_false_iff.mpr (fun heq => h (beq_iff_eq.mp heq))
-      rw [hb2]
+      rw [hb1, hb2]
       exact ih ⟨p.f current.val, (h_inv current.val).mp current.property⟩ (current :: acc)
 
 theorem getOrbit_restrictPermPred {D : Type} [DecidableEq D]
@@ -4863,13 +4873,13 @@ def FaceCycleCut.capSingleVertex_DL {H : Hypermap} [DecidableEq H.Dart] {k : Nat
   ReachEN cut.uncoupleTriple.e cut.uncoupleTriple.n
     (cut.cutDart ⟨0, by have := cut.hk; omega⟩) d
 
-private theorem FaceCycleCut.capSingleVertex_DL_e {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
+theorem FaceCycleCut.capSingleVertex_DL_e {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
     (cut : FaceCycleCut H k) (d : H.Dart) :
     cut.capSingleVertex_DL d ↔ cut.capSingleVertex_DL (cut.uncoupleTriple.e.f d) :=
   ⟨fun hd => reachEN_trans _ _ hd ⟨WalkEN.step (StepEN.e_fwd d) (WalkEN.refl _)⟩,
    fun hd => reachEN_trans _ _ hd (reachEN_symm _ _ ⟨WalkEN.step (StepEN.e_fwd d) (WalkEN.refl _)⟩)⟩
 
-private theorem FaceCycleCut.capSingleVertex_DL_n {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
+theorem FaceCycleCut.capSingleVertex_DL_n {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
     (cut : FaceCycleCut H k) (d : H.Dart) :
     cut.capSingleVertex_DL d ↔ cut.capSingleVertex_DL (cut.uncoupleTriple.n.f d) :=
   ⟨fun hd => reachEN_trans _ _ hd ⟨WalkEN.step (StepEN.n_fwd d) (WalkEN.refl _)⟩,
@@ -4881,12 +4891,12 @@ noncomputable def FaceCycleCut.capSingleVertex_TL {H : Hypermap} [DecidableEq H.
   restrictTriplePred cut.uncoupleTriple cut.capSingleVertex_DL
     cut.capSingleVertex_DL_e cut.capSingleVertex_DL_n
 
-private noncomputable def FaceCycleCut.capSumTriple {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
+noncomputable def FaceCycleCut.capSumTriple {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
     (cut : FaceCycleCut H k) :
     PermTriple ({ d : H.Dart // cut.capSingleVertex_DL d } ⊕ Fin k) :=
   sumTriple cut.capSingleVertex_TL (singleCycleTriple k (by have := cut.hk; omega))
 
-private noncomputable def FaceCycleCut.capBaseTriple {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
+noncomputable def FaceCycleCut.capBaseTriple {H : Hypermap} [DecidableEq H.Dart] {k : Nat}
     (cut : FaceCycleCut H k) :
     PermTriple ({ d : H.Dart // cut.capSingleVertex_DL d } ⊕ Fin k) :=
   let a0_sum : { d : H.Dart // cut.capSingleVertex_DL d } ⊕ Fin k :=
@@ -4895,7 +4905,7 @@ private noncomputable def FaceCycleCut.capBaseTriple {H : Hypermap} [DecidableEq
     Sum.inr ⟨0, by have := cut.hk; omega⟩
   coupleEdge cut.capSumTriple a0_sum v0_sum
 
-private noncomputable def FaceCycleCut.capSpecs {H : Hypermap} [DecidableEq H.Dart]
+noncomputable def FaceCycleCut.capSpecs {H : Hypermap} [DecidableEq H.Dart]
     (darts : List H.Dart) (h_all : ∀ d : H.Dart, d ∈ darts)
     {k : Nat} (cut : FaceCycleCut H k) : List (Nat × Nat) :=
   let La := cut.posL darts h_all k
@@ -4911,7 +4921,7 @@ noncomputable def FaceCycleCut.capSingleVertexTriple {H : Hypermap} [DecidableEq
     Sum.inr ⟨0, by have := cut.hk; omega⟩
   coupleList cut.capBaseTriple (nestedPairs cut.capBaseTriple v0_sum (cut.capSpecs darts h_all))
 
-private noncomputable def FaceCycleCut.capDartsL_sub {H : Hypermap} [DecidableEq H.Dart]
+noncomputable def FaceCycleCut.capDartsL_sub {H : Hypermap} [DecidableEq H.Dart]
     (darts : List H.Dart) {k : Nat} (cut : FaceCycleCut H k) :
     List { d : H.Dart // cut.capSingleVertex_DL d } :=
   @predDarts H.Dart cut.capSingleVertex_DL (fun _ => Classical.propDecidable _) darts
@@ -5061,7 +5071,7 @@ private theorem reachEN_lift_restrictTriple {D : Type} (T : PermTriple D) (P : D
     ReachEN (restrictTriplePred T P h_e h_n).e (restrictTriplePred T P h_e h_n).n ⟨a, ha⟩ ⟨b, hb⟩ :=
   h.elim fun w => ⟨walkEN_lift_restrictTriple T P h_e h_n ha hb w⟩
 
-private theorem FaceCycleCut.capSingleVertex_DL_cut_all {H : Hypermap} [DecidableEq H.Dart]
+theorem FaceCycleCut.capSingleVertex_DL_cut_all {H : Hypermap} [DecidableEq H.Dart]
     (darts : List H.Dart) (h_nd : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
     (h_planar : H.isPlanar darts.length darts = true)
     (h_conn : H.numComponents darts.length darts = 1)
@@ -5141,14 +5151,14 @@ private theorem FaceCycleCut.capSingleVertex_specs_ok {H : Hypermap} [DecidableE
   have ha0_orb_len : (@getOrbit _ bCap cut.capSumTriple.f darts_cap.length a0_sum).length = La := by
     dsimp only [a0_sum, FaceCycleCut.capSumTriple, sumTriple]
     rw [getOrbit_sumPerm_inl_gen deceq_beq_iff_eq (b1 := inferInstance)
-      (fun u v => (deceq_beq_iff_eq u.val v.val).trans Subtype.ext_iff.symm)]
+      (fun u v => beq_iff_eq)]
     simp only [List.length_map]
     dsimp only [FaceCycleCut.capSingleVertex_TL, restrictTriplePred]
     let bSub : BEq { d : H.Dart // cut.capSingleVertex_DL d } := inferInstance
     let bSubDec : BEq { d : H.Dart // cut.capSingleVertex_DL d } := @instBEqOfDecidableEq _ _
     have hb_iff : ∀ u v : { d : H.Dart // cut.capSingleVertex_DL d },
         bSub.beq u v = true ↔ bSubDec.beq u v = true :=
-      fun u v => ((deceq_beq_iff_eq u.val v.val).trans Subtype.ext_iff.symm).trans (deceq_beq_iff_eq u v).symm
+      fun u v => beq_iff_eq.trans (deceq_beq_iff_eq u v).symm
     have h_inv_f : ∀ d, cut.capSingleVertex_DL d ↔ cut.capSingleVertex_DL (cut.uncoupleTriple.f.f d) := by
       intro d
       have he := cut.capSingleVertex_DL_e (cut.uncoupleTriple.n.f (cut.uncoupleTriple.f.f d))
@@ -5300,8 +5310,7 @@ private theorem FaceCycleCut.capSingleVertex_specs_ok {H : Hypermap} [DecidableE
         Sum.inr ⟨k - 1 - i, by have := cut.hk; simp [specs, FaceCycleCut.capSpecs] at hi; omega⟩ := by
     intro i hi
     have hi' : i < k - 1 := by simpa [specs, FaceCycleCut.capSpecs] using hi
-    dsimp only [specs, FaceCycleCut.capSpecs]
-    simp only [List.getElem_map, List.getElem_finRange, Fin.val_cast]
+    simp only [specs, FaceCycleCut.capSpecs, List.getElem_map, List.getElem_finRange, Fin.val_cast]
     refine ⟨hiter_pos (by omega) (by omega), ?_⟩
     have hf2 := hiter_snd (s := 1 + i) (by omega) (by omega)
     rw [show La + 1 + i = La + (1 + i) by omega, hf2]
@@ -5529,14 +5538,14 @@ theorem FaceCycleCut.capSingleVertexHypermap_face_ring {H : Hypermap} [Decidable
       exact (@mem_predDarts_iff H.Dart cut.capSingleVertex_DL decDL darts y).mpr (h_all y.val)
     dsimp only [a0_sum, FaceCycleCut.capSumTriple, sumTriple]
     rw [getOrbit_sumPerm_inl_gen deceq_beq_iff_eq (b1 := inferInstance)
-      (fun u v => (deceq_beq_iff_eq u.val v.val).trans Subtype.ext_iff.symm),
+      (fun u v => beq_iff_eq),
       List.length_map]
     dsimp only [FaceCycleCut.capSingleVertex_TL, restrictTriplePred]
     let bSub : BEq { d : H.Dart // cut.capSingleVertex_DL d } := inferInstance
     let bSubDec : BEq { d : H.Dart // cut.capSingleVertex_DL d } := @instBEqOfDecidableEq _ _
     have hb_iff : ∀ u v : { d : H.Dart // cut.capSingleVertex_DL d },
         bSub.beq u v = true ↔ bSubDec.beq u v = true :=
-      fun u v => ((deceq_beq_iff_eq u.val v.val).trans Subtype.ext_iff.symm).trans (deceq_beq_iff_eq u v).symm
+      fun u v => beq_iff_eq.trans (deceq_beq_iff_eq u v).symm
     have h_inv_f : ∀ d, cut.capSingleVertex_DL d ↔ cut.capSingleVertex_DL (cut.uncoupleTriple.f.f d) := by
       intro d
       have he := cut.capSingleVertex_DL_e (cut.uncoupleTriple.n.f (cut.uncoupleTriple.f.f d))
@@ -5826,7 +5835,7 @@ private theorem nodup_finRange_jcs (m : Nat) : (List.finRange m).Nodup :=
     dsimp at hv
     omega
 
-private theorem FaceCycleCut.capSingleVertexHypermap_node_dual_ring {H : Hypermap} [DecidableEq H.Dart]
+theorem FaceCycleCut.capSingleVertexHypermap_node_dual_ring {H : Hypermap} [DecidableEq H.Dart]
     (darts : List H.Dart) (h_nd : darts.Nodup) (h_all : ∀ d : H.Dart, d ∈ darts)
     (h_planar : H.isPlanar darts.length darts = true)
     (h_conn : H.numComponents darts.length darts = 1)

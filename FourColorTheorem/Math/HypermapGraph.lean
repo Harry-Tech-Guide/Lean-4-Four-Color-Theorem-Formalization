@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Graph
-import FourColorTheorem.Math.Planarity
+module
+
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Graph
+public import FourColorTheorem.Math.Planarity
+
+@[expose] public section
 
 namespace Math
 namespace Hypermap

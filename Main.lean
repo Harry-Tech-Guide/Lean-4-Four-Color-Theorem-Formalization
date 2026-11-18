@@ -1,18 +1,22 @@
-import FourColorTheorem.Math.FourColorTheorem
-import FourColorTheorem.Math.DReductionProof
-import FourColorTheorem.Math.ReducibilityProof
-import FourColorTheorem.Math.EmptyLiveSet
-import FourColorTheorem.Math.Matching
-import FourColorTheorem.Math.KempeConsistencyTheorem
-import FourColorTheorem.Math.KempeConsistency
-import FourColorTheorem.Math.Symmetry
-import FourColorTheorem.Math.Trace
-import FourColorTheorem.Math.Reflection
-import FourColorTheorem.Math.Configuration
-import FourColorTheorem.Math.Kempe
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.Planarity
-import FourColorTheorem.Math.FastReducer
+module
+
+public import FourColorTheorem.Math.FourColorTheorem
+public import FourColorTheorem.Math.DReductionProof
+public import FourColorTheorem.Math.ReducibilityProof
+public import FourColorTheorem.Math.EmptyLiveSet
+public import FourColorTheorem.Math.Matching
+public import FourColorTheorem.Math.KempeConsistencyTheorem
+public import FourColorTheorem.Math.KempeConsistency
+public import FourColorTheorem.Math.Symmetry
+public import FourColorTheorem.Math.Trace
+public import FourColorTheorem.Math.Reflection
+public import FourColorTheorem.Math.Configuration
+public import FourColorTheorem.Math.Kempe
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Planarity
+public import FourColorTheorem.Math.FastReducer
+
+@[expose] public section
 
 open Math.FastReducer
 

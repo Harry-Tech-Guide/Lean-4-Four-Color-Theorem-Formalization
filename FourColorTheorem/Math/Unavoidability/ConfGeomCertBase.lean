@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Unavoidability.FastConfEquiv
+module
+
+public import FourColorTheorem.Math.Unavoidability.FastConfEquiv
+
+@[expose] public section
 
 /-!
 # Certified Configuration Geometric Checkers & Unpacking Lemmas (Stage R.1 Base)
@@ -864,19 +868,19 @@ private theorem natListContains_iff (xs : List Nat) (a : Nat) :
       rw [ih', List.mem_cons]
       exact ⟨Or.inr, fun hm => hm.elim (fun h => absurd h hne) id⟩
 
-private theorem rc_adj_size_eq_n (h : Nat) (hh : h < 633) :
+theorem rc_adj_size_eq_n (h : Nat) (hh : h < 633) :
     (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj.size =
       (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).n := by
   rcases fastConf_equiv_header h hh with ⟨_, _, _, _, hn, _, _, _, _, _, _, hrcadj, _⟩
   dsimp [configOfRConf, Configuration.totalNodes] at hn hrcadj
   omega
 
-private theorem rc_r_pos (h : Nat) (hh : h < 633) :
+theorem rc_r_pos (h : Nat) (hh : h < 633) :
     0 < (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).r := by
   rcases fastConf_equiv_header h hh with ⟨_, _, hr, _, _, hr6, _⟩
   omega
 
-private theorem rc_r_add_int_eq_n (h : Nat) (hh : h < 633) :
+theorem rc_r_add_int_eq_n (h : Nat) (hh : h < 633) :
     (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).r +
       (configOfRConf (parsedRConfList[h]'(parsedRConfList_length ▸ hh))).interiorSize =
       (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).n := by
@@ -884,13 +888,13 @@ private theorem rc_r_add_int_eq_n (h : Nat) (hh : h < 633) :
   dsimp [configOfRConf, Configuration.totalNodes] at hr hn
   omega
 
-private theorem fc_intVerts_len_eq (h : Nat) (hh : h < 633) :
+theorem fc_intVerts_len_eq (h : Nat) (hh : h < 633) :
     (lookupFastConfRec h).intVerts.length =
       (configOfRConf (parsedRConfList[h]'(parsedRConfList_length ▸ hh))).interiorSize := by
   rcases fastConf_equiv_header h hh with ⟨_, _, _, _, _, _, _, _, _, _, hlen, _⟩
   exact hlen
 
-private theorem rc_int_idx_lt_adj_size (h : Nat) (hh : h < 633) {iu : Nat}
+theorem rc_int_idx_lt_adj_size (h : Nat) (hh : h < 633) {iu : Nat}
     (hiu : iu < (configOfRConf (parsedRConfList[h]'(parsedRConfList_length ▸ hh))).interiorSize) :
     (configOfRConf (parsedRConfList[h]'(parsedRConfList_length ▸ hh))).ringSize + iu <
       (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj.size := by
@@ -900,7 +904,7 @@ private theorem rc_int_idx_lt_adj_size (h : Nat) (hh : h < 633) {iu : Nat}
       (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).r := rfl
   omega
 
-private theorem rc_ring_idx_lt_adj_size (h : Nat) (hh : h < 633) {x : Nat}
+theorem rc_ring_idx_lt_adj_size (h : Nat) (hh : h < 633) {x : Nat}
     (hx : x < (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).r) :
     x < (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj.size := by
   have hsz := rc_adj_size_eq_n h hh
@@ -956,7 +960,7 @@ private theorem geom_adjL_spec (h : Nat) (hh : h < 633) :
     have hi : x < ((parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj.toList.map Array.toList).length := by
       rw [hadjlen]; exact hx
     rw [Internal.listGetD_eq_getElem _ _ hi, List.getElem_map]
-    exact congrArg Array.toList (Array.getElem_toList (by omega))
+    exact congrArg Array.toList (Array.getElem_toList (by rw [Array.length_toList, hsz]; exact hx))
   · intro x y hx hy
     have hx' : x < (configOfRConf (parsedRConfList[h]'(parsedRConfList_length ▸ hh))).totalNodes := by
       rw [hn]; exact hx
@@ -969,7 +973,7 @@ private theorem geom_adjL_spec (h : Nat) (hh : h < 633) :
     have hlst : ((parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj.toList[x]'
         (by rw [Array.length_toList, hsz]; exact hx)) =
         (parsedRConfList[h]'(parsedRConfList_length ▸ hh)).adj[x]'(Nat.lt_of_lt_of_eq hx hsz.symm) :=
-      Array.getElem_toList (by omega)
+      Array.getElem_toList (by rw [Array.length_toList, hsz]; exact hx)
     rw [hlst, hceq]
     exact natListContains_iff _ y
 

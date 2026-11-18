@@ -1,3 +1,5 @@
+module
+
 /-
 Stage P.2: All-Degrees Discharging Soundness (RSST 4.5, 4.6, 4.7, 4.8 & Euler-120 Unavoidability).
 
@@ -8,10 +10,14 @@ zero `DischargingTreesVerified` hypotheses) that every complete planar triangula
 degree ≥ 5 (and the dual `H.dual` of any bridgeless cubic planar 5-edge-connected map `H`)
 contains a vertex hub whose oriented cartwheel degree table admits `HasExactReducedAxle`.
 -/
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.Batch.DischargeMaster
-import FourColorTheorem.Math.Unavoidability.HintBounds
-import FourColorTheorem.Math.Unavoidability.Deg56Trees
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Batch.DischargeMaster
+public import FourColorTheorem.Math.Unavoidability.HintBounds
+public import FourColorTheorem.Math.Unavoidability.Deg56Trees
+
+@[expose] public section
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 namespace Math.Unavoidability
 
@@ -155,14 +161,14 @@ theorem cartDegOriented_fan1_s2_eq_out_refl_11_of_deg6 (H : Hypermap) [Decidable
   have hs2_deg : Hypermap.nodeDegree H (H.edge.f (ruleRotInv H (!refl) s)) fuel = 6 := by
     have h_eq : H.edge.f (ruleRotInv H (!refl) s) = ruleVertexDart H (!refl) (H.edge.f s) 3 := by
       dsimp [ruleVertexDart]
-      rw [H.edge_involution]
+      rw [H.edge_involution]; rfl
     rw [h_eq, ← cartDegOriented_2_eq_in H fuel deg refl s h5]
     exact h_s2
   dsimp [cartDegOriented]
   rw [cartDartOriented_fan1 H deg refl s (by omega) (by omega), spokeDartOriented_2,
       ruleVertexDart_refl_11]
   dsimp [ruleVertexDart]
-  rw [fan_deg6_rotInv3_eq_rot3 H darts h_all h_le refl (H.edge.f (ruleRotInv H (!refl) s)) hs2_deg]
+  rw [fan_deg6_rotInv3_eq_rot3 H darts h_all h_le refl (H.edge.f (ruleRotInv H (!refl) s)) hs2_deg]; rfl
 
 private theorem validRuleOutletCompilation_5_all :
     (theRules.all fun r =>
@@ -265,10 +271,10 @@ theorem compileRuleOutlet_sound_deg6 (H : Hypermap) [DecidableEq H.Dart]
       have hm : theRules[5]! = RawRule.mk 11 (6, 6) (6, 12)
           [(3, 6, 6), (5, 6, 6), (9, 5, 6), (11, 5, 5)] true := rfl
       rw [hm]
-      dsimp [ruleVertexDart]
+      dsimp
       have hd6 : degMatchesBound (Hypermap.nodeDegree H s fuel) (6, 6) = true := by
         rw [h_deg]; decide
-      rw [hd6]
+      rw [show ruleVertexDart H (!refl) s 0 = s from rfl, hd6]
       simp only [Bool.true_and, Bool.and_true]
     · have hco : compileRuleOutlet 6 1 false true theRules[5]! =
           some (false, [(1, 6, 12), (2, 6, 6), (3, 6, 6), (8, 5, 6), (14, 5, 5)]) := by decide
@@ -336,10 +342,10 @@ theorem compileRuleOutlet_sound_deg6 (H : Hypermap) [DecidableEq H.Dart]
         have hm : theRules[7]! = RawRule.mk 15 (6, 6) (7, 12)
             [(3, 6, 6), (5, 6, 6), (7, 5, 5), (9, 6, 6), (11, 5, 6)] true := rfl
         rw [hm]
-        dsimp [ruleVertexDart]
+        dsimp
         have hd6 : degMatchesBound (Hypermap.nodeDegree H s fuel) (6, 6) = true := by
           rw [h_deg]; decide
-        rw [hd6]
+        rw [show ruleVertexDart H (!refl) s 0 = s from rfl, hd6]
         simp only [Bool.true_and, Bool.and_true]
       · have hco : compileRuleOutlet 6 1 false true theRules[7]! =
             some (false, [(1, 7, 12), (2, 6, 6), (3, 6, 6), (7, 5, 5), (8, 6, 6), (14, 5, 6)]) := by decide
@@ -435,7 +441,9 @@ theorem compiledOutletsSum_spoke1_eq_netDartShift_of_sound
       rw [hinv] at hpos hneg
       simp only [Bool.false_eq_true, ↓reduceIte, Int.add_zero] at hpos hneg
       rw [← hpos, ← hneg]
-      cases matchesRawRule H fuel (!refl) (H.edge.f s) r <;> cases matchesRawRule H fuel (!refl) s r <;> rfl
+      by_cases h1 : matchesRawRule H fuel (!refl) (H.edge.f s) r = true <;>
+        by_cases h2 : matchesRawRule H fuel (!refl) s r = true <;>
+        (simp [h1, h2]; try omega)
     · dsimp
       rw [compiledOutletsSum_append, compiledOutletsSum_compileRuleOutlet,
           compiledOutletsSum_compileRuleOutlet, h_rule_sound true true r hr,
@@ -446,10 +454,11 @@ theorem compiledOutletsSum_spoke1_eq_netDartShift_of_sound
       rw [hinv] at hpos hneg
       simp only [↓reduceIte] at hpos hneg
       rw [← hpos, ← hneg]
-      cases matchesRawRule H fuel (!refl) (H.edge.f s) r <;>
-        cases matchesRawRule H fuel refl (H.edge.f s) r <;>
-        cases matchesRawRule H fuel (!refl) s r <;>
-        cases matchesRawRule H fuel refl s r <;> decide
+      by_cases h1 : matchesRawRule H fuel (!refl) (H.edge.f s) r = true <;>
+        by_cases h2 : matchesRawRule H fuel refl (H.edge.f s) r = true <;>
+        by_cases h3 : matchesRawRule H fuel (!refl) s r = true <;>
+        by_cases h4 : matchesRawRule H fuel refl s r = true <;>
+        (simp [h1, h2, h3, h4]; try omega)
   have h_fold :
       List.foldl (fun acc r => acc + compiledOutletsSum (cartDegOriented H fuel deg refl s)
         (compileRuleAllOutlets deg 1 r)) 0 theRules =
@@ -536,14 +545,14 @@ theorem activeOutletSum_hub_foldl_eq_orbitNetShift_deg56 (H : Hypermap) [Decidab
       rcases h_deg with h5 | h6
       · have hx5 : x ∈ List.range' 1 5 := by dsimp [deg] at hx_mem; rw [h5] at hx_mem; exact hx_mem
         have h_all5 := List.all_eq_true.mp validCompiledTable_5 x hx5
-        have htbl : tbl = shiftedTable5Lit := by dsimp [tbl, deg]; rw [h5, if_pos rfl]
+        have htbl : tbl = shiftedTable5Lit := by simp [tbl, deg, h5]
         rw [htbl]
         dsimp [deg] at h5 ⊢
         rw [show Hypermap.nodeDegree H u fuel = 5 from h5]
         exact h_all5
       · have hx6 : x ∈ List.range' 1 6 := by dsimp [deg] at hx_mem; rw [h6] at hx_mem; exact hx_mem
         have h_all6 := List.all_eq_true.mp validCompiledTable_6 x hx6
-        have htbl : tbl = shiftedTable6Lit := by dsimp [tbl, deg]; rw [h6, if_neg (by decide)]
+        have htbl : tbl = shiftedTable6Lit := by simp [tbl, deg, h6]
         rw [htbl]
         dsimp [deg] at h6 ⊢
         rw [show Hypermap.nodeDegree H u fuel = 6 from h6]

@@ -1,27 +1,31 @@
-import FourColorTheorem.Math.Batch.CBatch26_R13_Part1
-import FourColorTheorem.Math.Batch.CBatch27_R13_Part2
-import FourColorTheorem.Math.Batch.CBatch28_R13_Part3
-import FourColorTheorem.Math.Batch.CBatch29_R13_Part4
-import FourColorTheorem.Math.Batch.CBatch30_R13_Part5
-import FourColorTheorem.Math.Batch.CBatch31_R13_Part6
-import FourColorTheorem.Math.Batch.CBatch32_R13_Part7
-import FourColorTheorem.Math.Batch.CBatch33_R13_Part8
-import FourColorTheorem.Math.Batch.CBatch34_R13_Part9
-import FourColorTheorem.Math.Batch.CBatch35_R13_Part10
-import FourColorTheorem.Math.Batch.CBatch36_R13_Part11
-import FourColorTheorem.Math.Batch.CBatch37_R13_Part12
-import FourColorTheorem.Math.Batch.CBatch38_R13_Part13
-import FourColorTheorem.Math.Batch.CBatch39_R13_Part14
-import FourColorTheorem.Math.Batch.CBatch40_R13_Part15
-import FourColorTheorem.Math.Batch.CBatch41_R13_Part16
-import FourColorTheorem.Math.Batch.CBatch42_R13_Part17
-import FourColorTheorem.Math.Batch.CBatch43_R13_Part18
-import FourColorTheorem.Math.Batch.CBatch44_R13_Part19
-import FourColorTheorem.Math.Batch.CBatch45_R13_Part20
-import FourColorTheorem.Math.Batch.CBatch46_R13_Part21
-import FourColorTheorem.Math.Batch.CBatch47_R13_Part22
-import FourColorTheorem.Math.Batch.CBatch48_R13_Part23
-import FourColorTheorem.Math.Batch.CBatch49_R13_Part24
+module
+
+public import FourColorTheorem.Math.Batch.CBatch26_R13_Part1
+public import FourColorTheorem.Math.Batch.CBatch27_R13_Part2
+public import FourColorTheorem.Math.Batch.CBatch28_R13_Part3
+public import FourColorTheorem.Math.Batch.CBatch29_R13_Part4
+public import FourColorTheorem.Math.Batch.CBatch30_R13_Part5
+public import FourColorTheorem.Math.Batch.CBatch31_R13_Part6
+public import FourColorTheorem.Math.Batch.CBatch32_R13_Part7
+public import FourColorTheorem.Math.Batch.CBatch33_R13_Part8
+public import FourColorTheorem.Math.Batch.CBatch34_R13_Part9
+public import FourColorTheorem.Math.Batch.CBatch35_R13_Part10
+public import FourColorTheorem.Math.Batch.CBatch36_R13_Part11
+public import FourColorTheorem.Math.Batch.CBatch37_R13_Part12
+public import FourColorTheorem.Math.Batch.CBatch38_R13_Part13
+public import FourColorTheorem.Math.Batch.CBatch39_R13_Part14
+public import FourColorTheorem.Math.Batch.CBatch40_R13_Part15
+public import FourColorTheorem.Math.Batch.CBatch41_R13_Part16
+public import FourColorTheorem.Math.Batch.CBatch42_R13_Part17
+public import FourColorTheorem.Math.Batch.CBatch43_R13_Part18
+public import FourColorTheorem.Math.Batch.CBatch44_R13_Part19
+public import FourColorTheorem.Math.Batch.CBatch45_R13_Part20
+public import FourColorTheorem.Math.Batch.CBatch46_R13_Part21
+public import FourColorTheorem.Math.Batch.CBatch47_R13_Part22
+public import FourColorTheorem.Math.Batch.CBatch48_R13_Part23
+public import FourColorTheorem.Math.Batch.CBatch49_R13_Part24
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

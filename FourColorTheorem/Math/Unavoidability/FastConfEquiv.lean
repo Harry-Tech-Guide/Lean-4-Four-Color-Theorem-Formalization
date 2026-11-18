@@ -1,19 +1,25 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBase
-import FourColorTheorem.Math.Unavoidability.FastConfEquivData
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk0
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk1
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk2
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk3
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk4
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk5
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk6
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk7
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk8
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk9
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBase
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivData
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk0
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk1
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk2
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk3
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk4
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk5
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk6
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk7
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk8
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBlk9
+
+@[expose] public section
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 /-!
 # Stage P.3: 633-Configuration `FastConf` ↔ `RConf` Equivalence & Contract Safety

@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.CheckerSoundness.InitialLiveProof
-import FourColorTheorem.Math.CheckerSoundness.BuildSMDataSoundness
-import FourColorTheorem.Math.Soundness.ContractSoundness
+module
+
+public import FourColorTheorem.Math.CheckerSoundness.InitialLiveProof
+public import FourColorTheorem.Math.CheckerSoundness.BuildSMDataSoundness
+public import FourColorTheorem.Math.Soundness.ContractSoundness
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness

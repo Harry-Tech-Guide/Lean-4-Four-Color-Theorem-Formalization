@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Topology.Paths
-import FourColorTheorem.Math.Topology.KempeTopology
-import FourColorTheorem.Math.Topology.Surgery
+module
+
+public import FourColorTheorem.Math.Topology.Paths
+public import FourColorTheorem.Math.Topology.KempeTopology
+public import FourColorTheorem.Math.Topology.Surgery
+
+@[expose] public section
 
 namespace Hypermap
 

@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.Topology.Genus
+module
+
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Topology.Genus
+
+@[expose] public section
 
 /-!
 # Minimal Counterexample Primal Properties (`T.1`)

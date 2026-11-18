@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Coloring
-import FourColorTheorem.Math.Kempe
-import FourColorTheorem.Math.Topology.Paths
+module
+
+public import FourColorTheorem.Math.Coloring
+public import FourColorTheorem.Math.Kempe
+public import FourColorTheorem.Math.Topology.Paths
+
+@[expose] public section
 
 open Classical
 

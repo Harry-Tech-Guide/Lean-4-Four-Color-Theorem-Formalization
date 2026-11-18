@@ -1,4 +1,8 @@
-import FiveColorTheorem.Graph
+module
+
+public import FiveColorTheorem.Graph
+
+@[expose] public section
 
 namespace Math
 

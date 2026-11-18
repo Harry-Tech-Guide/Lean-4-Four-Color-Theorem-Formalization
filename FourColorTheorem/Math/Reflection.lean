@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Configuration
-import FourColorTheorem.Math.FastReducer
+module
+
+public import FourColorTheorem.Math.Configuration
+public import FourColorTheorem.Math.FastReducer
+
+@[expose] public section
 
 namespace FourColorTheorem
 

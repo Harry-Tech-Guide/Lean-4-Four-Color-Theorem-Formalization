@@ -1,11 +1,15 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.OrbitLemmas
-import FourColorTheorem.Math.Topology.Euler
-import FourColorTheorem.Math.Topology.Paths
-import FourColorTheorem.Math.Topology.Jordan
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+public import FourColorTheorem.Math.Topology.Euler
+public import FourColorTheorem.Math.Topology.Paths
+public import FourColorTheorem.Math.Topology.Jordan
+
+@[expose] public section
 
 /-!
 # Connected Components, Walk Equivalence, and Dual Planarity (`ComponentLemmas`)

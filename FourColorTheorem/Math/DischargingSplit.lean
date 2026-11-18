@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.DischargingAlgo
-import FourColorTheorem.Math.KernelRfl
+module
+
+public import FourColorTheorem.Math.DischargingAlgo
+public import FourColorTheorem.Math.KernelRfl
+
+@[expose] public section
 
 namespace Math.Discharging
 

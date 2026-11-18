@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.OrbitLemmas
-import FourColorTheorem.Math.HypermapGraph
+module
+
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+public import FourColorTheorem.Math.HypermapGraph
+
+@[expose] public section
 
 namespace Hypermap
 

@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.CheckerSoundness.StructuralChecks
-import FourColorTheorem.Math.CheckerSoundness.IterationProof
+module
+
+public import FourColorTheorem.Math.CheckerSoundness.StructuralChecks
+public import FourColorTheorem.Math.CheckerSoundness.IterationProof
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness
@@ -47,11 +51,14 @@ def relabelDigit (θ : ColorPairing) (d : Nat) : Nat :=
 /-- For any two distinct colors `col1 ≠ col2`, the edge digit of `(relabelColor θ col1, relabelColor θ col2)`
     equals `relabelDigit θ` applied to the edge digit of `(col1, col2)`. -/
 theorem edge_digit_relabel (θ : ColorPairing) (col1 col2 : Color) (h_ne : col1 ≠ col2) :
-    (let diff' := (relabelColor θ col1).toNat ^^^ (relabelColor θ col2).toNat
-     if diff' > 0 then diff' - 1 else 0) =
-    relabelDigit θ (let diff := col1.toNat ^^^ col2.toNat; if diff > 0 then diff - 1 else 0) := by
-  dsimp [relabelColor, relabelDigit]
-  cases θ.a <;> cases θ.b <;> cases col1 <;> cases col2 <;> revert h_ne <;> decide
+    (if (relabelColor θ col1).toNat ^^^ (relabelColor θ col2).toNat > 0 then
+      ((relabelColor θ col1).toNat ^^^ (relabelColor θ col2).toNat) - 1 else 0) =
+    relabelDigit θ (if col1.toNat ^^^ col2.toNat > 0 then (col1.toNat ^^^ col2.toNat) - 1 else 0) := by
+  have hx : (if col1.toNat ^^^ col2.toNat > 0 then (col1.toNat ^^^ col2.toNat) - 1 else 0) + 1 =
+      col1.toNat ^^^ col2.toNat := by
+    cases col1 <;> cases col2 <;> first | rfl | exact False.elim (h_ne rfl)
+  dsimp [relabelDigit]
+  rw [relabelColor_xor θ col1 col2, hx]
 
 /-- At `p = id`, `permTraceAux` coincides with `boundaryTraceAux`. -/
 theorem permTraceAux_id (r : Nat) (b : Nat → Color) (pow3 : Array Nat) (rem i acc : Nat) :
@@ -78,8 +85,13 @@ theorem boundaryTraceAux_relabel (c : Configuration) (h_ring : IsRingCycle c)
       Nat.mod_lt (i + 1) (by have := h_ring.1; omega)
     have h_adj : c.adj i ((i + 1) % c.ringSize) = true := h_ring.2 i hi
     have h_ne : b i ≠ b ((i + 1) % c.ringSize) := hb i ((i + 1) % c.ringSize) hi h_nxt h_adj
-    dsimp [boundaryTraceAux, permTraceAux, relabelBoundary]
-    rw [edge_digit_relabel θ (b i) (b ((i + 1) % c.ringSize)) h_ne]
+    simp only [boundaryTraceAux, permTraceAux]
+    have hed : (if (relabelBoundary θ b i).toNat ^^^ (relabelBoundary θ b ((i + 1) % c.ringSize)).toNat > 0 then
+        ((relabelBoundary θ b i).toNat ^^^ (relabelBoundary θ b ((i + 1) % c.ringSize)).toNat) - 1 else 0) =
+      relabelDigit θ (if (b i).toNat ^^^ (b ((i + 1) % c.ringSize)).toNat > 0 then
+        ((b i).toNat ^^^ (b ((i + 1) % c.ringSize)).toNat) - 1 else 0) :=
+      edge_digit_relabel θ (b i) (b ((i + 1) % c.ringSize)) h_ne
+    rw [hed]
     exact ih (i + 1) _ (by omega)
 
 /-- **Theorem B1 (`boundaryTrace_relabel`):**
@@ -173,10 +185,9 @@ theorem smFitTree_flipBits (sm : SMData) (fuel k t acc : Nat) :
     by_cases hk : k ≥ sm.p
     · rw [if_pos hk, if_pos hk]
     · rw [if_neg hk, if_neg hk]
-      dsimp [flipBits]
-      cases hbit : ((t &&& 1) == 0) with
-      | true =>
-        rw [if_pos rfl]
+      simp only [flipBits]
+      by_cases hbit : ((t &&& 1) == 0) = true
+      · simp only [hbit, ↓reduceIte]
         have h_and : ((2 * flipBits fuel (t >>> 1) + 1) &&& 1 == 0) = false := by
           rw [Nat.and_one_is_mod]
           simp
@@ -184,12 +195,10 @@ theorem smFitTree_flipBits (sm : SMData) (fuel k t acc : Nat) :
           rw [Nat.shiftRight_eq_div_pow]
           change (2 * flipBits fuel (t >>> 1) + 1) / 2 = flipBits fuel (t >>> 1)
           omega
-        rw [h_and]
-        dsimp
-        rw [h_shr]
+        simp only [h_and, Bool.false_eq_true, ↓reduceIte, h_shr]
         exact ih (k + 1) (t >>> 1) (acc + sm.b[k]!)
-      | false =>
-        rw [if_neg Bool.noConfusion]
+      · have hbf : ((t &&& 1) == 0) = false := Bool.eq_false_iff.mpr hbit
+        simp only [hbf, Bool.false_eq_true, ↓reduceIte]
         have h_and : ((2 * flipBits fuel (t >>> 1)) &&& 1 == 0) = true := by
           rw [Nat.and_one_is_mod]
           simp

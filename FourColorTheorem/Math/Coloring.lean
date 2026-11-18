@@ -1,5 +1,9 @@
+module
 
-import FourColorTheorem.Math.Hypermap
+
+public import FourColorTheorem.Math.Hypermap
+
+@[expose] public section
 
 -- Step 3: Map Coloring
 

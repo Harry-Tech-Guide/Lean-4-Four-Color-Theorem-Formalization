@@ -1,10 +1,14 @@
-import FourColorTheorem.Math.Batch.CBatch05_R11_Part1
-import FourColorTheorem.Math.Batch.CBatch06_R11_Part2
-import FourColorTheorem.Math.Batch.CBatch07_R11_Part3
-import FourColorTheorem.Math.Batch.CBatch08_R11_Part4
-import FourColorTheorem.Math.Batch.CBatch09_R11_Part5
-import FourColorTheorem.Math.Batch.CBatch10_R11_Part6
-import FourColorTheorem.Math.Batch.CBatch11_R11_Part7
+module
+
+public import FourColorTheorem.Math.Batch.CBatch05_R11_Part1
+public import FourColorTheorem.Math.Batch.CBatch06_R11_Part2
+public import FourColorTheorem.Math.Batch.CBatch07_R11_Part3
+public import FourColorTheorem.Math.Batch.CBatch08_R11_Part4
+public import FourColorTheorem.Math.Batch.CBatch09_R11_Part5
+public import FourColorTheorem.Math.Batch.CBatch10_R11_Part6
+public import FourColorTheorem.Math.Batch.CBatch11_R11_Part7
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

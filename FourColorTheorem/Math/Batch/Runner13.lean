@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Batch.Runner
+module
+
+public import FourColorTheorem.Math.Batch.Runner
+
+@[expose] public section
 
 namespace Math
 namespace Batch

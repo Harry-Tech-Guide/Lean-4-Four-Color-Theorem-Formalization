@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Soundness.Representation
-import FourColorTheorem.Math.CheckerSoundness.InitialLive
+module
+
+public import FourColorTheorem.Math.Soundness.Representation
+public import FourColorTheorem.Math.CheckerSoundness.InitialLive
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness

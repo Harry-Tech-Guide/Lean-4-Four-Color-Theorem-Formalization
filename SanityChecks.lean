@@ -1,35 +1,33 @@
-import Challenge
-import ConditionalBridge
+module
+
+public import Challenge
+
+@[expose] public section
 
 /-!
 # Semantic Non-Vacuity & Sharpness Sanity Checks (`SanityChecks.lean`)
 
 This standalone verification module proves four semantic sanity checks confirming
 that the hypermap, planarity, and coloring definitions in `Challenge.lean` / `Solution.lean`
-are neither vacuously false on the left of the implication nor trivially true on the right (checks 1-4),
-and records an honest audit fact about the legacy conditional bridge (check 5):
+are neither vacuously false on the left of the implication nor trivially true on the right:
 
 1. **Non-Vacuity of Planarity (Existence):**
    Explicit construction of the tetrahedral planar triangulation `K4_hypermap` ($K_4$ on 12 darts,
    4 vertices, 6 edges, 4 triangular faces) and constructive proof that it satisfies
-   `Math.IsCompleteDarts`, `Math.IsPlanar`, `Math.Hypermap.isBridgeless`, and `Nonempty (Math.MapColoring K4_hypermap)`.
+   `Spec.IsCompleteDarts`, `Spec.IsPlanar`, `Spec.Hypermap.isBridgeless`, and `Nonempty (Spec.MapColoring K4_hypermap)`.
 2. **Non-Triviality of Planarity (Exclusion):**
    Explicit construction of the complete graph $K_5$ as a 20-dart hypermap `K5_hypermap` (5 vertices,
-   10 edges connecting all vertex pairs) and proof that `¬ Math.IsPlanar K5_hypermap K5_darts`,
+   10 edges connecting all vertex pairs) and proof that `¬ Spec.IsPlanar K5_hypermap K5_darts`,
    together with Euler's triangulation edge bound $E \le 3V - 6$.
 3. **Sharpness of Coloring (3-Color Counterexample):**
    Parameterized $k$-coloring definitions `VertexColoringK` and `FaceColoringK` (proven equivalent
-   to `Hypermap.VertexColoring` and `Math.MapColoring` at $k = 4$), and proof that the planar
+   to `Spec.Hypermap.VertexColoring` and `Spec.MapColoring` at $k = 4$), and proof that the planar
    tetrahedron `K4_hypermap` is NOT 3-colorable (`¬ Nonempty (VertexColoringK K4_hypermap 3)` and
    `¬ Nonempty (FaceColoringK K4_hypermap 3)`).
 4. **Sharpness of Coloring (4-Color Non-Planar Counterexample):**
    Proof that the non-planar hypermap `K5_hypermap` is NOT 4-colorable
-   (`¬ Nonempty (Hypermap.VertexColoring K5_hypermap)` and
-   `¬ Nonempty (Math.MapColoring K5_hypermap.dual)`).
-5. **Audit of the legacy conditional bridge (`bridge_iff_no_mc`):**
-   `Spec.ValidRSSTCertificateSuite` is satisfiable by trivial data, hence
-   `Spec.RSSTStandardizationBridge` is *equivalent* to ``no minimal counterexample exists''. The
-   conditional theorem in `ConditionalSolution.lean` is therefore not an independent result.
+   (`¬ Nonempty (Spec.Hypermap.VertexColoring K5_hypermap)` and
+   `¬ Nonempty (Spec.MapColoring K5_hypermap.dual)`).
 -/
 
 namespace SanityChecks
@@ -188,7 +186,7 @@ theorem k4_face_left_inv : ∀ d : Fin 12, k4FaceInv (k4FaceFun d) = d := by dec
 theorem k4_face_right_inv : ∀ d : Fin 12, k4FaceFun (k4FaceInv d) = d := by decide
 theorem k4_enf_id : ∀ d : Fin 12, k4EdgeFun (k4NodeFun (k4FaceFun d)) = d := by decide
 
-def K4_hypermap : Spec.Hypermap where
+abbrev K4_hypermap : Spec.Hypermap where
   Dart := Fin 12
   edge := { f := k4EdgeFun, inv := k4EdgeFun, left_inv := k4_edge_inv, right_inv := k4_edge_inv }
   node := { f := k4NodeFun, inv := k4NodeInv, left_inv := k4_node_left_inv, right_inv := k4_node_right_inv }
@@ -206,9 +204,11 @@ def K4_darts : List K4_hypermap.Dart :=
 /-- Check 1a: `K4_darts` is a complete, duplicate-free dart enumeration for `K4_hypermap`. -/
 theorem k4_is_complete_darts : Spec.IsCompleteDarts K4_hypermap K4_darts := by
   refine ⟨by decide, ?_, by decide⟩
-  intro (d : Fin 12)
-  revert d
-  decide
+  intro (⟨v, hv⟩ : Fin 12)
+  match v with
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 =>
+    simp [K4_darts]
+  | _ + 12 => omega
 
 /-- Check 1b (Non-Vacuity of Planarity): `K4_hypermap` satisfies `Spec.IsPlanar` ($V - E + F = 4 - 6 + 4 = 2$). -/
 theorem k4_is_planar : Spec.IsPlanar K4_hypermap K4_darts := by
@@ -328,7 +328,7 @@ theorem k5_face_left_inv : ∀ d : Fin 20, k5FaceInv (k5FaceFun d) = d := by dec
 theorem k5_face_right_inv : ∀ d : Fin 20, k5FaceFun (k5FaceInv d) = d := by decide
 theorem k5_enf_id : ∀ d : Fin 20, k5EdgeFun (k5NodeFun (k5FaceFun d)) = d := by decide
 
-def K5_hypermap : Spec.Hypermap where
+abbrev K5_hypermap : Spec.Hypermap where
   Dart := Fin 20
   edge := { f := k5EdgeFun, inv := k5EdgeFun, left_inv := k5_edge_inv, right_inv := k5_edge_inv }
   node := { f := k5NodeFun, inv := k5NodeInv, left_inv := k5_node_left_inv, right_inv := k5_node_right_inv }
@@ -346,9 +346,11 @@ def K5_darts : List K5_hypermap.Dart :=
 
 theorem k5_is_complete_darts : Spec.IsCompleteDarts K5_hypermap K5_darts := by
   refine ⟨by decide, ?_, by decide⟩
-  intro (d : Fin 20)
-  revert d
-  decide
+  intro (⟨v, hv⟩ : Fin 20)
+  match v with
+  | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 =>
+    simp [K5_darts]
+  | _ + 20 => omega
 
 theorem k5_is_bridgeless : Spec.Hypermap.isBridgeless K5_hypermap K5_darts := by
   unfold Spec.Hypermap.isBridgeless
@@ -554,28 +556,5 @@ theorem k5_dual_not_4_map_colorable : ¬ Nonempty (Spec.MapColoring K5_hypermap.
     edge_proper := fc.edge_proper
   }
   exact k5_not_4_vertex_colorable ⟨hvc⟩
-
-/-!
-## 5. Audit: the legacy conditional bridge is equivalent to the absence of minimal counterexamples
--/
-
-/-- Trivial data satisfies the certificate-suite specification: no real certificates are needed. -/
-theorem trivial_suite_valid :
-    Spec.ValidRSSTCertificateSuite 633 (fun _ => 4) (fun _ => true) (fun _ => true) True
-      (fun _ _ _ _ => 0) :=
-  ⟨rfl, fun _ _ => Nat.le_refl 4, fun _ _ => Or.inl rfl, trivial, fun _ _ _ _ => rfl⟩
-
-/-- Check 5: `Spec.RSSTStandardizationBridge` is literally equivalent to "no minimal counterexample
-    exists", i.e. (by well-founded descent) to the Four Color Theorem itself. -/
-theorem bridge_iff_no_mc :
-    Spec.RSSTStandardizationBridge ↔
-      ∀ (H : Spec.Hypermap) [DecidableEq H.Dart] (darts : List H.Dart),
-        Spec.MinimalCounterexample H darts → False := by
-  constructor
-  · intro h H _ darts mc
-    exact h 633 (fun _ => 4) (fun _ => true) (fun _ => true) True (fun _ _ _ _ => 0)
-      trivial_suite_valid H darts mc
-  · intro h _ _ _ _ _ _ _ H _ darts mc
-    exact h H darts mc
 
 end SanityChecks

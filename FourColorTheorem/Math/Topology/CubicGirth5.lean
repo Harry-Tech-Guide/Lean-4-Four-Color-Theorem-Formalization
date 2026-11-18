@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
-import FourColorTheorem.Math.Topology.PlanarKempe
+module
+
+public import FourColorTheorem.Math.Topology.MinimalCounterexamplePrimal
+public import FourColorTheorem.Math.Topology.PlanarKempe
+
+@[expose] public section
 
 /-!
 # Cubic & Girth >= 5 Properties of a Minimal Counterexample (`T.2`)
@@ -1117,7 +1121,7 @@ theorem mc_nodeDegree_eq_three (H : Hypermap) [DecidableEq H.Dart] (darts : List
     · exact h_nfa12 (sameOrbit_trans H.face ha1_sym (toH hc2))
   have h_se : ∀ w, H_s.edge.f w = H.edge.f w := fun _ => rfl
   have he1 : H_s.edge.f a1 = H.edge.f a1 := rfl
-  have he2 : H_s.edge.f (H_s.node.f a1) = H.edge.f a2 := by rw [h_sn_a1_val]; rfl
+  have he2 : H_s.edge.f (H_s.node.f a1) = H.edge.f a2 := by rw [h_sn_a1_val]
   have h_sw_fval : ∀ v : H.Dart,
       H_s.face.f (swapFun a1 (H_s.edge.f (H_s.node.f a1))
         (swapFun (H_s.node.f a1) (H_s.edge.f a1) v)) =
@@ -2851,7 +2855,6 @@ private theorem quad_H02_disconnected_of_F0_eq_F2 (H : Hypermap) [DecidableEq H.
     rw [dif_neg z.val.property]
     have hzx : (⟨z.val.val, z.val.property⟩ : H1.Dart) = z.val := rfl
     rw [dif_neg (by simpa [hzx] using z.property)]
-    rfl
   have h_four : ∀ a b : H02.Dart,
       (a = b3'' ∨ a = d1'' ∨ a = b1'' ∨ a = d3'') →
       (b = b3'' ∨ b = d1'' ∨ b = b1'' ∨ b = d3'') →
@@ -3592,7 +3595,6 @@ private theorem quad_K5_contradiction (H : Hypermap) [DecidableEq H.Dart] (darts
       (sameOrbit_symm_of_complete H.face darts h_mc.complete (h_cls_to_rep i y hy))
     refine reachENIn_dual_node_of_sameOrbit_face H (fun z => cls z = some i) ?_ hx hxy
     intro z
-    dsimp only
     rw [h_cls_face z]
   -- Adjacent outer face cross-edges via `node_edge_of_face_step`:
   have hstep0 := node_edge_of_face_step H darts h_mc d0

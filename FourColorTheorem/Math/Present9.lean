@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.ProofTree
+module
+
+public import FourColorTheorem.Math.ProofTree
+
+@[expose] public section
 
 namespace Math
 namespace Discharging

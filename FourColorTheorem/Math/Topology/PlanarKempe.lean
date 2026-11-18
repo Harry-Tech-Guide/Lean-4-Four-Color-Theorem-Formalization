@@ -1,18 +1,22 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Planarity
-import FourColorTheorem.Math.Kempe
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Topology.OrbitLemmas
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.Euler
-import FourColorTheorem.Math.Topology.ComponentLemmas
-import FourColorTheorem.Math.Topology.SubtypeSurgery
-import FourColorTheorem.Math.Topology.Genus
-import FourColorTheorem.Math.Topology.K5Obstruction
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Planarity
+public import FourColorTheorem.Math.Kempe
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.Euler
+public import FourColorTheorem.Math.Topology.ComponentLemmas
+public import FourColorTheorem.Math.Topology.SubtypeSurgery
+public import FourColorTheorem.Math.Topology.Genus
+public import FourColorTheorem.Math.Topology.K5Obstruction
+
+@[expose] public section
 
 /-!
 # Stage S.3 (Part 2): Planar Kempe-Chain Non-Crossing & Boundary Partition Pullback
@@ -383,17 +387,22 @@ def WalkENIn.ofSameOrbit {D : Type} (e n : Perm D) (P : D → Prop)
     (hP : ∀ z, P (n.f z) ↔ P z) (x : D) (hx : P x) :
     ∀ k : Nat, WalkENIn e n P x (Perm.iter n k x)
   | 0 => .refl hx
-  | k + 1 => by
-    rw [perm_iter_succ_left]
-    have w := WalkENIn.ofSameOrbit e n P hP x hx k
-    exact .n_fwd w ((hP _).mpr (walkENIn_right w))
+  | k + 1 =>
+    Eq.mp (congrArg (WalkENIn e n P x) (perm_iter_succ_left n k x).symm)
+      (.n_fwd (WalkENIn.ofSameOrbit e n P hP x hx k)
+        ((hP _).mpr (walkENIn_right (WalkENIn.ofSameOrbit e n P hP x hx k))))
 
 theorem WalkENIn.eLen_ofSameOrbit {D : Type} (e n : Perm D) (P : D → Prop)
     (hP : ∀ z, P (n.f z) ↔ P z) (x : D) (hx : P x) (k : Nat) :
     (WalkENIn.ofSameOrbit e n P hP x hx k).eLen = 0 := by
+  have hcast : ∀ {a b : D} (heq : a = b) (w : WalkENIn e n P x a),
+      (Eq.mp (congrArg (WalkENIn e n P x) heq) w).eLen = w.eLen := by
+    rintro _ _ rfl _; rfl
   induction k with
   | zero => rfl
-  | succ k ih => simpa [WalkENIn.ofSameOrbit, WalkENIn.eLen] using ih
+  | succ k ih =>
+    dsimp only [WalkENIn.ofSameOrbit]
+    exact (hcast (perm_iter_succ_left n k x).symm _).trans ih
 
 theorem nonempty_walkENIn_iff_reachENIn {D : Type} {e n : Perm D} {P : D → Prop} {x y : D} :
     Nonempty (WalkENIn e n P x y) ↔ ReachENIn e n P x y := by
@@ -605,7 +614,6 @@ theorem isPlanar_dual (H : Hypermap) [DecidableEq H.Dart] (darts : List H.Dart)
   have hd := (eulerChar_le_two_mul_numComponents H.dual darts h_nodup h_all h_len).2
   have hp := (eulerChar_le_two_mul_numComponents H darts h_nodup h_all h_len).2
   rw [hd, hp, genusDeficit_dual_eq H darts h_all h_len]
-  rfl
 
 end WalksAndDual
 
@@ -635,7 +643,7 @@ def splitVertexTriple {D : Type} [DecidableEq D] (T : PermTriple D) (d_a d_b : D
     exact T.enf_id x
 
 /-- 1-step vertex/face split on a `Hypermap`. -/
-def splitVertexAtPair (H : Hypermap) [DecidableEq H.Dart] (d_a d_b : H.Dart) : Hypermap where
+abbrev splitVertexAtPair (H : Hypermap) [DecidableEq H.Dart] (d_a d_b : H.Dart) : Hypermap where
   Dart := H.Dart
   edge := H.edge
   node := swapCompRight H.node d_a d_b
@@ -700,7 +708,7 @@ theorem reachEN_splitVertexTriple_imp {D : Type} [DecidableEq D]
         exact reachEN_trans _ _ ⟨.step (.n_bwd u) (.refl _)⟩ (hswap (T.n.inv u))
     exact reachEN_trans _ _ huv ih
 
-private def MergeEN {D : Type} (e n : Perm D) (d_a d_b x y : D) : Prop :=
+def MergeEN {D : Type} (e n : Perm D) (d_a d_b x y : D) : Prop :=
   ReachEN e n x y ∨ ((ReachEN e n x d_a ∨ ReachEN e n x d_b) ∧ (ReachEN e n y d_a ∨ ReachEN e n y d_b))
 
 private theorem mergeEN_refl {D : Type} (e n : Perm D) (d_a d_b x : D) :
@@ -1464,7 +1472,9 @@ theorem addFaceApex4_darts_complete (H : Hypermap) [DecidableEq H.Dart]
     cases x with
     | inl d => exact List.mem_append.mpr (.inl (List.mem_map.mpr ⟨d, h_all d, rfl⟩))
     | inr k => exact List.mem_append.mpr (.inr (List.mem_map.mpr ⟨k, h8_mem k, rfl⟩))
-  · simp [darts', fin8Darts]
+  · change (List.map (@Sum.inl H.Dart (Fin 8)) darts ++ List.map (@Sum.inr H.Dart (Fin 8)) fin8Darts).length = _
+    rw [List.length_append, List.length_map, List.length_map]
+    rfl
 
 theorem addFaceApex4_edge_free (H : Hypermap) [DecidableEq H.Dart]
     (c : Fin 4 → H.Dart) (hc_inj : ∀ i j : Fin 4, c i = c j → i = j)
@@ -1847,7 +1857,7 @@ theorem isPlanar_addFaceApex4 (H : Hypermap) [DecidableEq H.Dart]
       induction k generalizing d with
       | zero => rfl
       | succ k ih =>
-        rw [Perm.iter_succ_right, Perm.iter_succ_right]
+        rw [Perm.iter_succ_right H'.face k (Sum.inl d : H'.Dart), Perm.iter_succ_right H.face k d]
         have hfd : ¬ SameOrbit H.face (c 0) (H.face.f d) := fun h =>
           hd (sameOrbit_trans H.face h (sameOrbit_symm_of_complete H.face darts h_all (sameOrbit_step H.face rfl)))
         have hci : cornerIdx c (H.face.f d) = none := cornerIdx_eq_none_iff.mpr (fun m heq => by
@@ -2628,7 +2638,7 @@ theorem exists_min_hit_lt {D : Type} (p : Perm D) (d0 d1 : D)
     ∃ t0 : Nat, t0 < k ∧ Q (Perm.iter p (t0 + 1) d0) ∧ ∀ t, t ≤ t0 → ¬ Q (Perm.iter p t d0) := by
   have hk_eq : Perm.iter p (1 + (k - 1)) d0 = d1 := by rwa [show 1 + (k - 1) = k by omega]
   obtain ⟨r, hr⟩ := firstIndexRel_some_of_hit (fun t => Q (Perm.iter p t d0)) k 1 (k - 1) (by omega)
-    (by dsimp only; rw [hk_eq]; exact h_hit)
+    (by rw [hk_eq]; exact h_hit)
   obtain ⟨hr1, hr2, hrP, hr_min⟩ := firstIndexRel_spec (fun t => Q (Perm.iter p t d0)) k 1 r hr
   refine ⟨r - 1, by omega, by rwa [show r - 1 + 1 = r by omega], fun t ht => ?_⟩
   cases t with
@@ -3413,7 +3423,6 @@ theorem alternating_walks_intersect_of_cyclic_face (H : Hypermap) [DecidableEq H
                 intro Q hQn hQcls hQ
                 exact WalkENIn.reachENIn_liftAddApex4 c hc_inj hQn
                   (fun z => cls z = some i) hQcls (fun k hk => by
-                    dsimp only
                     simp only [cls, dif_pos k.isLt]
                     exact (hcls_ck k).symm.trans (hQcls (c k) hk)) hQ
               match h_iv : i.val, hi4 with
@@ -3594,16 +3603,19 @@ theorem alternating_walks_intersect_of_cyclic_face (H : Hypermap) [DecidableEq H
           have heq : H'.edge.f (.inl (H.edge.f u3)) = .inl u3 := by
             change (addApex4E H).f (.inl (H.edge.f u3)) = .inl u3
             exact congrArg Sum.inl (H.edge_involution u3)
+          change cls (H'.edge.f (.inl (H.edge.f u3))) = _
           rw [heq]; exact hcls_B3 u3 ⟨t3, Nat.le_refl _, sameOrbit_refl H.node u3⟩
         | 0, _, 2, _ =>
           have heq : H'.edge.f (.inl m1) = .inl m1' := by
             change (addApex4E H).f (.inl m1) = .inl m1'
             exact congrArg Sum.inl hm1_info.2.2.2.2
+          change cls (H'.edge.f (.inl m1)) = _
           rw [heq]; exact hcls_B2 m1' ⟨0, Nat.zero_le _, hm1_info.2.2.2.1⟩
         | 1, _, 3, _ =>
           have heq : H'.edge.f (.inl m2) = .inl m2' := by
             change (addApex4E H).f (.inl m2) = .inl m2'
             exact congrArg Sum.inl hm2_info.2.2.2.2
+          change cls (H'.edge.f (.inl m2)) = _
           rw [heq]; exact hcls_B3 m2' ⟨0, Nat.zero_le _, hm2_info.2.2.2.1⟩
         | 0, _, 4, _ => rfl
         | 1, _, 4, _ => rfl

@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.DischargingAlgo
+module
+
+public import FourColorTheorem.Math.DischargingAlgo
+
+@[expose] public section
 
 namespace Math.Discharging
 

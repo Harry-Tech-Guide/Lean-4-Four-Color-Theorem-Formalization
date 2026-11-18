@@ -1,3 +1,7 @@
+module
+
+@[expose] public section
+
 namespace Math.Discharging
 
 structure FastPosOut where

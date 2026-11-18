@@ -1,4 +1,8 @@
-import FiveColorTheorem.Planar
+module
+
+public import FiveColorTheorem.Planar
+
+@[expose] public section
 
 namespace Math
 

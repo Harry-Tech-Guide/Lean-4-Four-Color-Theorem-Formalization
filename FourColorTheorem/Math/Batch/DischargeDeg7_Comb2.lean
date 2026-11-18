@@ -1,13 +1,17 @@
-import FourColorTheorem.Math.TestDischarging
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.DischargingSplit
-import FourColorTheorem.Math.Batch.DischargeDeg7_Defs
-import FourColorTheorem.Math.Batch.DischargeDeg7_Part1
-import FourColorTheorem.Math.Batch.DischargeDeg7_Part2
-import FourColorTheorem.Math.Batch.DischargeDeg7_Part3
-import FourColorTheorem.Math.Batch.DischargeDeg7_Part4
-import FourColorTheorem.Math.Batch.DischargeDeg7_Part5
-import FourColorTheorem.Math.Batch.DischargeDeg7_Comb1
+module
+
+public import FourColorTheorem.Math.TestDischarging
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.DischargingSplit
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Defs
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Part1
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Part2
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Part3
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Part4
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Part5
+public import FourColorTheorem.Math.Batch.DischargeDeg7_Comb1
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

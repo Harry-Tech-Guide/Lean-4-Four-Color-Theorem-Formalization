@@ -1,13 +1,17 @@
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Discharging
-import FourColorTheorem.Math.Rules
-import FourColorTheorem.Math.MainTheorem
-import FourColorTheorem.Math.Unavoidability.HintBounds
-import FourColorTheorem.Math.Unavoidability.AllDegreesDischarge
-import FourColorTheorem.Math.Unavoidability.FastConfEquiv
-import FourColorTheorem.Math.Unavoidability.ConfGeomCert
-import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
-import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+module
+
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Discharging
+public import FourColorTheorem.Math.Rules
+public import FourColorTheorem.Math.MainTheorem
+public import FourColorTheorem.Math.Unavoidability.HintBounds
+public import FourColorTheorem.Math.Unavoidability.AllDegreesDischarge
+public import FourColorTheorem.Math.Unavoidability.FastConfEquiv
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCert
+public import FourColorTheorem.Math.Unavoidability.CheckIsoSoundness
+public import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+
+@[expose] public section
 
 namespace Math
 

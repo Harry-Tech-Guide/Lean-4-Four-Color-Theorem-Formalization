@@ -1,7 +1,11 @@
-import FourColorTheorem.Math.Batch.Runner
-import FourColorTheorem.Math.Batch.Batch01_R6to9
-import FourColorTheorem.Math.Batch.Batch02_R10_Part1
-import FourColorTheorem.Math.Batch.Batch03_R10_Part2
+module
+
+public import FourColorTheorem.Math.Batch.Runner
+public import FourColorTheorem.Math.Batch.Batch01_R6to9
+public import FourColorTheorem.Math.Batch.Batch02_R10_Part1
+public import FourColorTheorem.Math.Batch.Batch03_R10_Part2
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

@@ -1,5 +1,9 @@
-import FourColorTheorem.Math.KernelSoundness.KernelInitialSoundness
-import FourColorTheorem.Math.CheckerSoundness.BuildSMDataSoundness
+module
+
+public import FourColorTheorem.Math.KernelSoundness.KernelInitialSoundness
+public import FourColorTheorem.Math.CheckerSoundness.BuildSMDataSoundness
+
+@[expose] public section
 
 namespace Math
 namespace KernelSoundness
@@ -12,6 +16,8 @@ open CheckerSoundness
 
 set_option linter.unusedVariables false
 set_option linter.constructorNameAsVariable false
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 /-!
 # Checkpoint K4.3: Soundness of `PackStep`, `ChordOp`, `CatalanTrie`, and `kempeRound`
@@ -3685,8 +3691,7 @@ theorem boundaryKempeSwap_comp (c : Configuration) (b : BoundaryColoring c)
     boundaryKempeSwap c (boundaryKempeSwap c b θ S1) θ S2 =
       boundaryKempeSwap c b θ (fun v => Bool.xor (S1 v) (S2 v)) := by
   funext i
-  dsimp [boundaryKempeSwap]
-  cases S1 i <;> cases S2 i <;> simp [θ.swap_inv]
+  cases h1 : S1 i <;> cases h2 : S2 i <;> simp [boundaryKempeSwap, h1, h2, θ.swap_inv]
 
 theorem validSwapChoice_xor (c : Configuration) (b b1 b2 : BoundaryColoring c)
     (θ : ColorPairing) (equiv_ab equiv_cd : Nat → Nat → Prop) (S1 S2 : Nat → Bool)
@@ -4328,7 +4333,7 @@ theorem testBit_buildThueMorseParityAux (rMod2 c W evenM oddM q r : Nat)
           rw [Nat.mul_comm 2 (q / 2), Nat.mul_assoc (q / 2) 2 W, Nat.add_assoc]
     change Nat.testBit (buildThueMorseParityAux rMod2 c nextW nextEven nextOdd) (q * W + r) = _
     rw [hIdx, ih nextW nextEven nextOdd (q / 2) r' hNextW_pos hNextEven hNextOdd hq_div hr'_lt]
-    dsimp [popcountK]
+    rw [show popcountK (c + 1) q = (q % 2) + popcountK c (q / 2) from rfl]
     rcases (by omega : q % 2 = 0 ∨ q % 2 = 1) with hq0 | hq1
     · have hr'_eq : r' = r := by dsimp [r']; rw [hq0, Nat.zero_mul, Nat.zero_add]
       rw [hr'_eq, hq0, Nat.zero_add,

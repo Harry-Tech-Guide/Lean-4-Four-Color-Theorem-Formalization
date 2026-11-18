@@ -1,8 +1,12 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Unavoidability.FastConfEquivBase
+public import FourColorTheorem.Math.Unavoidability.FastConfEquivBase
+
+@[expose] public section
 
 /-!
 # 633-Configuration `RConf` ↔ `FastConf` Block/Row Indexing Table
@@ -180,10 +184,15 @@ private def pDrop2 : List FastReducer.RConf := pDrop1.drop 128
 private def pDrop3 : List FastReducer.RConf := pDrop2.drop 128
 private def pDrop4 : List FastReducer.RConf := pDrop3.drop 128
 
+set_option maxRecDepth 200000 in
 private theorem chunk0_eq : parsedRConfList.take 128 = rcBlk_0.flatten ++ rcBlk_1.flatten := rfl
+set_option maxRecDepth 200000 in
 private theorem chunk1_eq : pDrop1.take 128 = rcBlk_2.flatten ++ rcBlk_3.flatten := rfl
+set_option maxRecDepth 200000 in
 private theorem chunk2_eq : pDrop2.take 128 = rcBlk_4.flatten ++ rcBlk_5.flatten := rfl
+set_option maxRecDepth 200000 in
 private theorem chunk3_eq : pDrop3.take 128 = rcBlk_6.flatten ++ rcBlk_7.flatten := rfl
+set_option maxRecDepth 200000 in
 private theorem chunk4_eq : pDrop4 = rcBlk_8.flatten ++ rcBlk_9.flatten := rfl
 
 private theorem parsedRConfList_chunks_eq :
@@ -308,16 +317,16 @@ theorem rcTable_cell_len (b r : Nat) (hb : b < 10) (hr : r < 8) :
     ((rcTable[b]'(by rw [rcTable_len]; exact hb))[r]'(by
       rw [rcTable_row_len b hb]; exact hr)).length = (if b < 9 then 8 else if r < 7 then 8 else 1) := by
   match b with
-  | 0 => simpa using (map_len_replicate_8 _ rcBlk_0_row_lens r hr).2
-  | 1 => simpa using (map_len_replicate_8 _ rcBlk_1_row_lens r hr).2
-  | 2 => simpa using (map_len_replicate_8 _ rcBlk_2_row_lens r hr).2
-  | 3 => simpa using (map_len_replicate_8 _ rcBlk_3_row_lens r hr).2
-  | 4 => simpa using (map_len_replicate_8 _ rcBlk_4_row_lens r hr).2
-  | 5 => simpa using (map_len_replicate_8 _ rcBlk_5_row_lens r hr).2
-  | 6 => simpa using (map_len_replicate_8 _ rcBlk_6_row_lens r hr).2
-  | 7 => simpa using (map_len_replicate_8 _ rcBlk_7_row_lens r hr).2
-  | 8 => simpa using (map_len_replicate_8 _ rcBlk_8_row_lens r hr).2
-  | 9 => simpa using (map_len_rcBlk_9 r hr).2
+  | 0 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_0_row_lens r hr).2
+  | 1 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_1_row_lens r hr).2
+  | 2 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_2_row_lens r hr).2
+  | 3 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_3_row_lens r hr).2
+  | 4 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_4_row_lens r hr).2
+  | 5 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_5_row_lens r hr).2
+  | 6 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_6_row_lens r hr).2
+  | 7 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_7_row_lens r hr).2
+  | 8 => simpa [rcTable] using (map_len_replicate_8 _ rcBlk_8_row_lens r hr).2
+  | 9 => simpa [rcTable] using (map_len_rcBlk_9 r hr).2
   | _ + 10 => omega
 
 private theorem rcFlatBlocks_item_len (b : Nat) (hb : b < 10) :

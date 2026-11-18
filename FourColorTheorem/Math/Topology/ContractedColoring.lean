@@ -1,10 +1,14 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 Released under Apache 2.0 license.
 -/
-import FourColorTheorem.Math.Topology.DiskExcision
-import FourColorTheorem.Math.Topology.ShortCircuits
-import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+public import FourColorTheorem.Math.Topology.DiskExcision
+public import FourColorTheorem.Math.Topology.ShortCircuits
+public import FourColorTheorem.Math.Unavoidability.FreeCompletionProjection
+
+@[expose] public section
 
 /-!
 # Stage V.1–V.2: Contracted Coloring Existence for All 384 C-Reducible Configurations
@@ -531,7 +535,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
   have h_b : ∀ i : Fin 3, SameOrbit H.face (rf ⟨(i.val + 1) % 3, Nat.mod_lt _ (by omega)⟩) (H.edge.f (cd i)) := by
     rintro ⟨iv, hiv⟩
     apply sameOrbit_face_of_sameVertex_dual darts h_mc
-    rcases (by omega : iv = 0 ∨ iv = 1 ∨ iv = 2) with rfl | rfl | rfl <;> dsimp [rf, cd]
+    rcases (by omega : iv = 0 ∨ iv = 1 ∨ iv = 2) with rfl | rfl | rfl <;> simp only [rf, cd]
     · exact dual_sameVertex_symm darts h_mc h1B
     · exact dual_sameVertex_symm darts h_mc hd_BCC
     · rw [H.edge_edge]; exact dual_sameVertex_symm darts h_mc h2A
@@ -546,7 +550,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
   have hres : H.dual.node.f d_AB = d_AC ∨ H.dual.node.inv d_AB = d_AC := by
     rcases mc_three_cycle_is_facial_dual H darts h_mc cut with h3L | h3R
     · have horb := (mc_three_cycle_facial_orbits_dual H darts h_mc cut h3L).2.2 ⟨0, by decide⟩ ⟨2, by decide⟩
-      dsimp [cut, cd] at horb
+      simp only [cut, cd] at horb
       rcases sameOrbit_node_cases darts h_mc horb with h0 | h1 | h2
       · exfalso
         have heq : H.edge.f d_AB = d_AC := by rw [← h0, H.edge_edge]
@@ -574,7 +578,7 @@ private theorem mc_three_cycle_consecutive {H : Hypermap} [DecidableEq H.Dart]
       have hcutR2 : cut.rev.cutDart ⟨2, by decide⟩ = H.edge.f (cd ⟨0, by decide⟩) := by
         dsimp [FaceCycleCut.rev]
       rw [hcutR0, hcutR2] at horb
-      dsimp [cd] at horb
+      simp only [cd] at horb
       rw [H.edge_edge] at horb
       rcases sameOrbit_node_cases darts h_mc horb with h0 | h1 | h2
       · exfalso
@@ -2145,7 +2149,7 @@ theorem mc_contractDeleted_isBridgeless
           SameOrbit H.face (rf ⟨(i.val + 1) % 4, Nat.mod_lt _ (by omega)⟩) (H.edge.f (cd i)) := by
         rintro ⟨iv, hiv⟩
         rcases (by omega : iv = 0 ∨ iv = 1 ∨ iv = 2 ∨ iv = 3) with rfl | rfl | rfl | rfl <;>
-        dsimp [rf, cd]
+        simp only [rf, cd]
         · exact h01b
         · exact h12b
         · exact h23b
@@ -2163,7 +2167,7 @@ theorem mc_contractDeleted_isBridgeless
           (areAdjacentVertices_iff H.dual darts h_mc.complete (Nat.le_refl _)
             (p.emb.rep u) (p.emb.rep b)).mpr ⟨w,
               sameVertex_dual_of_sameOrbit_face darts h_mc (sameOrbit_face_symm darts h_mc hwa),
-              by simpa [Hypermap.dual] using
+              by simpa [Hypermap.dual, cut, rf] using
                 sameVertex_dual_of_sameOrbit_face darts h_mc (sameOrbit_face_symm darts h_mc hwb)⟩
         exact mc_dual_L2_adj_impossible h hh hlen darts h_mc p hmc hua hab hub
           hua_ce.2.2.2.1 hab_ce.2.2.2.1 hadj_ub
@@ -2171,7 +2175,7 @@ theorem mc_contractDeleted_isBridgeless
           (areAdjacentVertices_iff H.dual darts h_mc.complete (Nat.le_refl _)
             (p.emb.rep a) (p.emb.rep v)).mpr ⟨w,
               sameVertex_dual_of_sameOrbit_face darts h_mc (sameOrbit_face_symm darts h_mc hwa),
-              by simpa [Hypermap.dual] using
+              by simpa [Hypermap.dual, cut, rf] using
                 sameVertex_dual_of_sameOrbit_face darts h_mc (sameOrbit_face_symm darts h_mc hwb)⟩
         exact mc_dual_L2_adj_impossible h hh hlen darts h_mc p hmc hab hbv hav
           hab_ce.2.2.2.1 hbv_ce.2.2.2.1 hadj_av
@@ -2243,7 +2247,7 @@ theorem mc_faceOrbit_exists_not_mem_contractSym
             rw [hce] at hbad; cases hbad
           rw [vx_rep_distinct_in_dual h hh hlen darts h_mc p hmc hqAce hqBce hqAn hqBn hqne] at hsv_AB
           cases hsv_AB
-        · rw [if_neg hm_orb]; rfl
+        · rw [if_neg hm_orb]
     have h5 : 5 ≤ orb.length := mc_faceDegree_ge_five H darts h_mc z
     have hnd_orb : orb.Nodup := getOrbit_nodup H.face darts.length z
     have hle_map : orb.length ≤ (c.contractEdges.map pick).length :=

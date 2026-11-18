@@ -1,5 +1,9 @@
+module
 
-import FourColorTheorem.Math.KempeConsistency
+
+public import FourColorTheorem.Math.KempeConsistency
+
+@[expose] public section
 
 -- Step 10: Combinatorial Planarity (Non-Crossing Matchings)
 

@@ -1,20 +1,24 @@
-import FourColorTheorem.Math.Batch.R6to10
-import FourColorTheorem.Math.Batch.R11
-import FourColorTheorem.Math.Batch.R12
-import FourColorTheorem.Math.Batch.R13
-import FourColorTheorem.Math.Batch.R14
-import FourColorTheorem.Math.Batch.CR8to10
-import FourColorTheorem.Math.Batch.CR11
-import FourColorTheorem.Math.Batch.CR12
-import FourColorTheorem.Math.Batch.CR13
-import FourColorTheorem.Math.Batch.CR14
-import FourColorTheorem.Math.U633Parser
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Soundness.DReduce
-import FourColorTheorem.Math.Soundness.CReduce
-import FourColorTheorem.Math.Soundness.StructuralVerification
-import FourColorTheorem.Math.CheckerSoundness.IterationElimination
-import FourColorTheorem.Math.KernelSoundness.KernelBridgeProof
+module
+
+public import FourColorTheorem.Math.Batch.R6to10
+public import FourColorTheorem.Math.Batch.R11
+public import FourColorTheorem.Math.Batch.R12
+public import FourColorTheorem.Math.Batch.R13
+public import FourColorTheorem.Math.Batch.R14
+public import FourColorTheorem.Math.Batch.CR8to10
+public import FourColorTheorem.Math.Batch.CR11
+public import FourColorTheorem.Math.Batch.CR12
+public import FourColorTheorem.Math.Batch.CR13
+public import FourColorTheorem.Math.Batch.CR14
+public import FourColorTheorem.Math.U633Parser
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Soundness.DReduce
+public import FourColorTheorem.Math.Soundness.CReduce
+public import FourColorTheorem.Math.Soundness.StructuralVerification
+public import FourColorTheorem.Math.CheckerSoundness.IterationElimination
+public import FourColorTheorem.Math.KernelSoundness.KernelBridgeProof
+
+@[expose] public section
 
 set_option maxHeartbeats 0
 set_option maxRecDepth 10000000

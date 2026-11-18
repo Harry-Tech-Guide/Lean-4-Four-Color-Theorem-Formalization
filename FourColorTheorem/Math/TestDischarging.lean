@@ -1,10 +1,14 @@
-import FourColorTheorem.Math.DischargingAlgo
-import FourColorTheorem.Math.Present7
-import FourColorTheorem.Math.Present8
-import FourColorTheorem.Math.Present9
-import FourColorTheorem.Math.Present10
-import FourColorTheorem.Math.Present11
-import FourColorTheorem.Math.Rules
+module
+
+public import FourColorTheorem.Math.DischargingAlgo
+public import FourColorTheorem.Math.Present7
+public import FourColorTheorem.Math.Present8
+public import FourColorTheorem.Math.Present9
+public import FourColorTheorem.Math.Present10
+public import FourColorTheorem.Math.Present11
+public import FourColorTheorem.Math.Rules
+
+@[expose] public section
 
 namespace Math.Discharging
 

@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Reducibility
-import FourColorTheorem.Math.Coloring
+module
+
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Reducibility
+public import FourColorTheorem.Math.Coloring
+
+@[expose] public section
 
 namespace Hypermap
 
@@ -78,7 +82,7 @@ def faceOf (e n : Perm D) : Perm D :=
 
 /-- Deletes the edge `{d, edge d}`: both darts are detached from their edge and node
     cycles (they become fixed points), and the face permutation is recomputed. -/
-def deleteEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
+abbrev deleteEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
   { Dart := H.Dart,
     edge := bypass (bypass H.edge d) (H.edge.f d),
     node := bypass (bypass H.node d) (H.edge.f d),
@@ -88,7 +92,7 @@ def deleteEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
     edge_node_face_id := fun x => by simp only [faceOf, Perm.right_inv] }
 
 /-- Edge contraction is edge deletion in the dual map. -/
-def contractEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
+abbrev contractEdge (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
   have : DecidableEq H.dual.Dart := inferInstanceAs (DecidableEq H.Dart)
   (H.dual.deleteEdge d).dual
 
@@ -182,7 +186,7 @@ theorem excisePerms_edge_apply_of_not_mem {D : Type} [DecidableEq D]
     rw [ih_app, h_del]
 
 /-- Excision of an embedded configuration yielding a hypermap with definitionally identical dart type. -/
-def exciseFixed (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart) : Hypermap :=
+abbrev exciseFixed (H : Hypermap) [DecidableEq H.Dart] (c : Math.Configuration) (f : Nat → H.Dart) : Hypermap :=
   let internalIndices := List.range c.interiorSize |>.map (fun i => c.ringSize + i)
   let internalDarts := internalIndices.map f
   let p := excisePerms (H.edge, H.node) internalDarts

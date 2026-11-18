@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.CheckerSoundness.LoopInvariants
+module
+
+public import FourColorTheorem.Math.CheckerSoundness.LoopInvariants
+
+@[expose] public section
 
 namespace Math
 namespace CheckerSoundness

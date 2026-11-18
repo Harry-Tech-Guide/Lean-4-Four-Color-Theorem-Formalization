@@ -1,6 +1,10 @@
+module
 
-import FourColorTheorem.Math.Configuration
-import FourColorTheorem.Math.EmptyLiveSet
+
+public import FourColorTheorem.Math.Configuration
+public import FourColorTheorem.Math.EmptyLiveSet
+
+@[expose] public section
 
 -- Step 12: The Grand Reducibility Link
 

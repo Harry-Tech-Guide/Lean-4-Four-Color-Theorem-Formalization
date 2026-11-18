@@ -1,3 +1,5 @@
+module
+
 /-
 Copyright (c) 2026 Four Color Theorem Formalization Project.
 All rights reserved.
@@ -6,9 +8,13 @@ Released under Apache 2.0 license.
 Stage R.2: Soundness of `rootedSubConfRec` + `checkIsoRec` into a faithful
 hypermap triangulation embedding (`AppearsInTriangulation`).
 -/
-import FourColorTheorem.Math.Unavoidability.AllDegreesDischarge
-import FourColorTheorem.Math.Unavoidability.ConfGeomCert
-import FourColorTheorem.Math.Unavoidability.FastConfEquiv
+public import FourColorTheorem.Math.Unavoidability.AllDegreesDischarge
+public import FourColorTheorem.Math.Unavoidability.ConfGeomCert
+public import FourColorTheorem.Math.Unavoidability.FastConfEquiv
+
+@[expose] public section
+
+attribute [-simp] Nat.lor_eq Nat.land_eq Nat.xor_eq Nat.shiftLeft_eq' Nat.shiftRight_eq'
 
 namespace Math.Unavoidability
 
@@ -3237,7 +3243,7 @@ end SWARAndIsoSoundness
 
 section AppearsInTriangulation
 
-private def checkRingAdj (rc : FastReducer.RConf) : Bool :=
+def checkRingAdj (rc : FastReducer.RConf) : Bool :=
   let r := rc.r
   (List.range r).all fun x =>
     let adjx := (rc.adj.getD x #[]).toList
@@ -3471,7 +3477,7 @@ private theorem matchesConfCycleFn_of_mem_cyc {h : Nat} (hh : h < 633)
   have hn_eq : c.totalNodes = rc.n := hhdr.2.2.2.2.1
   have hint_eq : c.interiorSize = rc.n - rc.r := hhdr.2.2.2.1
   have hu_lt_n : c.ringSize + iu < rc.n := by
-    have hc_4 : 4 ≤ rc.n - rc.r := by simpa [c, rc] using hhdr.2.2.2.2.2.2.2.1
+    have hc_4 : 4 ≤ rc.n - rc.r := by rw [← hint_eq]; exact hhdr.2.2.2.2.2.2.2.1
     have hsum : c.ringSize + iu < c.ringSize + c.interiorSize := Nat.add_lt_add_left hiu _
     rw [hr_eq, hint_eq] at hsum
     omega
@@ -3505,7 +3511,7 @@ private theorem matchesConfCycleFn_of_mem_cyc {h : Nat} (hh : h < 633)
     have hmc' : dartFn (c.ringSize + iu) (nbrs[j + 1]'hj1) =
         (nodePermOriented T orient).f (dartFn (c.ringSize + iu) (nbrs[j]'hj_nbr)) := by
       simpa [nbrs, rc, c, hmod'] using hmc_step
-    simpa [hr_eq, hv_eq, hw_eq] using hmc'
+    simpa [c, rc, hv_eq, hw_eq] using hmc'
   · have hj_last : j + 1 = nbrs.length := by omega
     have hmod : (j + 1) % nbrs.length = 0 := by rw [hj_last, Nat.mod_self]
     have hv_eq : cp.v = nbrs[j] + 1 := by
@@ -3524,7 +3530,7 @@ private theorem matchesConfCycleFn_of_mem_cyc {h : Nat} (hh : h < 633)
     have hmc' : dartFn (c.ringSize + iu) (nbrs[0]'hj1_pos) =
         (nodePermOriented T orient).f (dartFn (c.ringSize + iu) (nbrs[j]'hj_nbr)) := by
       simpa [nbrs, rc, c, hmod'] using hmc_step
-    simpa [hr_eq, hv_eq, hw_eq] using hmc'
+    simpa [c, rc, hv_eq, hw_eq] using hmc'
 
 theorem matchesConfCycle_of_mem_cyc {h : Nat} (hh : h < 633)
     {T : Hypermap} [DecidableEq T.Dart] {darts : List T.Dart}
@@ -3715,12 +3721,12 @@ private theorem canonCartDart_rot_chain {h : Nat} (hh : h < 633)
       rw [hraw]
       congr 1
     have hcp_mem : (ivu.cyc[j]'hj_cyc) ∈ ivu.cyc := List.getElem_mem hj_cyc
-    have hcyc_lt : j < ((parsedRConfList[h]'hlen).adj[(configOfRConf (parsedRConfList[h]'hlen)).ringSize + iu]'(
-        by have h := hiu_adj; dsimp only [c] at h; rw [h]; exact hu_adj)).toList.length := by
-      simpa [c, hiu_adj, nbrs] using hj_lt
     have hadj_row : ((parsedRConfList[h]'hlen).adj[(configOfRConf (parsedRConfList[h]'hlen)).ringSize + iu]'(
         by have h := hiu_adj; dsimp only [c] at h; rw [h]; exact hu_adj)).toList = nbrs := by
       simp [c, nbrs, hiu_adj]
+    have hcyc_lt : j < ((parsedRConfList[h]'hlen).adj[(configOfRConf (parsedRConfList[h]'hlen)).ringSize + iu]'(
+        by have h := hiu_adj; dsimp only [c] at h; rw [h]; exact hu_adj)).toList.length := by
+      rw [hadj_row]; exact hj_lt
     have hcp_spec : ivu.cyc[j]'hj_cyc =
         { v := nbrs[j] + 1,
           w := if hj1 : j + 1 < nbrs.length then nbrs[j + 1] + 1 else nbrs[0] + 1 } := by

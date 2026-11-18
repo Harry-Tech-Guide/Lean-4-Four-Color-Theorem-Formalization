@@ -1,9 +1,13 @@
-import FiveColorTheorem.Graph
+module
 
-import FiveColorTheorem.Kempe
+public import FiveColorTheorem.Graph
 
-import FiveColorTheorem.Planar
+public import FiveColorTheorem.Kempe
 
-import FiveColorTheorem.MainTheorem
+public import FiveColorTheorem.Planar
+
+public import FiveColorTheorem.MainTheorem
+
+@[expose] public section
 
 -- Ready for 4CT configs!

@@ -1,4 +1,8 @@
-import FourColorTheorem.Math.Kempe
+module
+
+public import FourColorTheorem.Math.Kempe
+
+@[expose] public section
 
 namespace Math
 
@@ -16,7 +20,7 @@ instance : Inhabited Configuration where
 def IsValidConfigColoring (c : Configuration) (color : Nat → Color) : Prop :=
   ∀ i j, i < c.totalNodes → j < c.totalNodes → c.adj i j = true → color i ≠ color j
 
-def BoundaryColoring (_ : Configuration) := Nat → Color
+abbrev BoundaryColoring (_ : Configuration) := Nat → Color
 
 def IsValidBoundaryColoring (c : Configuration) (b : BoundaryColoring c) : Prop :=
   ∀ i j, i < c.ringSize → j < c.ringSize → c.adj i j = true → b i ≠ b j

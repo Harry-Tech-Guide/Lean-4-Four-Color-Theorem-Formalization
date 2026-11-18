@@ -1,12 +1,16 @@
-import FourColorTheorem.Math.Hypermap
-import FourColorTheorem.Math.Planarity
-import FourColorTheorem.Math.Topology.Paths
-import FourColorTheorem.Math.Topology.OrbitLemmas
-import FourColorTheorem.Math.Topology.Surgery
-import FourColorTheorem.Math.Topology.Euler
-import FourColorTheorem.Math.Topology.ComponentLemmas
-import FourColorTheorem.Math.Topology.SubtypeSurgery
-import FourColorTheorem.Math.Topology.Genus
+module
+
+public import FourColorTheorem.Math.Hypermap
+public import FourColorTheorem.Math.Planarity
+public import FourColorTheorem.Math.Topology.Paths
+public import FourColorTheorem.Math.Topology.OrbitLemmas
+public import FourColorTheorem.Math.Topology.Surgery
+public import FourColorTheorem.Math.Topology.Euler
+public import FourColorTheorem.Math.Topology.ComponentLemmas
+public import FourColorTheorem.Math.Topology.SubtypeSurgery
+public import FourColorTheorem.Math.Topology.Genus
+
+@[expose] public section
 
 namespace Hypermap
 
@@ -788,7 +792,7 @@ theorem deleteEdgeSubtype_node_sameOrbit_iff (H : Hypermap) [DecidableEq H.Dart]
   exact sameOrbit_bypass_iff H.node d u.val w.val hu_ne_d hw_ne_d
 
 /-- Subtype edge contraction defined via duality from `deleteEdgeSubtype`. -/
-def contractEdgeSubtype (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
+abbrev contractEdgeSubtype (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) : Hypermap :=
   (H.dual.deleteEdgeSubtype d).dual
 
 instance instDecidableEqContractEdgeDart (H : Hypermap) [DecidableEq H.Dart] (d : H.Dart) :
@@ -811,7 +815,6 @@ theorem contractEdgeSubtype_isPlanar (H : Hypermap) [DecidableEq H.Dart]
   have h_del : (H.dual.deleteEdgeSubtype d).isPlanar fuel' darts' = true :=
     deleteEdgeSubtype_isPlanar H.dual darts h_nodup h_comp h_fuel h_dual_planar d hd_ne
       darts' h_nodup' h_comp' h_fuel'
-  dsimp only [contractEdgeSubtype]
   rw [isPlanar_dual_of_complete (H.dual.deleteEdgeSubtype d) darts' h_comp' h_fuel']
   exact h_del
 
@@ -1100,11 +1103,13 @@ theorem no_K5_subgraph_of_isPlanar (H : Hypermap) [DecidableEq H.Dart]
           h_keep_in_sub _ ((mem_k5KeepDarts_iff H e_dart _).mpr ⟨0, 4, by decide, Or.inr rfl⟩)⟩
     have hv'_val : ∀ i : Fin 5, SameOrbit H.node (v' i).val (v i) := by
       intro i
-      dsimp only [v']
-      split
-      · rename_i hi
+      by_cases hi : i.val < 4
+      · have hv'_eq : v' i = e_dart' i ⟨4, by omega⟩ hi := dif_pos hi
+        rw [hv'_eq]
         exact he_i i ⟨4, by omega⟩ hi
-      · rename_i hi
+      · have hv'_eq : v' i = ⟨H.edge.f (e_dart 0 4 (by decide)),
+            h_keep_in_sub _ ((mem_k5KeepDarts_iff H e_dart _).mpr ⟨0, 4, by decide, Or.inr rfl⟩)⟩ := dif_neg hi
+        rw [hv'_eq]
         have hi4 : i = 4 := Fin.ext (by omega)
         subst hi4
         exact he_j 0 4 (by decide)
@@ -1140,7 +1145,7 @@ theorem no_K5_subgraph_of_isPlanar (H : Hypermap) [DecidableEq H.Dart]
         | cons p ps ih =>
           rcases List.nodup_cons.mp hnd with ⟨hp_nmem, hps_nd⟩
           have hp : p.1 < p.2 := hlt p List.mem_cons_self
-          dsimp [List.flatMap]
+          rw [List.flatMap_cons]
           simp only [hp, ↓reduceDIte]
           have h_edge_ne : e_dart p.1 p.2 hp ≠ H.edge.f (e_dart p.1 p.2 hp) := by
             intro heq

@@ -1,6 +1,10 @@
-import FourColorTheorem.Math.Reflection
-import FourColorTheorem.Math.ReducibilityProof
-import FourColorTheorem.Math.EmptyLiveSet
+module
+
+public import FourColorTheorem.Math.Reflection
+public import FourColorTheorem.Math.ReducibilityProof
+public import FourColorTheorem.Math.EmptyLiveSet
+
+@[expose] public section
 
 namespace FourColorTheorem
 

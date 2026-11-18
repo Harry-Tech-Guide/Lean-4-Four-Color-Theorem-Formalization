@@ -1,3 +1,7 @@
+module
+
+@[expose] public section
+
 /-!
 # Self-Contained Formal Specification of Combinatorial Hypermaps & The Four Color Theorem
 
@@ -23,7 +27,7 @@ def Perm.one {D : Type} : Perm D :=
 
 instance {D : Type} : Inhabited (Perm D) := ⟨Perm.one⟩
 
-/-- A combinatorial hypermap represents a topological map via three permutations on darts. -/
+/-- An orientable combinatorial map (involutive hypermap) via three permutations on darts. -/
 structure Hypermap where
   Dart : Type
   edge : Perm Dart
@@ -114,10 +118,10 @@ def isPlanar (fuel : Nat) (darts : List H.Dart) : Bool :=
   let eulerChar := (countOrbits H.node fuel darts : Int) - (countOrbits H.edge fuel darts : Int) + (countOrbits H.face fuel darts : Int)
   eulerChar == 2 * (countComponents H fuel darts : Int)
 
-def sameVertex (d1 d2 : H.Dart) (fuel : Nat := 1000) : Bool := (getOrbit H.node fuel d1).contains d2
-def sameFace (d1 d2 : H.Dart) (fuel : Nat := 1000) : Bool := (getOrbit H.face fuel d1).contains d2
-def areAdjacentDarts (d1 d2 : H.Dart) (fuel : Nat := 1000) : Bool := sameVertex H (H.edge.f d1) d2 fuel
-def isBridge (d : H.Dart) (fuel : Nat := 1000) : Bool := sameFace H d (H.edge.f d) fuel
+def sameVertex (d1 d2 : H.Dart) (fuel : Nat) : Bool := (getOrbit H.node fuel d1).contains d2
+def sameFace (d1 d2 : H.Dart) (fuel : Nat) : Bool := (getOrbit H.face fuel d1).contains d2
+def areAdjacentDarts (d1 d2 : H.Dart) (fuel : Nat) : Bool := sameVertex H (H.edge.f d1) d2 fuel
+def isBridge (d : H.Dart) (fuel : Nat) : Bool := sameFace H d (H.edge.f d) fuel
 
 /-- A hypermap is bridgeless if no dart's opposite edge dart lies in the same face orbit. -/
 def isBridgeless (darts : List H.Dart) (fuel : Nat := darts.length) : Prop :=

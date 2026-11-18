@@ -1,6 +1,10 @@
+module
 
-import FourColorTheorem.Math.Kempe
-import FourColorTheorem.Math.Configuration
+
+public import FourColorTheorem.Math.Kempe
+public import FourColorTheorem.Math.Configuration
+
+@[expose] public section
 
 -- Step 8: Exterior Kempe Matchings
 
