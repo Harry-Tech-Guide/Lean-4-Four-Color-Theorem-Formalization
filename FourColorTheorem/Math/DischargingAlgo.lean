@@ -894,7 +894,9 @@ def evalQSteps (deg : Nat) (st : Nat) (cw : Bool) : List QStep → Nat → Nat �
         evalQSteps deg st cw rest img' usedMask'
 
 def rootedSubConfNat (deg : Nat) (st : Nat) (fc : FastConf) (x y : Nat) (cw : Bool) : Option Nat :=
-  strictNat (setImgNat (setImgNat (setImgNat emptyImgNat 0 (if cw then 1 else 0)) fc.z0 x) fc.z1 y) fun img2 =>
+  let im0 := if cw then 1532495540865888858358347027150309183618739122183602113
+             else 1532495540865888858358347027150309183618739122183602112
+  strictNat (setImgNat (setImgNat im0 fc.z0 x) fc.z1 y) fun img2 =>
   strictNat (Nat.lor (Nat.shiftLeft 1 x) (Nat.shiftLeft 1 y)) fun used0 =>
   match evalQSteps deg st cw fc.qSteps img2 used0 with
   | none => none
@@ -1431,7 +1433,9 @@ noncomputable def evalQStepsRec (deg : Nat) (st : Nat) (cw : Bool) (steps : List
     steps img0 used0
 
 noncomputable def rootedSubConfRec (deg : Nat) (st : Nat) (z0 z1 : Nat) (qSteps : List QStep) (x y : Nat) (cw : Bool) : Option Nat :=
-  strictNat (setImgNat (setImgNat (setImgNat emptyImgNat 0 (Bool.rec 0 1 cw)) z0 x) z1 y) fun img2 =>
+  let im0 := Bool.rec 1532495540865888858358347027150309183618739122183602112
+                      1532495540865888858358347027150309183618739122183602113 cw
+  strictNat (setImgNat (setImgNat im0 z0 x) z1 y) fun img2 =>
   strictNat (Nat.lor (Nat.shiftLeft 1 x) (Nat.shiftLeft 1 y)) fun used0 =>
   match evalQStepsRec deg st cw qSteps img2 used0 with
   | none => none
